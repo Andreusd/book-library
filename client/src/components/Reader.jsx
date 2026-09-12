@@ -3,8 +3,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { 
   ArrowLeft, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, 
-  Maximize2, Minimize2, ExternalLink, Moon, Sun, 
-  LayoutList, Check, RotateCw
+  Maximize2, Minimize2, ExternalLink, Moon, Sun
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 
@@ -19,13 +18,19 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
   const [loading, setLoading] = useState(true);
   const [rendering, setRendering] = useState(false);
   const [invertColors, setInvertColors] = useState(false);
-  const [showThumbnails, setShowThumbnails] = useState(false);
   const [pageInput, setPageInput] = useState(String(book.progress?.page || 1));
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const renderTaskRef = useRef(null);
+  const lastRenderedPageRef = useRef(null);
+  const onProgressUpdateRef = useRef(onProgressUpdate);
+  const lastWheelTimeRef = useRef(0);
+
+  useEffect(() => {
+    onProgressUpdateRef.current = onProgressUpdate;
+  }, [onProgressUpdate]);
 
   // Load PDF Document
   useEffect(() => {
@@ -75,19 +80,24 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
     })
     .then(r => r.json())
     .then(data => {
-      if (onProgressUpdate && data.progress) {
-        onProgressUpdate(book.id, data.progress);
+      if (onProgressUpdateRef.current && data.progress) {
+        onProgressUpdateRef.current(book.id, data.progress);
       }
     })
     .catch(err => console.error('Failed to save progress:', err));
-  }, [book.id, onProgressUpdate]);
+  }, [book.id]);
 
   // Render Page on Canvas
   const renderPage = useCallback((pageNum) => {
     if (!pdfDoc || !canvasRef.current) return;
 
     if (renderTaskRef.current) {
-      renderTaskRef.current.cancel();
+      try {
+        renderTaskRef.current.cancel();
+      } catch (e) {
+        // ignore cancellation
+      }
+      renderTaskRef.current = null;
     }
 
     setRendering(true);
@@ -117,10 +127,14 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
 
       task.promise.then(
         () => {
+          renderTaskRef.current = null;
           setRendering(false);
-          // Scroll back to top when flipping pages
-          if (containerRef.current) {
-            containerRef.current.scrollTop = 0;
+          // Only scroll back to top if the page actually changed, not on zoom or re-renders
+          if (lastRenderedPageRef.current !== pageNum) {
+            lastRenderedPageRef.current = pageNum;
+            if (containerRef.current) {
+              containerRef.current.scrollTop = 0;
+            }
           }
         },
         (err) => {
@@ -130,29 +144,37 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
           setRendering(false);
         }
       );
+    }).catch(err => {
+      console.error('Failed to get page:', err);
+      setRendering(false);
     });
   }, [pdfDoc, scale]);
 
+  // Render page when document, page number, or scale changes
   useEffect(() => {
     if (pdfDoc) {
       renderPage(currentPage);
       setPageInput(String(currentPage));
+    }
+  }, [pdfDoc, currentPage, scale, renderPage]);
+
+  // Persist progress to backend with debounce to prevent spamming
+  useEffect(() => {
+    if (!pdfDoc || totalPages < 1) return;
+    const timer = setTimeout(() => {
       saveProgress(currentPage, totalPages);
-    }
-  }, [pdfDoc, currentPage, scale, renderPage, saveProgress, totalPages]);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [pdfDoc, currentPage, totalPages, saveProgress]);
 
-  // Navigation handlers
-  const goToNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(prev => prev + 1);
-    }
-  };
+  // Page Navigation handlers
+  const goToNextPage = useCallback(() => {
+    setCurrentPage(prev => (prev < totalPages ? prev + 1 : prev));
+  }, [totalPages]);
 
-  const goToPrevPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(prev => prev - 1);
-    }
-  };
+  const goToPrevPage = useCallback(() => {
+    setCurrentPage(prev => (prev > 1 ? prev - 1 : prev));
+  }, []);
 
   const handlePageSubmit = (e) => {
     e.preventDefault();
@@ -172,15 +194,64 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
     }).catch(err => console.error('Failed to open locally:', err));
   };
 
-  // Keyboard navigation
+  // Keyboard navigation & smart scrolling
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.target.tagName === 'INPUT') return;
 
-      if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === 'Space') {
+      const container = containerRef.current;
+      const isScrollable = container && container.scrollHeight > container.clientHeight + 10;
+
+      if (e.key === 'ArrowRight') {
         goToNextPage();
-      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+      } else if (e.key === 'ArrowLeft') {
         goToPrevPage();
+      } else if (e.key === 'PageDown' || e.key === ' ') {
+        e.preventDefault();
+        if (isScrollable) {
+          const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 30;
+          if (atBottom) {
+            goToNextPage();
+          } else {
+            container.scrollBy({ top: container.clientHeight * 0.8, behavior: 'smooth' });
+          }
+        } else {
+          goToNextPage();
+        }
+      } else if (e.key === 'PageUp') {
+        e.preventDefault();
+        if (isScrollable) {
+          const atTop = container.scrollTop <= 30;
+          if (atTop) {
+            goToPrevPage();
+          } else {
+            container.scrollBy({ top: -container.clientHeight * 0.8, behavior: 'smooth' });
+          }
+        } else {
+          goToPrevPage();
+        }
+      } else if (e.key === 'ArrowDown') {
+        if (isScrollable) {
+          const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 10;
+          if (atBottom) {
+            goToNextPage();
+          } else {
+            container.scrollBy({ top: 120, behavior: 'smooth' });
+          }
+        } else {
+          goToNextPage();
+        }
+      } else if (e.key === 'ArrowUp') {
+        if (isScrollable) {
+          const atTop = container.scrollTop <= 10;
+          if (atTop) {
+            goToPrevPage();
+          } else {
+            container.scrollBy({ top: -120, behavior: 'smooth' });
+          }
+        } else {
+          goToPrevPage();
+        }
       } else if (e.key === 'Escape') {
         onClose();
       } else if (e.key === '+' || e.key === '=') {
@@ -192,7 +263,27 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentPage, totalPages, onClose]);
+  }, [goToNextPage, goToPrevPage, onClose]);
+
+  // Handle wheel on non-scrollable page to flip pages
+  const handleWheel = (e) => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const isScrollable = container.scrollHeight > container.clientHeight + 10;
+    if (!isScrollable) {
+      const now = Date.now();
+      if (now - lastWheelTimeRef.current < 450) return;
+
+      if (e.deltaY > 25) {
+        lastWheelTimeRef.current = now;
+        goToNextPage();
+      } else if (e.deltaY < -25) {
+        lastWheelTimeRef.current = now;
+        goToPrevPage();
+      }
+    }
+  };
 
   // Fit Width
   const fitWidth = () => {
@@ -344,27 +435,31 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
         {/* Scrollable Document Container */}
         <div 
           ref={containerRef}
-          className="flex-1 overflow-auto flex justify-center items-start p-4 sm:p-6"
+          tabIndex={0}
+          onWheel={handleWheel}
+          className="flex-1 overflow-y-auto overflow-x-auto p-4 sm:p-6 focus:outline-none scroll-smooth"
         >
           {loading ? (
-            <div className="flex flex-col items-center justify-center h-full gap-3 text-neutral-400">
+            <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-3 text-neutral-400">
               <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
               <p className="text-sm">{t('loadingBook')}</p>
             </div>
           ) : (
-            <div className="relative shadow-2xl rounded overflow-hidden">
-              <canvas 
-                ref={canvasRef}
-                className="max-w-none transition-filter duration-200 rounded"
-                style={{
-                  filter: invertColors ? 'invert(0.9) hue-rotate(180deg) brightness(0.95) contrast(1.1)' : 'none',
-                }}
-              />
-              {rendering && (
-                <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm text-neutral-300 text-xs px-2 py-1 rounded">
-                  {t('rendering')}
-                </div>
-              )}
+            <div className="min-h-full flex justify-center items-start">
+              <div className="relative shadow-2xl rounded">
+                <canvas 
+                  ref={canvasRef}
+                  className="max-w-none transition-filter duration-200 rounded block"
+                  style={{
+                    filter: invertColors ? 'invert(0.9) hue-rotate(180deg) brightness(0.95) contrast(1.1)' : 'none',
+                  }}
+                />
+                {rendering && (
+                  <div className="absolute top-3 right-3 bg-black/70 backdrop-blur-sm text-neutral-300 text-xs px-2.5 py-1 rounded shadow pointer-events-none">
+                    {t('rendering')}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

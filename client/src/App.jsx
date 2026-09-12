@@ -104,18 +104,9 @@ export default function App() {
   }, [loadBooks]);
 
   // Handle book progress update from Reader
-  const handleProgressUpdate = (bookId, newProgress) => {
-    // Update current books list
-    setBooks(prev => prev.map(b => {
-      if (b.id === bookId) {
-        return { ...b, progress: newProgress };
-      }
-      return b;
-    }));
-
-    // Reload continue reading list
-    loadContinueReading();
-  };
+  const handleProgressUpdate = useCallback((bookId, newProgress) => {
+    setBooks(prev => prev.map(b => (b.id === bookId ? { ...b, progress: newProgress } : b)));
+  }, []);
 
   // Right-click context menu handler
   const handleContextMenu = (e, book) => {
@@ -352,7 +343,10 @@ export default function App() {
       {activeBook && (
         <Reader
           book={activeBook}
-          onClose={() => setActiveBook(null)}
+          onClose={() => {
+            setActiveBook(null);
+            loadContinueReading();
+          }}
           onProgressUpdate={handleProgressUpdate}
         />
       )}
