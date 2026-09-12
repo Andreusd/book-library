@@ -1,0 +1,8 @@
+node_modules/
+.cache/
+__pycache__/
+*.pyc
+.env
+dist/
+client/dist/
+client/node_modules/

@@ -1,0 +1,87 @@
+import React, { useEffect, useRef } from 'react';
+import { FolderEdit, RotateCcw, Folder } from 'lucide-react';
+import { useI18n } from '../i18n';
+
+export default function ShelfContextMenu({ 
+  x, 
+  y, 
+  shelf, 
+  onClose, 
+  onOpenRename, 
+  onResetName 
+}) {
+  const menuRef = useRef(null);
+  const { t } = useI18n();
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        onClose();
+      }
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onClose]);
+
+  const menuWidth = 220;
+  const menuHeight = 120;
+  const posX = Math.min(Math.max(10, x), window.innerWidth - menuWidth - 10);
+  const posY = Math.min(Math.max(10, y), window.innerHeight - menuHeight - 10);
+
+  return (
+    <div
+      ref={menuRef}
+      style={{ left: `${posX}px`, top: `${posY}px` }}
+      className="fixed z-50 w-56 bg-neutral-900/95 backdrop-blur-xl border border-neutral-750 rounded-xl shadow-2xl py-1.5 text-xs text-neutral-200 select-none animate-in fade-in zoom-in-95 duration-100"
+    >
+      {/* Shelf header snippet */}
+      <div className="px-3 py-1.5 border-b border-neutral-800/80 mb-1">
+        <p className="font-semibold text-neutral-100 truncate text-[11px] leading-tight flex items-center gap-1.5">
+          <Folder className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+          <span>{shelf.name}</span>
+        </p>
+        <span className="text-[10px] text-neutral-400 font-mono">
+          {t('folderLabel', { folder: shelf.folder })}
+        </span>
+      </div>
+
+      {/* Rename Action */}
+      <button
+        onClick={() => {
+          onClose();
+          onOpenRename(shelf);
+        }}
+        className="w-full px-3 py-1.5 flex items-center gap-2.5 hover:bg-amber-500/15 hover:text-amber-300 text-left transition"
+      >
+        <FolderEdit className="w-4 h-4 text-amber-400 shrink-0" />
+        <span>{t('renameShelfVirtual')}</span>
+      </button>
+
+      {/* Reset Name Action (if customized) */}
+      {shelf.custom_name && (
+        <button
+          onClick={() => {
+            onClose();
+            onResetName(shelf);
+          }}
+          className="w-full px-3 py-1.5 flex items-center gap-2.5 hover:bg-neutral-800 text-neutral-300 hover:text-neutral-100 text-left transition"
+        >
+          <RotateCcw className="w-4 h-4 text-sky-400 shrink-0" />
+          <span>{t('restoreOriginalName')}</span>
+        </button>
+      )}
+    </div>
+  );
+}
