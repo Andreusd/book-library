@@ -17,7 +17,8 @@ class ProgressTracker:
         if os.path.exists(self.data_path):
             try:
                 with open(self.data_path, "r", encoding="utf-8") as f:
-                    return json.load(f)
+                    data = json.load(f)
+                    return {k: v for k, v in data.items() if v.get("page", 1) > 1 or v.get("status") == "completed"}
             except Exception as e:
                 print(f"Error loading progress file: {e}")
         return {}
@@ -35,6 +36,18 @@ class ProgressTracker:
 
     def set_progress(self, book_id: str, page: int, total_pages: int) -> Dict[str, Any]:
         with self._lock:
+            # A book is only in progress if read beyond page 1 (cover)
+            if page <= 1:
+                if book_id in self._data:
+                    del self._data[book_id]
+                    self._save()
+                return {
+                    "page": 1,
+                    "total_pages": total_pages,
+                    "percent": 0.0,
+                    "status": "not_started"
+                }
+
             pct = round((page / max(total_pages, 1)) * 100, 1)
             record = {
                 "page": page,
@@ -72,10 +85,12 @@ class ProgressTracker:
             return dict(self._data)
 
     def get_recent(self, limit: int = 8, include_completed: bool = False) -> List[Dict[str, Any]]:
-        """Returns list of book_ids sorted by most recently read, excluding completed books by default."""
+        """Returns list of book_ids sorted by most recently read, excluding completed books and books on page 1."""
         with self._lock:
             items = []
             for b_id, info in self._data.items():
+                if info.get("page", 1) <= 1:
+                    continue
                 if not include_completed and info.get("percent", 0) >= 100:
                     continue
                 items.append({

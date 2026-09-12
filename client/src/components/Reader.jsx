@@ -158,9 +158,10 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
     }
   }, [pdfDoc, currentPage, scale, renderPage]);
 
-  // Persist progress to backend with debounce to prevent spamming
+  // Persist progress to backend with debounce (only when progressed past page 1)
   useEffect(() => {
     if (!pdfDoc || totalPages < 1) return;
+    if (currentPage <= 1) return;
     const timer = setTimeout(() => {
       saveProgress(currentPage, totalPages);
     }, 400);

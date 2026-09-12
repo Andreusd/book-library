@@ -5,7 +5,11 @@ import { useI18n } from '../i18n';
 export default function ContinueReading({ books, onSelectBook, onContextMenu }) {
   const { t } = useI18n();
 
-  if (!books || books.length === 0) return null;
+  const inProgressBooks = (books || []).filter(
+    b => b.progress && b.progress.page > 1 && b.progress.percent < 100
+  );
+
+  if (inProgressBooks.length === 0) return null;
 
   return (
     <section className="mb-8">
@@ -13,12 +17,12 @@ export default function ContinueReading({ books, onSelectBook, onContextMenu }) 
         <Bookmark className="w-5 h-5 text-amber-500" />
         <h2 className="text-base font-semibold text-neutral-100">{t('continueReading')}</h2>
         <span className="text-xs text-neutral-500 font-normal">
-          {t('booksInProgress', { count: books.length })}
+          {t('booksInProgress', { count: inProgressBooks.length })}
         </span>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {books.map((book) => {
+        {inProgressBooks.map((book) => {
           const percent = book.progress ? Math.round(book.progress.percent) : 0;
 
           return (
