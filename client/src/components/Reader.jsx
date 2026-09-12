@@ -14,7 +14,27 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
   const [pdfDoc, setPdfDoc] = useState(null);
   const [currentPage, setCurrentPage] = useState(book.progress?.page || 1);
   const [totalPages, setTotalPages] = useState(book.progress?.total_pages || 1);
-  const [scale, setScale] = useState(1.2);
+  const getInitialZoom = () => {
+    try {
+      const localZoom = localStorage.getItem(`book_zoom_${book.id}`);
+      if (localZoom) {
+        const parsed = parseFloat(localZoom);
+        if (!isNaN(parsed) && parsed >= 0.4 && parsed <= 3.5) {
+          return parsed;
+        }
+      }
+    } catch (e) {}
+
+    if (book.progress?.zoom) {
+      const z = parseFloat(book.progress.zoom);
+      if (!isNaN(z) && z >= 0.4 && z <= 3.5) {
+        return z;
+      }
+    }
+    return 1.2;
+  };
+
+  const [scale, setScale] = useState(getInitialZoom);
   const [loading, setLoading] = useState(true);
   const [rendering, setRendering] = useState(false);
   const [invertColors, setInvertColors] = useState(false);
@@ -26,7 +46,12 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
   const renderTaskRef = useRef(null);
   const lastRenderedPageRef = useRef(null);
   const onProgressUpdateRef = useRef(onProgressUpdate);
+  const scaleRef = useRef(scale);
   const lastWheelTimeRef = useRef(0);
+
+  useEffect(() => {
+    scaleRef.current = scale;
+  }, [scale]);
 
   useEffect(() => {
     onProgressUpdateRef.current = onProgressUpdate;
@@ -75,7 +100,8 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
       body: JSON.stringify({
         book_id: book.id,
         page: page,
-        total_pages: total
+        total_pages: total,
+        zoom: scaleRef.current
       })
     })
     .then(r => r.json())
@@ -167,6 +193,27 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
     }, 400);
     return () => clearTimeout(timer);
   }, [pdfDoc, currentPage, totalPages, saveProgress]);
+
+  // Persist zoom level to localStorage and backend with debounce
+  useEffect(() => {
+    if (!pdfDoc) return;
+    try {
+      localStorage.setItem(`book_zoom_${book.id}`, String(scale));
+    } catch (e) {}
+
+    const timer = setTimeout(() => {
+      fetch('/api/book/zoom', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          book_id: book.id,
+          zoom: scale
+        })
+      }).catch(err => console.error('Failed to save zoom:', err));
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [book.id, scale, pdfDoc]);
 
   // Page Navigation handlers
   const goToNextPage = useCallback(() => {

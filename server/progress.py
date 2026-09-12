@@ -34,36 +34,62 @@ class ProgressTracker:
         with self._lock:
             return self._data.get(book_id)
 
-    def set_progress(self, book_id: str, page: int, total_pages: int) -> Dict[str, Any]:
+    def set_progress(self, book_id: str, page: int, total_pages: int, zoom: Optional[float] = None) -> Dict[str, Any]:
         with self._lock:
+            existing = self._data.get(book_id, {})
+            current_zoom = round(zoom, 2) if zoom is not None else existing.get("zoom", 1.2)
+
             # A book is only in progress if read beyond page 1 (cover)
             if page <= 1:
-                if book_id in self._data:
-                    del self._data[book_id]
-                    self._save()
-                return {
+                record = {
                     "page": 1,
                     "total_pages": total_pages,
                     "percent": 0.0,
+                    "zoom": current_zoom,
                     "status": "not_started"
                 }
+                self._data[book_id] = record
+                self._save()
+                return record
 
             pct = round((page / max(total_pages, 1)) * 100, 1)
             record = {
                 "page": page,
                 "total_pages": total_pages,
                 "percent": pct,
+                "zoom": current_zoom,
                 "updated_at": datetime.now().isoformat()
             }
             self._data[book_id] = record
             self._save()
             return record
 
+    def set_zoom(self, book_id: str, zoom: float) -> Dict[str, Any]:
+        """Saves preferred zoom for a book, preserving reading progress."""
+        with self._lock:
+            existing = self._data.get(book_id, {
+                "page": 1,
+                "total_pages": 1,
+                "percent": 0.0,
+                "status": "not_started"
+            })
+            existing["zoom"] = round(zoom, 2)
+            self._data[book_id] = existing
+            self._save()
+            return existing
+
     def reset_progress(self, book_id: str):
-        """Removes progress record completely for a book."""
+        """Resets progress to page 1 but preserves preferred zoom."""
         with self._lock:
             if book_id in self._data:
-                del self._data[book_id]
+                zoom = self._data[book_id].get("zoom", 1.2)
+                self._data[book_id] = {
+                    "page": 1,
+                    "total_pages": 1,
+                    "percent": 0.0,
+                    "zoom": zoom,
+                    "status": "not_started"
+                }
                 self._save()
 
     def mark_completed(self, book_id: str, total_pages: int = 1) -> Dict[str, Any]:

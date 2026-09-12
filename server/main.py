@@ -47,6 +47,11 @@ class ProgressPayload(BaseModel):
     book_id: str
     page: int
     total_pages: int
+    zoom: Optional[float] = None
+
+class ZoomPayload(BaseModel):
+    book_id: str
+    zoom: float
 
 class StatusPayload(BaseModel):
     book_id: str
@@ -178,9 +183,15 @@ def stream_pdf(book_id: str):
 
 @app.post("/api/progress")
 def save_progress(payload: ProgressPayload):
-    """Saves the current reading page for a book."""
-    record = tracker.set_progress(payload.book_id, payload.page, payload.total_pages)
+    """Saves the current reading page and zoom for a book."""
+    record = tracker.set_progress(payload.book_id, payload.page, payload.total_pages, payload.zoom)
     return {"status": "ok", "progress": record}
+
+@app.post("/api/book/zoom")
+def save_zoom(payload: ZoomPayload):
+    """Saves the preferred zoom level for a book."""
+    record = tracker.set_zoom(payload.book_id, payload.zoom)
+    return {"status": "ok", "record": record}
 
 @app.post("/api/book/status")
 def update_book_status(payload: StatusPayload):
