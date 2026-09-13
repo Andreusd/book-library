@@ -155,6 +155,7 @@ export default function Reader({
   const onProgressUpdateRef = useRef(onProgressUpdate);
   const scaleRef = useRef(scale);
   const lastWheelTimeRef = useRef(0);
+  const lastSwipeTimeRef = useRef(0);
 
   useEffect(() => {
     scaleRef.current = scale;
@@ -688,10 +689,49 @@ export default function Reader({
         return;
       }
 
-      // Normal Wheel on non-scrollable page to flip pages
       const container = containerRef.current;
       if (!container) return;
 
+      // 1. Two-finger horizontal trackpad swipe to flip pages
+      const absX = Math.abs(e.deltaX);
+      const absY = Math.abs(e.deltaY);
+
+      if (absX > 25 && absX > absY * 1.2) {
+        const now = Date.now();
+        if (now - lastSwipeTimeRef.current > 380) {
+          const isHorizScrollable = container.scrollWidth > container.clientWidth + 10;
+          if (!isHorizScrollable) {
+            e.preventDefault();
+            lastSwipeTimeRef.current = now;
+            if (e.deltaX > 0) {
+              goToNextPage();
+            } else {
+              goToPrevPage();
+            }
+            return;
+          } else {
+            const atRightEdge = container.scrollLeft + container.clientWidth >= container.scrollWidth - 15;
+            const atLeftEdge = container.scrollLeft <= 15;
+            if (e.deltaX > 0 && atRightEdge) {
+              e.preventDefault();
+              lastSwipeTimeRef.current = now;
+              goToNextPage();
+              return;
+            } else if (e.deltaX < 0 && atLeftEdge) {
+              e.preventDefault();
+              lastSwipeTimeRef.current = now;
+              goToPrevPage();
+              return;
+            }
+          }
+        } else {
+          // Debounce active swipe to prevent browser back/forward navigation
+          e.preventDefault();
+          return;
+        }
+      }
+
+      // 2. Normal Wheel on non-scrollable page to flip pages
       const isScrollable = container.scrollHeight > container.clientHeight + 10;
       if (!isScrollable) {
         const now = Date.now();
@@ -909,74 +949,109 @@ export default function Reader({
           />
         )}
 
-        {/* Scrollable Document Container */}
-        <div 
-          ref={containerRef}
-          tabIndex={0}
-          onContextMenu={handleTextContextMenu}
-          className="flex-1 overflow-y-auto overflow-x-auto p-4 sm:p-6 focus:outline-none scroll-smooth select-text"
-        >
-          {loading ? (
-            <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-3 text-neutral-400 select-none">
-              <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
-              <p className="text-sm">{t('loadingBook')}</p>
-            </div>
-          ) : (
-            <div className="min-h-full flex justify-center items-start">
-              {/* Document Page Wrapper with exact CSS dimensions and PDF.js scale variables */}
-              <div 
-                ref={pageWrapperRef}
-                className="relative shadow-2xl rounded"
-                style={{
-                  width: pageDims.width ? `${pageDims.width}px` : 'auto',
-                  height: pageDims.height ? `${pageDims.height}px` : 'auto',
-                  '--scale-factor': scale,
-                  '--total-scale-factor': scale,
-                  '--user-unit': 1,
-                  '--scale-round-x': '1px',
-                  '--scale-round-y': '1px',
-                }}
-              >
-                {/* Canvas raster background */}
-                <canvas 
-                  ref={canvasRef}
-                  className="max-w-none transition-filter duration-200 rounded block"
-                  style={{
-                    filter: invertColors ? 'invert(0.9) hue-rotate(180deg) brightness(0.95) contrast(1.1)' : 'none',
-                  }}
-                />
-
-                {/* Text Layer for text selection & copy */}
-                <div 
-                  ref={textLayerRef}
-                  className="textLayer"
-                  style={{
-                    filter: invertColors ? 'invert(0.9) hue-rotate(180deg) brightness(0.95) contrast(1.1)' : 'none',
-                  }}
-                />
-
-                {/* Annotation Layer for clickable links */}
-                <div 
-                  ref={annotationLayerRef}
-                  className="annotationLayer"
-                />
-
-                {/* Visual Highlights & Comment Badges Overlay */}
-                <HighlightOverlay
-                  annotations={annotations.filter(a => a.page === currentPage)}
-                  onUpdateComment={handleUpdateComment}
-                  onDeleteAnnotation={handleDeleteAnnotation}
-                  invertColors={invertColors}
-                />
-
-                {/* Rendering indicator badge */}
-                {rendering && (
-                  <div className="absolute top-3 right-3 bg-black/70 backdrop-blur-sm text-neutral-300 text-xs px-2.5 py-1 rounded shadow pointer-events-none z-10 select-none">
-                    {t('rendering')}
-                  </div>
-                )}
+        {/* Document Area & Floating Navigation Stage */}
+        <div className="relative flex-1 flex flex-col min-w-0 h-full overflow-hidden group/stage">
+          {/* Scrollable Document Container */}
+          <div 
+            ref={containerRef}
+            tabIndex={0}
+            onContextMenu={handleTextContextMenu}
+            className="flex-1 overflow-y-auto overflow-x-auto p-4 sm:p-6 focus:outline-none scroll-smooth select-text"
+          >
+            {loading ? (
+              <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-3 text-neutral-400 select-none">
+                <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                <p className="text-sm">{t('loadingBook')}</p>
               </div>
-            </div>
+            ) : (
+              <div className="min-h-full flex justify-center items-start">
+                {/* Document Page Wrapper with exact CSS dimensions and PDF.js scale variables */}
+                <div 
+                  ref={pageWrapperRef}
+                  className="relative shadow-2xl rounded"
+                  style={{
+                    width: pageDims.width ? `${pageDims.width}px` : 'auto',
+                    height: pageDims.height ? `${pageDims.height}px` : 'auto',
+                    '--scale-factor': scale,
+                    '--total-scale-factor': scale,
+                    '--user-unit': 1,
+                    '--scale-round-x': '1px',
+                    '--scale-round-y': '1px',
+                  }}
+                >
+                  {/* Canvas raster background */}
+                  <canvas 
+                    ref={canvasRef}
+                    className="max-w-none transition-filter duration-200 rounded block"
+                    style={{
+                      filter: invertColors ? 'invert(0.9) hue-rotate(180deg) brightness(0.95) contrast(1.1)' : 'none',
+                    }}
+                  />
+
+                  {/* Text Layer for text selection & copy */}
+                  <div 
+                    ref={textLayerRef}
+                    className="textLayer"
+                    style={{
+                      filter: invertColors ? 'invert(0.9) hue-rotate(180deg) brightness(0.95) contrast(1.1)' : 'none',
+                    }}
+                  />
+
+                  {/* Annotation Layer for clickable links */}
+                  <div 
+                    ref={annotationLayerRef}
+                    className="annotationLayer"
+                  />
+
+                  {/* Visual Highlights & Comment Badges Overlay */}
+                  <HighlightOverlay
+                    annotations={annotations.filter(a => a.page === currentPage)}
+                    onUpdateComment={handleUpdateComment}
+                    onDeleteAnnotation={handleDeleteAnnotation}
+                    invertColors={invertColors}
+                  />
+
+                  {/* Rendering indicator badge */}
+                  {rendering && (
+                    <div className="absolute top-3 right-3 bg-black/70 backdrop-blur-sm text-neutral-300 text-xs px-2.5 py-1 rounded shadow pointer-events-none z-10 select-none">
+                      {t('rendering')}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Floating Left Navigation Button */}
+          {currentPage > 1 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                goToPrevPage();
+              }}
+              className="absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 z-20 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-neutral-900/80 hover:bg-neutral-850/95 backdrop-blur-md border border-neutral-750/80 hover:border-amber-500/60 text-neutral-300 hover:text-white shadow-2xl flex items-center justify-center transition-all duration-200 opacity-60 hover:opacity-100 sm:opacity-0 sm:group-hover/stage:opacity-80 sm:hover:!opacity-100 hover:scale-110 active:scale-95 cursor-pointer select-none"
+              title={t('prevPageTitle')}
+              aria-label={t('prevPageTitle')}
+            >
+              <ChevronLeft className="w-6 h-6 sm:w-7 sm:h-7 text-neutral-300 hover:text-amber-400 transition-colors" />
+            </button>
+          )}
+
+          {/* Floating Right Navigation Button */}
+          {currentPage < totalPages && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                goToNextPage();
+              }}
+              className="absolute right-3 sm:right-5 top-1/2 -translate-y-1/2 z-20 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-neutral-900/80 hover:bg-neutral-850/95 backdrop-blur-md border border-neutral-750/80 hover:border-amber-500/60 text-neutral-300 hover:text-white shadow-2xl flex items-center justify-center transition-all duration-200 opacity-60 hover:opacity-100 sm:opacity-0 sm:group-hover/stage:opacity-80 sm:hover:!opacity-100 hover:scale-110 active:scale-95 cursor-pointer select-none"
+              title={t('nextPageTitle')}
+              aria-label={t('nextPageTitle')}
+            >
+              <ChevronRight className="w-6 h-6 sm:w-7 sm:h-7 text-neutral-300 hover:text-amber-400 transition-colors" />
+            </button>
           )}
         </div>
 

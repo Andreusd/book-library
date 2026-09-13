@@ -69,6 +69,7 @@ export BOOK_LIBRARY_PATH="/path/to/your/books"
 | `Right Arrow` / `Space` / `Page Down` | Next page in reader / Próxima página no leitor |
 | `Left Arrow` / `Page Up` | Previous page in reader / Página anterior no leitor |
 | `Up Arrow` / `Down Arrow` | Scroll page up/down (pure scrolling) / Rolar página para cima/baixo (rolagem suave) |
+| `Trackpad 2-Finger Swipe (Left / Right)` | Flip to Next / Previous page / Virar para Próxima / Anterior |
 | `+` / `-` | Zoom in / Zoom out |
 | `Ctrl + Scroll Wheel` | PDF smooth zoom / Zoom suave do PDF |
 | `Esc` | Close reader & return to library / Voltar à estante |
