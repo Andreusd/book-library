@@ -164,6 +164,12 @@ export default function Reader({
     onProgressUpdateRef.current = onProgressUpdate;
   }, [onProgressUpdate]);
 
+  useEffect(() => {
+    if (isFavorite !== undefined) {
+      setFavState(isFavorite);
+    }
+  }, [isFavorite]);
+
   // Lock body/html scroll while Reader is mounted to prevent background library scrollbar from leaking
   useEffect(() => {
     const originalBodyOverflow = document.body.style.overflow;

@@ -17,6 +17,25 @@ import SettingsModal from './components/SettingsModal';
 import LanguageSelector from './components/LanguageSelector';
 import { useI18n } from './i18n';
 
+// Helper to extract book ID from URL route (/book/:id, #/book/:id, ?book=:id)
+function getBookIdFromRoute() {
+  if (typeof window === 'undefined') return null;
+  const pathMatch = window.location.pathname.match(/\/book\/([^/?#]+)/);
+  if (pathMatch && pathMatch[1]) {
+    return decodeURIComponent(pathMatch[1]);
+  }
+  const hashMatch = window.location.hash.match(/#\/?book\/([^/?#]+)/);
+  if (hashMatch && hashMatch[1]) {
+    return decodeURIComponent(hashMatch[1]);
+  }
+  const searchParams = new URLSearchParams(window.location.search);
+  const qBook = searchParams.get('book');
+  if (qBook) {
+    return qBook;
+  }
+  return null;
+}
+
 export default function App() {
   const { t } = useI18n();
   const [shelves, setShelves] = useState([]);
@@ -32,6 +51,7 @@ export default function App() {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [sortBy, setSortBy] = useState('title_asc');
   const [activeBook, setActiveBook] = useState(null);
+  const [routeLoading, setRouteLoading] = useState(() => Boolean(getBookIdFromRoute()));
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     try {
       const saved = localStorage.getItem('sidebar_open');
@@ -135,6 +155,84 @@ export default function App() {
     })
     .catch(err => console.error('Failed to toggle favorite:', err));
   }, [loadFavorites]);
+
+  // Open reader and update browser route to /book/:id
+  const openReader = useCallback((book) => {
+    if (!book) return;
+    setActiveBook(book);
+    const targetPath = `/book/${encodeURIComponent(book.id)}`;
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({ bookId: book.id }, '', targetPath);
+    }
+  }, []);
+
+  // Close reader and reset route to /
+  const closeReader = useCallback(() => {
+    setActiveBook(null);
+    if (window.location.pathname.startsWith('/book/') || window.location.search.includes('book=') || window.location.hash.includes('book/')) {
+      window.history.pushState(null, '', '/');
+    }
+    loadContinueReading();
+    loadFavorites();
+  }, [loadContinueReading, loadFavorites]);
+
+  // Handle browser Back and Forward navigation (popstate)
+  useEffect(() => {
+    const handlePopState = () => {
+      const bookId = getBookIdFromRoute();
+      if (bookId) {
+        if (!activeBook || activeBook.id !== bookId) {
+          fetch(`/api/book/${encodeURIComponent(bookId)}`)
+            .then(res => {
+              if (!res.ok) throw new Error('Book not found');
+              return res.json();
+            })
+            .then(book => {
+              if (book && book.id) setActiveBook(book);
+            })
+            .catch(() => {
+              setActiveBook(null);
+              window.history.replaceState(null, '', '/');
+            });
+        }
+      } else {
+        if (activeBook) {
+          setActiveBook(null);
+          loadContinueReading();
+          loadFavorites();
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [activeBook, loadContinueReading, loadFavorites]);
+
+  // Load book directly from route on initial page load / reload
+  useEffect(() => {
+    const initialBookId = getBookIdFromRoute();
+    if (initialBookId) {
+      fetch(`/api/book/${encodeURIComponent(initialBookId)}`)
+        .then(res => {
+          if (!res.ok) throw new Error('Book not found');
+          return res.json();
+        })
+        .then(book => {
+          if (book && book.id) {
+            setActiveBook(book);
+          }
+        })
+        .catch(err => {
+          console.error('Failed to load book from route:', err);
+          window.history.replaceState(null, '', '/');
+        })
+        .finally(() => {
+          setRouteLoading(false);
+        });
+    } else {
+      setRouteLoading(false);
+    }
+  }, []);
 
   // Load Books
   const loadBooks = useCallback(() => {
@@ -386,7 +484,7 @@ export default function App() {
           {!selectedShelf && !debouncedQuery && continueReading.length > 0 && (
             <ContinueReading 
               books={continueReading} 
-              onSelectBook={(book) => setActiveBook(book)} 
+              onSelectBook={(book) => openReader(book)} 
               onContextMenu={handleContextMenu}
             />
           )}
@@ -395,7 +493,7 @@ export default function App() {
           {!selectedShelf && !debouncedQuery && favorites.length > 0 && (
             <FavoriteBooks
               books={favorites}
-              onSelectBook={(book) => setActiveBook(book)}
+              onSelectBook={(book) => openReader(book)}
               onContextMenu={handleContextMenu}
               onToggleFavorite={handleToggleFavorite}
             />
@@ -437,7 +535,7 @@ export default function App() {
                   key={book.id}
                   book={book}
                   isFavorite={favoriteIds.has(book.id)}
-                  onSelectBook={(selected) => setActiveBook(selected)}
+                  onSelectBook={(selected) => openReader(selected)}
                   onContextMenu={handleContextMenu}
                   onToggleFavorite={handleToggleFavorite}
                 />
@@ -482,16 +580,20 @@ export default function App() {
         </main>
       </div>
 
+      {/* Route Loading Fullscreen State */}
+      {routeLoading && !activeBook && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-neutral-950 text-neutral-400 gap-3 select-none">
+          <div className="w-9 h-9 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm font-medium text-neutral-300">{t('loadingBook')}</p>
+        </div>
+      )}
+
       {/* Embedded Fullscreen PDF Reader */}
       {activeBook && (
         <Reader
           book={activeBook}
           isFavorite={favoriteIds.has(activeBook.id)}
-          onClose={() => {
-            setActiveBook(null);
-            loadContinueReading();
-            loadFavorites();
-          }}
+          onClose={closeReader}
           onProgressUpdate={handleProgressUpdate}
           onToggleFavorite={handleToggleFavorite}
         />
@@ -505,7 +607,7 @@ export default function App() {
           book={contextMenu.book}
           isFavorite={favoriteIds.has(contextMenu.book.id)}
           onClose={() => setContextMenu({ isOpen: false, x: 0, y: 0, book: null })}
-          onOpenReader={(book) => setActiveBook(book)}
+          onOpenReader={(book) => openReader(book)}
           onMarkStatus={handleMarkStatus}
           onToggleFavorite={handleToggleFavorite}
         />
