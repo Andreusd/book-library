@@ -8,9 +8,9 @@ export const translations = {
     filterShelvesPlaceholder: 'Filter shelves...',
     allShelves: 'All Shelves',
     categories: 'Categories ({count})',
-    oneDriveSafe: 'OneDrive Protected (Read-Only)',
+    librarySafe: 'Source Folder Protected (Read-Only)',
     customNameNotice: 'Custom display name in app',
-    oneDriveFolderLabel: 'OneDrive Folder: {folder}',
+    originalFolderLabel: 'Original Folder: {folder}',
     toggleSidebar: 'Toggle menu (Ctrl+B)',
     collapseSidebar: 'Collapse menu (Ctrl+B)',
     expandSidebar: 'Expand menu (Ctrl+B)',
@@ -36,10 +36,13 @@ export const translations = {
     readButton: 'Read',
     openInSystemTitle: 'Open in Windows default app (Firefox, Acrobat)',
 
-    // Empty state
+    // Empty state & Onboarding
     noBooksFound: 'No books found',
     noBooksDesc: "We couldn't find any books matching your search or in this category.",
     clearSearch: 'Clear search',
+    setupPromptTitle: 'Welcome to Digital Bookshelf',
+    setupPromptDesc: 'To get started, configure the folder where your PDF books are located.',
+    configureLibrary: 'Configure Library Folder',
 
     // Reader
     backToLibrary: 'Library',
@@ -69,12 +72,25 @@ export const translations = {
     restoreOriginalName: 'Restore Original Name',
     renameModalTitle: 'Rename Shelf (Virtual)',
     realFolderPrefix: 'Real folder: ',
-    renameDisclaimer: 'This name is only displayed inside the app. Real folders on OneDrive remain 100% untouched.',
+    renameDisclaimer: 'This name is only displayed inside the app. Real filesystem folders remain 100% untouched.',
     shelfNameLabel: 'Shelf Display Name:',
     renamePlaceholder: 'e.g. Advanced Algorithms',
     restoreOriginal: 'Restore Original',
     cancel: 'Cancel',
     saveName: 'Save Name',
+
+    // Settings
+    settings: 'Settings',
+    settingsTitle: 'Library Settings',
+    libraryPathLabel: 'Books Directory Path',
+    libraryPathPlaceholder: 'e.g. C:\\Books or /home/user/books',
+    libraryPathHelp: 'Enter the folder where your PDF books or category folders are stored.',
+    validFolder: 'Valid folder: {books} books across {shelves} shelves found',
+    noPdfsFound: 'Directory exists, but no PDF files were found inside',
+    pathNotFound: 'Directory does not exist on disk',
+    notADirectory: 'Path is a file, not a directory',
+    saveSettings: 'Save & Rescan',
+    settingsSaved: 'Settings saved successfully!',
   },
   pt: {
     // Sidebar
@@ -83,9 +99,9 @@ export const translations = {
     filterShelvesPlaceholder: 'Filtrar estantes...',
     allShelves: 'Todas as Estantes',
     categories: 'Categorias ({count})',
-    oneDriveSafe: 'OneDrive Protegido (Modo Leitura)',
+    librarySafe: 'Pasta de Origem Protegida (Modo Leitura)',
     customNameNotice: 'Nome personalizado no app',
-    oneDriveFolderLabel: 'Pasta OneDrive: {folder}',
+    originalFolderLabel: 'Pasta Original: {folder}',
     toggleSidebar: 'Alternar menu (Ctrl+B)',
     collapseSidebar: 'Recolher menu (Ctrl+B)',
     expandSidebar: 'Expandir menu (Ctrl+B)',
@@ -111,10 +127,13 @@ export const translations = {
     readButton: 'Ler',
     openInSystemTitle: 'Abrir no app padrão do Windows (Firefox, Acrobat)',
 
-    // Empty state
+    // Empty state & Onboarding
     noBooksFound: 'Nenhum livro encontrado',
     noBooksDesc: 'Não encontramos nenhum livro correspondente à sua busca ou nesta categoria.',
     clearSearch: 'Limpar pesquisa',
+    setupPromptTitle: 'Bem-vindo à Estante Digital',
+    setupPromptDesc: 'Para começar, configure a pasta onde seus livros em PDF estão localizados.',
+    configureLibrary: 'Configurar Pasta de Livros',
 
     // Reader
     backToLibrary: 'Biblioteca',
@@ -144,12 +163,25 @@ export const translations = {
     restoreOriginalName: 'Restaurar Nome Original',
     renameModalTitle: 'Renomear Estante (Virtual)',
     realFolderPrefix: 'Pasta real: ',
-    renameDisclaimer: 'Este nome é exibido apenas dentro do app. Os arquivos e pastas reais no OneDrive permanecem 100% inalterados.',
+    renameDisclaimer: 'Este nome é exibido apenas dentro do app. Os arquivos e pastas reais no disco permanecem 100% inalterados.',
     shelfNameLabel: 'Nome de Exibição da Estante:',
     renamePlaceholder: 'Ex: Algoritmos Avançados',
     restoreOriginal: 'Restaurar Original',
     cancel: 'Cancelar',
     saveName: 'Salvar Nome',
+
+    // Settings
+    settings: 'Configurações',
+    settingsTitle: 'Configurações da Biblioteca',
+    libraryPathLabel: 'Caminho da Pasta de Livros',
+    libraryPathPlaceholder: 'Ex: C:\\Livros ou /home/usuario/livros',
+    libraryPathHelp: 'Insira a pasta onde seus livros em PDF ou pastas de categorias estão armazenados.',
+    validFolder: 'Pasta válida: {books} livros encontrados em {shelves} estantes',
+    noPdfsFound: 'A pasta existe, mas nenhum arquivo PDF foi encontrado dentro',
+    pathNotFound: 'O diretório não existe no disco',
+    notADirectory: 'O caminho informado é um arquivo, não uma pasta',
+    saveSettings: 'Salvar e Reexaminar',
+    settingsSaved: 'Configurações salvas com sucesso!',
   }
 };
 

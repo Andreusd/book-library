@@ -121,7 +121,7 @@ export default function Sidebar({
                       ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' 
                       : 'text-neutral-300 hover:bg-neutral-850 hover:text-white'}
                   `}
-                  title={s.custom_name ? `${s.name} (${t('oneDriveFolderLabel', { folder: s.folder })})` : s.name}
+                  title={s.custom_name ? `${s.name} (${t('originalFolderLabel', { folder: s.folder })})` : s.name}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <Folder className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-amber-400' : 'text-neutral-500'}`} />

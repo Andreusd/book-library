@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Search, SlidersHorizontal, Menu, X, BookOpen, 
-  ArrowUpDown, FolderOpen, RefreshCw, PanelLeftClose, PanelLeftOpen 
+  ArrowUpDown, FolderOpen, RefreshCw, PanelLeftClose, PanelLeftOpen,
+  Settings 
 } from 'lucide-react';
 
 import Sidebar from './components/Sidebar';
@@ -11,6 +12,7 @@ import Reader from './components/Reader';
 import ContextMenu from './components/ContextMenu';
 import ShelfContextMenu from './components/ShelfContextMenu';
 import ShelfRenameModal from './components/ShelfRenameModal';
+import SettingsModal from './components/SettingsModal';
 import LanguageSelector from './components/LanguageSelector';
 import { useI18n } from './i18n';
 
@@ -22,6 +24,7 @@ export default function App() {
   const [books, setBooks] = useState([]);
   const [continueReading, setContinueReading] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [sortBy, setSortBy] = useState('title_asc');
@@ -335,6 +338,15 @@ export default function App() {
             </div>
 
             <LanguageSelector />
+
+            {/* Settings Button */}
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="p-1.5 rounded-lg bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-amber-400 hover:border-amber-500/30 transition shadow-sm"
+              title={t('settings')}
+            >
+              <Settings className="w-4 h-4" />
+            </button>
           </div>
         </header>
 
@@ -384,6 +396,23 @@ export default function App() {
                   onContextMenu={handleContextMenu}
                 />
               ))}
+            </div>
+          ) : totalBooks === 0 && !debouncedQuery ? (
+            <div className="text-center py-20 flex flex-col items-center justify-center max-w-md mx-auto">
+              <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-4 shadow-lg shadow-amber-500/10">
+                <FolderOpen className="w-8 h-8" />
+              </div>
+              <h3 className="text-lg font-bold text-neutral-100">{t('setupPromptTitle')}</h3>
+              <p className="text-xs text-neutral-400 mt-2 mb-6 leading-relaxed">
+                {t('setupPromptDesc')}
+              </p>
+              <button
+                onClick={() => setSettingsOpen(true)}
+                className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-bold rounded-xl inline-flex items-center gap-2 shadow-xl shadow-amber-500/20 transition cursor-pointer"
+              >
+                <Settings className="w-4 h-4" />
+                <span>{t('configureLibrary')}</span>
+              </button>
             </div>
           ) : (
             <div className="text-center py-20 flex flex-col items-center justify-center">
@@ -450,6 +479,17 @@ export default function App() {
         isOpen={renameModal.isOpen}
         onClose={() => setRenameModal({ isOpen: false, shelf: null })}
         onSave={handleSaveShelfName}
+      />
+
+      {/* Library Settings Modal */}
+      <SettingsModal
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onSaved={() => {
+          loadShelves();
+          loadBooks();
+          loadContinueReading();
+        }}
       />
     </div>
   );

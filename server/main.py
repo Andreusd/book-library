@@ -64,6 +64,47 @@ class RenameShelfPayload(BaseModel):
 class OpenSystemPayload(BaseModel):
     book_id: str
 
+class SettingsPayload(BaseModel):
+    library_path: str
+
+class ValidatePathPayload(BaseModel):
+    path: str
+
+@app.get("/api/settings")
+def get_settings():
+    """Returns the current book library folder path and validation status."""
+    path = scanner.library_path
+    validation = scanner.config_mgr.validate_path(path) if path else {
+        "valid": False, "exists": False, "is_dir": False, "shelf_count": 0, "book_count": 0, "error": "path_empty", "normalized_path": ""
+    }
+    return {
+        "library_path": path,
+        "validation": validation,
+    }
+
+@app.post("/api/settings/validate")
+def validate_settings_path(payload: ValidatePathPayload):
+    """Validates a prospective book library folder path."""
+    return scanner.config_mgr.validate_path(payload.path)
+
+@app.post("/api/settings")
+def save_settings(payload: SettingsPayload):
+    """Saves and persists a new book library folder path."""
+    clean = payload.library_path.strip()
+    validation = scanner.config_mgr.validate_path(clean)
+    if clean and not validation["valid"]:
+        raise HTTPException(status_code=400, detail=f"Invalid folder path: {validation.get('error')}")
+
+    saved_path = scanner.set_library_path(clean)
+    books = scanner.get_books()
+    cover_mgr.pre_cache_all(books)
+    return {
+        "status": "ok",
+        "library_path": saved_path,
+        "shelves_count": len(scanner.get_shelves()),
+        "books_count": len(books)
+    }
+
 @app.get("/api/shelves")
 def list_shelves():
     """Returns list of all bookshelf categories with book counts."""
@@ -77,7 +118,7 @@ def list_shelves():
 
 @app.post("/api/shelves/rename")
 def rename_shelf(payload: RenameShelfPayload):
-    """Virtually renames a bookshelf inside the app without changing the OneDrive folder."""
+    """Virtually renames a bookshelf inside the app without changing the physical folder."""
     scanner.set_shelf_alias(payload.shelf_id, payload.custom_name)
     return {
         "status": "ok",

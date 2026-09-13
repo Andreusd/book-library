@@ -1,64 +1,81 @@
-# 📚 Estante Digital - Book Library WebApp
+# 📚 Digital Bookshelf / Estante Digital
 
-Aplicação web moderna, rápida e responsiva para visualização e leitura da sua biblioteca de livros em PDF localizada em `C:\Users\andre\OneDrive\Andreusd\Livros`.
+A modern, fast, responsive, and lightweight web application to organize, browse, and read your personal collection of PDF books.
 
-## 🚀 Como Executar
+---
 
-Basta dar **duplo clique** no arquivo:
+## 🚀 Quick Start / Como Executar
+
+### Windows (Quick Launch)
+Double click:
 ```cmd
 run.bat
 ```
-Ou pelo terminal:
+
+### Terminal
 ```bash
 python -m uvicorn server.main:app --host 127.0.0.1 --port 8000
 ```
-O app estará acessível em: **[http://127.0.0.1:8000](http://127.0.0.1:8000)**
+Open your browser at: **[http://127.0.0.1:8000](http://127.0.0.1:8000)**
 
-### 📦 Configuração Inicial (apenas se clonar em novo ambiente)
+---
+
+## ⚙️ Library Folder Configuration / Configuração da Pasta de Livros
+
+You can point the application to **any folder on your computer** where your PDF books are stored:
+1. Click the **⚙️ Settings** button in the top navigation bar.
+2. Enter your books directory path (e.g. `D:\Books`, `C:\Users\You\Documents\Books`, or `/home/user/books`).
+3. The app will validate the directory live and display the number of detected books and shelves.
+4. Click **Save & Rescan**—your library will load and persist across sessions in `.cache/config.json`.
+
+Alternatively, configure the path via environment variable:
 ```bash
-# 1. Instalar dependências Python
-pip install -r server/requirements.txt
-
-# 2. Instalar dependências e gerar o build do frontend
-cd client
-npm install
-npm run build
-cd ..
+export BOOK_LIBRARY_PATH="/path/to/your/books"
 ```
 
----
-
-## ✨ Recursos Implementados
-
-* **Estrutura por Estantes**: Cada pasta da sua biblioteca é mapeada diretamente como uma estante (ex: *Algoritmos e Estruturas*, *Arquitetura de Software*, *Computação*, *IA*, *Matemática*, etc.).
-* **Capas Idênticas ao Windows Explorer**: Renderização de alta fidelidade da primeira página de cada PDF usando o motor Google PDFium (`pypdfium2`).
-* **Segurança Total para o OneDrive**: A pasta do OneDrive permanece **100% em modo somente-leitura**. O cache de capas e o progresso de leitura são salvos localmente na pasta `.cache/` do projeto, sem poluir seus arquivos na nuvem.
-* **Clique Direto para Leitura**: Clicar em qualquer capa abre instantaneamente o leitor em tela cheia no navegador.
-* **Memória de Página (Progresso)**: O app salva automaticamente a página exata em que você parou e a porcentagem lida.
-* **Sessão "Continuar Lendo"**: Na tela inicial, os livros lidos recentemente aparecem no topo para retomada imediata com 1 clique.
-* **Leitor PDF Integrado**:
-  * Navegação rápida por páginas (setas, teclado, input numérico).
-  * Zoom ajustável (+, -, ajustar à largura).
-  * Modo leitura noturna (inversão de cores para PDFs claros).
-  * Botão de atalho para abrir no leitor padrão do Windows (Firefox, Acrobat, Sumatra).
-* **Busca Global Instantânea**: Pesquise títulos instantaneamente digitando ou pressionando `/`.
-* **Filtros e Ordenação**: Ordene por nome (A-Z ou Z-A), tamanho do arquivo ou livros lidos recentemente.
+> [!NOTE]
+> **Source Folder Safety (100% Read-Only)**:
+> The application will **never** alter, write to, or delete your source book files. All generated covers, virtual shelf aliases, and reading progress records are stored locally in the isolated `.cache/` folder.
 
 ---
 
-## ⌨️ Atalhos do Teclado
+## ✨ Features / Recursos
 
-| Tecla | Ação |
+* **Customizable & Portable Library**: Point to any folder of PDFs on any machine; works with categorized subfolders or direct PDFs.
+* **Explorer-Fidelity WebP Covers**: Automatically extracts high-resolution page-1 thumbnails using Google PDFium (`pypdfium2`).
+* **Virtual Shelf Renaming**: Right-click any shelf in the sidebar to give it a custom display name without altering the filesystem.
+* **Embedded Fullscreen PDF Reader**:
+  * **Text Selection & Copy**: Highlight and copy text directly from the PDF page (`Ctrl + C`).
+  * **Interactive Links**: Clickable Table of Contents destinations jump to chapters; external links open safely in a new tab.
+  * **Per-Book Zoom Memory**: Remembers your preferred zoom factor for each book.
+  * **Ctrl + Wheel Smooth Zoom**: Zoom seamlessly inside the viewer without scaling the browser page.
+  * **Night Mode**: Instant high-contrast dark reading mode.
+  * **Open in Windows Viewer**: One-click shortcut to launch the book in your default PDF app (Acrobat, Sumatra, Firefox).
+* **Reading Progress & "Continue Reading"**:
+  * Tracks current page and reading percentage.
+  * Books advance to the *Continue Reading* shelf only after reading beyond page 1 (covers don't mark books as started).
+  * Right-click any book to *Mark as Not Started* (instantly removes from Continue Reading) or *Mark as Completed*.
+* **Bilingual UI (EN / PT)**: Switch between English and Portuguese with a single click in the header.
+* **Responsive Toggleable Sidebar**: Smooth sidebar collapse with `Ctrl + B` and backdrop overlay on mobile.
+* **Instant Global Search & Sorting**: Press `/` to search titles in real time, or sort by name, file size, or recent reading.
+
+---
+
+## ⌨️ Keyboard Shortcuts / Atalhos do Teclado
+
+| Key / Tecla | Action / Ação |
 | :--- | :--- |
-| `/` | Focar na barra de busca |
-| `Seta Direita` / `Espaço` / `Page Down` | Próxima página (no leitor) |
-| `Seta Esquerda` / `Page Up` | Página anterior (no leitor) |
-| `+` / `-` | Aumentar / diminuir zoom |
-| `Esc` | Sair do leitor e voltar à estante |
+| `/` | Focus search bar / Focar na barra de busca |
+| `Ctrl + B` | Toggle sidebar / Alternar menu lateral |
+| `Right Arrow` / `Space` / `Page Down` | Next page in reader / Próxima página no leitor |
+| `Left Arrow` / `Page Up` | Previous page in reader / Página anterior no leitor |
+| `+` / `-` | Zoom in / Zoom out |
+| `Ctrl + Scroll Wheel` | PDF smooth zoom / Zoom suave do PDF |
+| `Esc` | Close reader & return to library / Voltar à estante |
 
 ---
 
-## 🛠️ Tecnologias
+## 🛠️ Tech Stack
 
-* **Backend**: Python 3.14, FastAPI, Uvicorn, PyPDFium2, Pillow.
+* **Backend**: Python 3.10+, FastAPI, Uvicorn, PyPDFium2, Pillow.
 * **Frontend**: React 19, Vite, Tailwind CSS v4, Lucide React, PDF.js.

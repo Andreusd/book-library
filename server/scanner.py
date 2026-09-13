@@ -5,8 +5,8 @@ from typing import List, Dict, Any, Optional
 
 import json
 import threading
+from .config import ConfigManager
 
-DEFAULT_LIBRARY_PATH = r"C:\Users\andre\OneDrive\Andreusd\Livros"
 ALIASES_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".cache", "shelf_aliases.json"))
 
 def format_size(bytes_size: int) -> str:
@@ -28,6 +28,8 @@ def clean_title(filename: str) -> str:
 
 def format_shelf_name(shelf_dir: str) -> str:
     """Converts a directory name like 'Algoritmos-e-Estruturas' into 'Algoritmos e Estruturas'."""
+    if shelf_dir == "_general":
+        return "General"
     return shelf_dir.replace('-', ' ').strip()
 
 def compute_book_id(shelf: str, filename: str) -> str:
@@ -36,11 +38,19 @@ def compute_book_id(shelf: str, filename: str) -> str:
     return hashlib.sha1(raw.encode('utf-8')).hexdigest()[:16]
 
 class LibraryScanner:
-    def __init__(self, library_path: str = DEFAULT_LIBRARY_PATH, aliases_path: str = ALIASES_PATH):
-        self.library_path = library_path
+    def __init__(self, config_mgr: Optional[ConfigManager] = None, aliases_path: str = ALIASES_PATH):
+        self.config_mgr = config_mgr or ConfigManager()
+        self.library_path = self.config_mgr.get_library_path()
         self.aliases_path = aliases_path
         self._lock = threading.RLock()
         self._aliases = self._load_aliases()
+
+    def set_library_path(self, new_path: str) -> str:
+        """Sets and persists a new book library folder path."""
+        with self._lock:
+            resolved = self.config_mgr.set_library_path(new_path)
+            self.library_path = resolved
+            return resolved
 
     def _load_aliases(self) -> Dict[str, str]:
         if os.path.exists(self.aliases_path):
@@ -77,19 +87,40 @@ class LibraryScanner:
 
     def get_shelves(self) -> List[Dict[str, Any]]:
         """Returns list of all bookshelf categories with metadata and book counts."""
-        if not os.path.exists(self.library_path):
+        if not self.library_path or not os.path.isdir(self.library_path):
             return []
 
         shelves = []
-        entries = sorted(os.listdir(self.library_path))
+        try:
+            entries = sorted(os.listdir(self.library_path))
+        except Exception:
+            return []
+
         with self._lock:
             aliases = dict(self._aliases)
+
+        # Check for direct PDFs in root directory
+        root_pdfs = [f for f in entries if f.lower().endswith('.pdf') and os.path.isfile(os.path.join(self.library_path, f))]
+        if root_pdfs:
+            custom_name = aliases.get("_general", "")
+            orig_name = "General"
+            shelves.append({
+                "id": "_general",
+                "name": custom_name if custom_name else orig_name,
+                "original_name": orig_name,
+                "custom_name": custom_name,
+                "folder": "_general",
+                "book_count": len(root_pdfs),
+            })
 
         for entry in entries:
             full_path = os.path.join(self.library_path, entry)
             if os.path.isdir(full_path):
-                # Count PDF files in this folder
-                pdf_count = sum(1 for f in os.listdir(full_path) if f.lower().endswith('.pdf'))
+                try:
+                    pdf_count = sum(1 for f in os.listdir(full_path) if f.lower().endswith('.pdf'))
+                except Exception:
+                    pdf_count = 0
+
                 if pdf_count > 0:
                     orig_name = format_shelf_name(entry)
                     custom_name = aliases.get(entry, "")
@@ -105,11 +136,43 @@ class LibraryScanner:
 
     def get_books(self, shelf_filter: Optional[str] = None) -> List[Dict[str, Any]]:
         """Returns all books, optionally filtered by bookshelf."""
-        if not os.path.exists(self.library_path):
+        if not self.library_path or not os.path.isdir(self.library_path):
             return []
 
         books = []
-        entries = sorted(os.listdir(self.library_path))
+        try:
+            entries = sorted(os.listdir(self.library_path))
+        except Exception:
+            return []
+
+        # Direct PDFs in root directory
+        if not shelf_filter or shelf_filter == "_general":
+            root_pdfs = [f for f in entries if f.lower().endswith('.pdf') and os.path.isfile(os.path.join(self.library_path, f))]
+            shelf_display = self.get_shelf_display_name("_general")
+            for fname in root_pdfs:
+                full_path = os.path.join(self.library_path, fname)
+                try:
+                    stat = os.stat(full_path)
+                    size = stat.st_size
+                    mtime = stat.st_mtime
+                except Exception:
+                    size = 0
+                    mtime = 0
+
+                book_id = compute_book_id("_general", fname)
+                books.append({
+                    "id": book_id,
+                    "title": clean_title(fname),
+                    "filename": fname,
+                    "shelf": "_general",
+                    "shelf_display": shelf_display,
+                    "size_bytes": size,
+                    "size_formatted": format_size(size),
+                    "modified_time": mtime,
+                    "path": full_path,
+                })
+
+        # Subdirectory shelves
         for shelf_name in entries:
             if shelf_filter and shelf_name != shelf_filter:
                 continue
@@ -119,7 +182,10 @@ class LibraryScanner:
                 continue
 
             shelf_display = self.get_shelf_display_name(shelf_name)
-            filenames = sorted(os.listdir(shelf_dir))
+            try:
+                filenames = sorted(os.listdir(shelf_dir))
+            except Exception:
+                filenames = []
 
             for fname in filenames:
                 if not fname.lower().endswith('.pdf'):
