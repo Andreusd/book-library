@@ -201,10 +201,10 @@ def update_book_status(payload: StatusPayload):
         raise HTTPException(status_code=404, detail="Book not found")
 
     if payload.status == "not_started":
-        tracker.reset_progress(payload.book_id)
+        rec = tracker.reset_progress(payload.book_id)
         return {
             "status": "ok",
-            "progress": {"page": 1, "total_pages": 0, "percent": 0, "status": "not_started"}
+            "progress": rec
         }
     elif payload.status == "completed":
         total_pages = 1

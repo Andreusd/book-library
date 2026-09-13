@@ -64,8 +64,14 @@ export default function ContextMenu({
     }
   };
 
-  const isCompleted = book.progress && (book.progress.percent >= 100 || book.progress.status === 'completed');
-  const isNotStarted = !book.progress || book.progress.page <= 1 && book.progress.percent === 0;
+  const isCompleted = Boolean(
+    book.progress && (book.progress.percent >= 100 || book.progress.status === 'completed')
+  );
+  const isNotStarted = Boolean(
+    !book.progress || 
+    book.progress.status === 'not_started' || 
+    (book.progress.page <= 1 && (book.progress.percent || 0) === 0)
+  );
 
   return (
     <div

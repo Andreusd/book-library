@@ -6,7 +6,11 @@ export default function ContinueReading({ books, onSelectBook, onContextMenu }) 
   const { t } = useI18n();
 
   const inProgressBooks = (books || []).filter(
-    b => b.progress && b.progress.page > 1 && b.progress.percent < 100
+    b => b.progress && 
+         b.progress.status !== 'not_started' && 
+         b.progress.status !== 'completed' && 
+         b.progress.page > 1 && 
+         b.progress.percent < 100
   );
 
   if (inProgressBooks.length === 0) return null;

@@ -7,8 +7,9 @@ export default function BookCard({ book, onSelectBook, onContextMenu }) {
   const [imageError, setImageError] = useState(false);
   const { t } = useI18n();
 
-  const isFinished = book.progress && (book.progress.percent >= 100 || book.progress.status === 'completed');
-  const hasProgress = book.progress && (book.progress.page > 1 || isFinished);
+  const isFinished = Boolean(book.progress && (book.progress.percent >= 100 || book.progress.status === 'completed'));
+  const isNotStarted = Boolean(!book.progress || book.progress.status === 'not_started' || (book.progress.page <= 1 && !isFinished));
+  const hasProgress = !isNotStarted && Boolean(book.progress && (book.progress.page > 1 || isFinished));
   const percent = book.progress ? Math.round(book.progress.percent) : 0;
 
   const handleOpenSystem = (e) => {

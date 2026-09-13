@@ -78,19 +78,22 @@ class ProgressTracker:
             self._save()
             return existing
 
-    def reset_progress(self, book_id: str):
-        """Resets progress to page 1 but preserves preferred zoom."""
+    def reset_progress(self, book_id: str) -> Dict[str, Any]:
+        """Resets progress to page 1 but preserves preferred zoom and total_pages."""
         with self._lock:
-            if book_id in self._data:
-                zoom = self._data[book_id].get("zoom", 1.2)
-                self._data[book_id] = {
-                    "page": 1,
-                    "total_pages": 1,
-                    "percent": 0.0,
-                    "zoom": zoom,
-                    "status": "not_started"
-                }
-                self._save()
+            existing = self._data.get(book_id, {})
+            zoom = existing.get("zoom", 1.2)
+            total_pages = existing.get("total_pages", 1)
+            record = {
+                "page": 1,
+                "total_pages": total_pages,
+                "percent": 0.0,
+                "zoom": zoom,
+                "status": "not_started"
+            }
+            self._data[book_id] = record
+            self._save()
+            return record
 
     def mark_completed(self, book_id: str, total_pages: int = 1) -> Dict[str, Any]:
         """Marks a book as 100% completed."""

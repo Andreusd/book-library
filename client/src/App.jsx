@@ -127,9 +127,21 @@ export default function App() {
     loadBooks();
   }, [loadBooks]);
 
-  // Handle book progress update from Reader
+  // Handle book progress update from Reader or status change
   const handleProgressUpdate = useCallback((bookId, newProgress) => {
     setBooks(prev => prev.map(b => (b.id === bookId ? { ...b, progress: newProgress } : b)));
+    setContinueReading(prev => {
+      const isNotReading = !newProgress || 
+        newProgress.status === 'not_started' || 
+        newProgress.status === 'completed' || 
+        (newProgress.page || 1) <= 1 || 
+        (newProgress.percent || 0) >= 100;
+
+      if (isNotReading) {
+        return prev.filter(b => b.id !== bookId);
+      }
+      return prev.map(b => (b.id === bookId ? { ...b, progress: newProgress } : b));
+    });
   }, []);
 
   // Right-click context menu handler
@@ -144,6 +156,26 @@ export default function App() {
 
   // Mark status handler (not_started / completed)
   const handleMarkStatus = (book, status) => {
+    // Instant optimistic update
+    if (status === 'not_started') {
+      const resetProgress = {
+        page: 1,
+        total_pages: book.progress?.total_pages || 1,
+        percent: 0,
+        status: 'not_started'
+      };
+      handleProgressUpdate(book.id, resetProgress);
+    } else if (status === 'completed') {
+      const totalPages = book.progress?.total_pages || 1;
+      const completedProgress = {
+        page: totalPages,
+        total_pages: totalPages,
+        percent: 100,
+        status: 'completed'
+      };
+      handleProgressUpdate(book.id, completedProgress);
+    }
+
     fetch('/api/book/status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -153,9 +185,14 @@ export default function App() {
     .then(data => {
       if (data.status === 'ok') {
         handleProgressUpdate(book.id, data.progress);
+        loadContinueReading();
       }
     })
-    .catch(err => console.error('Failed to update book status:', err));
+    .catch(err => {
+      console.error('Failed to update book status:', err);
+      loadContinueReading();
+      loadBooks();
+    });
   };
 
   // Open in system viewer
