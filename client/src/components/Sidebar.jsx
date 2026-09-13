@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Library, Layers, Search, Folder } from 'lucide-react';
+import { Library, Layers, Search, Folder, PanelLeftClose } from 'lucide-react';
 import { useI18n } from '../i18n';
 
 export default function Sidebar({ 
@@ -30,116 +30,126 @@ export default function Sidebar({
 
       {/* Sidebar Container */}
       <aside className={`
-        fixed top-0 bottom-0 left-0 z-40 w-72 bg-neutral-925 border-r border-neutral-850 flex flex-col transition-transform duration-300 lg:static lg:translate-x-0
-        ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+        fixed top-0 bottom-0 left-0 z-40 bg-neutral-925 border-r border-neutral-850 flex flex-col transition-all duration-300 ease-in-out shrink-0 overflow-hidden
+        lg:static lg:h-screen lg:sticky lg:top-0
+        ${isOpen 
+          ? 'w-72 translate-x-0 opacity-100' 
+          : 'w-72 -translate-x-full opacity-0 pointer-events-none lg:w-0 lg:border-r-0'
+        }
       `}>
-        {/* Brand Header */}
-        <div className="h-16 px-5 border-b border-neutral-850 flex items-center justify-between shrink-0 bg-neutral-900/40">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center shadow-lg shadow-amber-500/20 text-neutral-950">
-              <Library className="w-5 h-5 font-bold" />
+        {/* Inner wrapper to keep content width consistent during smooth collapse animation */}
+        <div className="w-72 flex flex-col h-full shrink-0">
+          {/* Brand Header with Close/Collapse Button */}
+          <div className="h-16 px-4 border-b border-neutral-850 flex items-center justify-between shrink-0 bg-neutral-900/40">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center shadow-lg shadow-amber-500/20 text-neutral-950 shrink-0">
+                <Library className="w-5 h-5 font-bold" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-sm font-bold text-neutral-100 tracking-tight truncate">{t('appTitle')}</h1>
+                <p className="text-[11px] text-neutral-400 truncate">
+                  {t('shelfCount', { books: totalBooks, shelves: shelves.length })}
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-sm font-bold text-neutral-100 tracking-tight">{t('appTitle')}</h1>
-              <p className="text-[11px] text-neutral-400">
-                {t('shelfCount', { books: totalBooks, shelves: shelves.length })}
-              </p>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800/80 transition shrink-0 ml-1"
+              title={t('collapseSidebar')}
+            >
+              <PanelLeftClose className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Shelf Filter Input */}
+          <div className="p-3 border-b border-neutral-850/60">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+              <input
+                type="text"
+                placeholder={t('filterShelvesPlaceholder')}
+                value={shelfFilter}
+                onChange={(e) => setShelfFilter(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 text-xs bg-neutral-900 border border-neutral-800 rounded-lg text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-amber-500/50"
+              />
             </div>
           </div>
+
+          {/* Shelves List */}
+          <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">
+            {/* All Books Option */}
+            <button
+              onClick={() => {
+                onSelectShelf(null);
+              }}
+              className={`
+                w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors
+                ${selectedShelf === null 
+                  ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' 
+                  : 'text-neutral-300 hover:bg-neutral-850 hover:text-white'}
+              `}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Layers className={`w-4 h-4 shrink-0 ${selectedShelf === null ? 'text-amber-400' : 'text-neutral-400'}`} />
+                <span className="truncate">{t('allShelves')}</span>
+              </div>
+              <span className={`
+                text-[11px] px-2 py-0.5 rounded-full font-mono font-semibold
+                ${selectedShelf === null ? 'bg-amber-500/20 text-amber-300' : 'bg-neutral-800 text-neutral-400'}
+              `}>
+                {totalBooks}
+              </span>
+            </button>
+
+            <div className="pt-2 pb-1 px-3">
+              <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider">
+                {t('categories', { count: filteredShelves.length })}
+              </span>
+            </div>
+
+            {/* Individual Shelves */}
+            {filteredShelves.map((s) => {
+              const isSelected = selectedShelf === s.id;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => {
+                    onSelectShelf(s.id);
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    if (onShelfContextMenu) {
+                      onShelfContextMenu(e, s);
+                    }
+                  }}
+                  className={`
+                    w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors
+                    ${isSelected 
+                      ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' 
+                      : 'text-neutral-300 hover:bg-neutral-850 hover:text-white'}
+                  `}
+                  title={s.custom_name ? `${s.name} (${t('oneDriveFolderLabel', { folder: s.folder })})` : s.name}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Folder className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-amber-400' : 'text-neutral-500'}`} />
+                    <span className="truncate text-left">{s.name}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                    {s.custom_name && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" title={t('customNameNotice')} />
+                    )}
+                    <span className={`
+                      text-[11px] px-1.5 py-0.2 rounded font-mono
+                      ${isSelected ? 'bg-amber-500/20 text-amber-300' : 'bg-neutral-850 text-neutral-400'}
+                    `}>
+                      {s.book_count}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </nav>
         </div>
-
-        {/* Shelf Filter Input */}
-        <div className="p-3 border-b border-neutral-850/60">
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
-            <input
-              type="text"
-              placeholder={t('filterShelvesPlaceholder')}
-              value={shelfFilter}
-              onChange={(e) => setShelfFilter(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 text-xs bg-neutral-900 border border-neutral-800 rounded-lg text-neutral-200 placeholder-neutral-500 focus:outline-none focus:border-amber-500/50"
-            />
-          </div>
-        </div>
-
-        {/* Shelves List */}
-        <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">
-          {/* All Books Option */}
-          <button
-            onClick={() => {
-              onSelectShelf(null);
-              if (onClose) onClose();
-            }}
-            className={`
-              w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors
-              ${selectedShelf === null 
-                ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' 
-                : 'text-neutral-300 hover:bg-neutral-850 hover:text-white'}
-            `}
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <Layers className={`w-4 h-4 shrink-0 ${selectedShelf === null ? 'text-amber-400' : 'text-neutral-400'}`} />
-              <span className="truncate">{t('allShelves')}</span>
-            </div>
-            <span className={`
-              text-[11px] px-2 py-0.5 rounded-full font-mono font-semibold
-              ${selectedShelf === null ? 'bg-amber-500/20 text-amber-300' : 'bg-neutral-800 text-neutral-400'}
-            `}>
-              {totalBooks}
-            </span>
-          </button>
-
-          <div className="pt-2 pb-1 px-3">
-            <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider">
-              {t('categories', { count: filteredShelves.length })}
-            </span>
-          </div>
-
-          {/* Individual Shelves */}
-          {filteredShelves.map((s) => {
-            const isSelected = selectedShelf === s.id;
-            return (
-              <button
-                key={s.id}
-                onClick={() => {
-                  onSelectShelf(s.id);
-                  if (onClose) onClose();
-                }}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  if (onShelfContextMenu) {
-                    onShelfContextMenu(e, s);
-                  }
-                }}
-                className={`
-                  w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors
-                  ${isSelected 
-                    ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' 
-                    : 'text-neutral-300 hover:bg-neutral-850 hover:text-white'}
-                `}
-                title={s.custom_name ? `${s.name} (${t('oneDriveFolderLabel', { folder: s.folder })})` : s.name}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <Folder className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-amber-400' : 'text-neutral-500'}`} />
-                  <span className="truncate text-left">{s.name}</span>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                  {s.custom_name && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" title={t('customNameNotice')} />
-                  )}
-                  <span className={`
-                    text-[11px] px-1.5 py-0.2 rounded font-mono
-                    ${isSelected ? 'bg-amber-500/20 text-amber-300' : 'bg-neutral-850 text-neutral-400'}
-                  `}>
-                    {s.book_count}
-                  </span>
-                </div>
-              </button>
-            );
-          })}
-        </nav>
-
-
       </aside>
     </>
   );

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Search, SlidersHorizontal, Menu, X, BookOpen, 
-  ArrowUpDown, FolderOpen, RefreshCw 
+  ArrowUpDown, FolderOpen, RefreshCw, PanelLeftClose, PanelLeftOpen 
 } from 'lucide-react';
 
 import Sidebar from './components/Sidebar';
@@ -26,7 +26,26 @@ export default function App() {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [sortBy, setSortBy] = useState('title_asc');
   const [activeBook, setActiveBook] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    try {
+      const saved = localStorage.getItem('sidebar_open');
+      if (saved !== null) {
+        return saved === 'true';
+      }
+    } catch (e) {}
+    return typeof window !== 'undefined' ? window.innerWidth >= 1024 : true;
+  });
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarOpen(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('sidebar_open', String(next));
+      } catch (e) {}
+      return next;
+    });
+  }, []);
+
   const [contextMenu, setContextMenu] = useState({ isOpen: false, x: 0, y: 0, book: null });
   const [shelfContextMenu, setShelfContextMenu] = useState({ isOpen: false, x: 0, y: 0, shelf: null });
   const [renameModal, setRenameModal] = useState({ isOpen: false, shelf: null });
@@ -44,14 +63,19 @@ export default function App() {
   // Global Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === '/' && document.activeElement !== searchInputRef.current && !activeBook) {
+      if (activeBook) return;
+
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
+        e.preventDefault();
+        toggleSidebar();
+      } else if (e.key === '/' && document.activeElement !== searchInputRef.current) {
         e.preventDefault();
         searchInputRef.current?.focus();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeBook]);
+  }, [activeBook, toggleSidebar]);
 
   // Load Shelves & Totals
   const loadShelves = useCallback(() => {
@@ -200,6 +224,9 @@ export default function App() {
         onSelectShelf={(id) => {
           setSelectedShelf(id);
           setSearchQuery('');
+          if (window.innerWidth < 1024) {
+            setSidebarOpen(false);
+          }
         }}
         onShelfContextMenu={handleShelfContextMenu}
         isOpen={sidebarOpen}
@@ -207,16 +234,20 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
         {/* Top Navigation Bar */}
         <header className="h-16 px-4 sm:px-6 bg-neutral-925/80 backdrop-blur-md border-b border-neutral-850 sticky top-0 z-20 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <button
-              onClick={() => setSidebarOpen(true)}
-              className="p-2 rounded-lg bg-neutral-850 text-neutral-300 hover:text-white lg:hidden"
-              title="Abrir menu"
+              onClick={toggleSidebar}
+              className={`p-2 rounded-lg transition-colors border ${
+                sidebarOpen 
+                  ? 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-100 hover:bg-neutral-850' 
+                  : 'bg-amber-500/15 border-amber-500/30 text-amber-400 hover:bg-amber-500/25'
+              }`}
+              title={sidebarOpen ? t('collapseSidebar') : t('expandSidebar')}
             >
-              <Menu className="w-5 h-5" />
+              {sidebarOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeftOpen className="w-5 h-5" />}
             </button>
 
             {/* Breadcrumb / Current Shelf Title */}

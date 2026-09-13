@@ -11,6 +11,9 @@ export const translations = {
     oneDriveSafe: 'OneDrive Protected (Read-Only)',
     customNameNotice: 'Custom display name in app',
     oneDriveFolderLabel: 'OneDrive Folder: {folder}',
+    toggleSidebar: 'Toggle menu (Ctrl+B)',
+    collapseSidebar: 'Collapse menu (Ctrl+B)',
+    expandSidebar: 'Expand menu (Ctrl+B)',
 
     // Header & Navigation
     searchPlaceholder: "Search books by title... (Press '/' to search)",
@@ -83,6 +86,9 @@ export const translations = {
     oneDriveSafe: 'OneDrive Protegido (Modo Leitura)',
     customNameNotice: 'Nome personalizado no app',
     oneDriveFolderLabel: 'Pasta OneDrive: {folder}',
+    toggleSidebar: 'Alternar menu (Ctrl+B)',
+    collapseSidebar: 'Recolher menu (Ctrl+B)',
+    expandSidebar: 'Expandir menu (Ctrl+B)',
 
     // Header & Navigation
     searchPlaceholder: "Pesquisar livros por título... (Pressione '/' para buscar)",
