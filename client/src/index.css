@@ -58,3 +58,39 @@
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.7);
 }
+
+/* PDF.js Text & Annotation Layers */
+.textLayer {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
+.textLayer ::selection {
+  background: rgba(245, 158, 11, 0.45) !important;
+  color: transparent !important;
+}
+
+.textLayer ::-moz-selection {
+  background: rgba(245, 158, 11, 0.45) !important;
+  color: transparent !important;
+}
+
+.annotationLayer {
+  pointer-events: none !important;
+}
+
+.annotationLayer .linkAnnotation {
+  pointer-events: auto !important;
+}
+
+.annotationLayer .linkAnnotation > a {
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  transition: background 0.15s ease, outline 0.15s ease !important;
+  border-radius: 2px !important;
+}
+
+.annotationLayer .linkAnnotation > a:hover {
+  background: rgba(245, 158, 11, 0.22) !important;
+  outline: 1.5px dashed rgba(245, 158, 11, 0.75) !important;
+}

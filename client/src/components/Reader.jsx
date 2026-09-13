@@ -6,14 +6,90 @@ import {
   Maximize2, Minimize2, ExternalLink, Moon, Sun
 } from 'lucide-react';
 import { useI18n } from '../i18n';
+import 'pdfjs-dist/web/pdf_viewer.css';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+
+/**
+ * Lightweight link service to handle PDF internal links (e.g. Table of Contents)
+ * and external hyperlinks.
+ */
+class SimpleLinkService {
+  constructor() {
+    this.pdfDoc = null;
+    this.onNavigate = null;
+  }
+
+  setDocument(pdfDoc) {
+    this.pdfDoc = pdfDoc;
+  }
+
+  setNavigate(onNavigate) {
+    this.onNavigate = onNavigate;
+  }
+
+  getDestinationHash(dest) {
+    return '#';
+  }
+
+  getAnchorUrl(hash) {
+    return hash || '#';
+  }
+
+  setHash(hash) {}
+
+  executeNamedAction(action) {
+    if (!this.onNavigate) return;
+    if (action === 'NextPage') {
+      this.onNavigate('next');
+    } else if (action === 'PrevPage') {
+      this.onNavigate('prev');
+    } else if (action === 'FirstPage') {
+      this.onNavigate(1);
+    } else if (action === 'LastPage' && this.pdfDoc) {
+      this.onNavigate(this.pdfDoc.numPages);
+    }
+  }
+
+  addLinkAttributes(link, url, newWindow = true) {
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer nofollow';
+  }
+
+  async goToDestination(dest) {
+    if (!this.pdfDoc || !this.onNavigate) return;
+    try {
+      let explicitDest = dest;
+      if (typeof dest === 'string') {
+        explicitDest = await this.pdfDoc.getDestination(dest);
+      }
+      if (!explicitDest) return;
+
+      const destRef = explicitDest[0];
+      let pageIndex = -1;
+      if (typeof destRef === 'object' && destRef !== null) {
+        pageIndex = await this.pdfDoc.getPageIndex(destRef);
+      } else if (typeof destRef === 'number') {
+        pageIndex = destRef;
+      }
+
+      if (typeof pageIndex === 'number' && pageIndex >= 0) {
+        this.onNavigate(pageIndex + 1);
+      }
+    } catch (e) {
+      console.error('Failed to navigate to destination:', e);
+    }
+  }
+}
 
 export default function Reader({ book, onClose, onProgressUpdate }) {
   const { t } = useI18n();
   const [pdfDoc, setPdfDoc] = useState(null);
   const [currentPage, setCurrentPage] = useState(book.progress?.page || 1);
   const [totalPages, setTotalPages] = useState(book.progress?.total_pages || 1);
+  const [pageDims, setPageDims] = useState({ width: 0, height: 0 });
+
   const getInitialZoom = () => {
     try {
       const localZoom = localStorage.getItem(`book_zoom_${book.id}`);
@@ -42,8 +118,13 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const canvasRef = useRef(null);
+  const textLayerRef = useRef(null);
+  const annotationLayerRef = useRef(null);
   const containerRef = useRef(null);
   const renderTaskRef = useRef(null);
+  const textLayerInstanceRef = useRef(null);
+  const annotationLayerInstanceRef = useRef(null);
+  const linkServiceRef = useRef(new SimpleLinkService());
   const lastRenderedPageRef = useRef(null);
   const onProgressUpdateRef = useRef(onProgressUpdate);
   const scaleRef = useRef(scale);
@@ -56,6 +137,36 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
   useEffect(() => {
     onProgressUpdateRef.current = onProgressUpdate;
   }, [onProgressUpdate]);
+
+  // Page Navigation handlers
+  const goToNextPage = useCallback(() => {
+    setCurrentPage(prev => (prev < totalPages ? prev + 1 : prev));
+  }, [totalPages]);
+
+  const goToPrevPage = useCallback(() => {
+    setCurrentPage(prev => (prev > 1 ? prev - 1 : prev));
+  }, []);
+
+  // Configure link service
+  const handleLinkNavigate = useCallback((target) => {
+    if (target === 'next') {
+      goToNextPage();
+    } else if (target === 'prev') {
+      goToPrevPage();
+    } else if (typeof target === 'number') {
+      setCurrentPage(Math.min(Math.max(1, target), totalPages));
+    }
+  }, [goToNextPage, goToPrevPage, totalPages]);
+
+  useEffect(() => {
+    linkServiceRef.current.setNavigate(handleLinkNavigate);
+  }, [handleLinkNavigate]);
+
+  useEffect(() => {
+    if (pdfDoc) {
+      linkServiceRef.current.setDocument(pdfDoc);
+    }
+  }, [pdfDoc]);
 
   // Load PDF Document
   useEffect(() => {
@@ -113,33 +224,50 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
     .catch(err => console.error('Failed to save progress:', err));
   }, [book.id]);
 
-  // Render Page on Canvas
+  // Render Page on Canvas, TextLayer and AnnotationLayer
   const renderPage = useCallback((pageNum) => {
     if (!pdfDoc || !canvasRef.current) return;
 
+    // Cancel any in-flight rendering
     if (renderTaskRef.current) {
       try {
         renderTaskRef.current.cancel();
-      } catch (e) {
-        // ignore cancellation
-      }
+      } catch (e) {}
       renderTaskRef.current = null;
+    }
+
+    if (textLayerInstanceRef.current) {
+      try {
+        textLayerInstanceRef.current.cancel();
+      } catch (e) {}
+      textLayerInstanceRef.current = null;
+    }
+
+    if (textLayerRef.current) {
+      textLayerRef.current.replaceChildren();
+    }
+    if (annotationLayerRef.current) {
+      annotationLayerRef.current.replaceChildren();
     }
 
     setRendering(true);
 
-    pdfDoc.getPage(pageNum).then((page) => {
+    pdfDoc.getPage(pageNum).then(async (page) => {
       const viewport = page.getViewport({ scale });
       const canvas = canvasRef.current;
       if (!canvas) return;
+
+      const vpWidth = Math.floor(viewport.width);
+      const vpHeight = Math.floor(viewport.height);
+      setPageDims({ width: vpWidth, height: vpHeight });
 
       const context = canvas.getContext('2d');
       const dpr = window.devicePixelRatio || 1;
 
       canvas.width = Math.floor(viewport.width * dpr);
       canvas.height = Math.floor(viewport.height * dpr);
-      canvas.style.width = `${Math.floor(viewport.width)}px`;
-      canvas.style.height = `${Math.floor(viewport.height)}px`;
+      canvas.style.width = `${vpWidth}px`;
+      canvas.style.height = `${vpHeight}px`;
 
       context.setTransform(dpr, 0, 0, dpr, 0, 0);
 
@@ -151,25 +279,66 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
       const task = page.render(renderContext);
       renderTaskRef.current = task;
 
-      task.promise.then(
-        () => {
-          renderTaskRef.current = null;
-          setRendering(false);
-          // Only scroll back to top if the page actually changed, not on zoom or re-renders
-          if (lastRenderedPageRef.current !== pageNum) {
-            lastRenderedPageRef.current = pageNum;
-            if (containerRef.current) {
-              containerRef.current.scrollTop = 0;
-            }
-          }
-        },
-        (err) => {
-          if (err?.name !== 'RenderingCancelledException') {
-            console.error('Render error:', err);
-          }
-          setRendering(false);
+      try {
+        await task.promise;
+      } catch (err) {
+        if (err?.name !== 'RenderingCancelledException') {
+          console.error('Render error:', err);
         }
-      );
+        setRendering(false);
+        return;
+      }
+
+      renderTaskRef.current = null;
+      setRendering(false);
+
+      // Only scroll back to top if the page actually changed (not on zoom)
+      if (lastRenderedPageRef.current !== pageNum) {
+        lastRenderedPageRef.current = pageNum;
+        if (containerRef.current) {
+          containerRef.current.scrollTop = 0;
+        }
+      }
+
+      // Render Text Layer for text selection & copying
+      if (textLayerRef.current) {
+        try {
+          const textContent = await page.getTextContent();
+          const textLayer = new pdfjsLib.TextLayer({
+            textContentSource: textContent,
+            container: textLayerRef.current,
+            viewport: viewport,
+          });
+          textLayerInstanceRef.current = textLayer;
+          await textLayer.render();
+        } catch (err) {
+          if (err?.name !== 'RenderingCancelledException') {
+            console.error('TextLayer render error:', err);
+          }
+        }
+      }
+
+      // Render Annotation Layer for clickable links (internal TOC & external URLs)
+      if (annotationLayerRef.current) {
+        try {
+          const annotations = await page.getAnnotations({ intent: 'display' });
+          if (annotations && annotations.length > 0) {
+            const annotationLayer = new pdfjsLib.AnnotationLayer({
+              div: annotationLayerRef.current,
+              page: page,
+              viewport: viewport,
+              linkService: linkServiceRef.current,
+            });
+            annotationLayerInstanceRef.current = annotationLayer;
+            await annotationLayer.render({
+              annotations: annotations,
+              viewport: viewport,
+            });
+          }
+        } catch (err) {
+          console.error('AnnotationLayer render error:', err);
+        }
+      }
     }).catch(err => {
       console.error('Failed to get page:', err);
       setRendering(false);
@@ -214,15 +383,6 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
 
     return () => clearTimeout(timer);
   }, [book.id, scale, pdfDoc]);
-
-  // Page Navigation handlers
-  const goToNextPage = useCallback(() => {
-    setCurrentPage(prev => (prev < totalPages ? prev + 1 : prev));
-  }, [totalPages]);
-
-  const goToPrevPage = useCallback(() => {
-    setCurrentPage(prev => (prev > 1 ? prev - 1 : prev));
-  }, []);
 
   const handlePageSubmit = (e) => {
     e.preventDefault();
@@ -388,9 +548,9 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
   const progressPercent = totalPages > 0 ? Math.round((currentPage / totalPages) * 100) : 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-neutral-950 text-neutral-100 select-none">
+    <div className="fixed inset-0 z-50 flex flex-col bg-neutral-950 text-neutral-100">
       {/* Top Header / Toolbar */}
-      <header className="h-14 px-4 bg-neutral-900/90 backdrop-blur-md border-b border-neutral-800 flex items-center justify-between z-10 shrink-0">
+      <header className="h-14 px-4 bg-neutral-900/90 backdrop-blur-md border-b border-neutral-850 flex items-center justify-between z-20 shrink-0 select-none">
         <div className="flex items-center gap-3 min-w-0">
           <button 
             onClick={onClose}
@@ -454,7 +614,7 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
         <div className="flex items-center gap-1.5">
           {/* Zoom controls */}
           <button 
-            onClick={() => setScale(s => Math.max(0.5, s - 0.15))}
+            onClick={() => setScale(s => Math.max(0.5, Number((s - 0.15).toFixed(2))))}
             className="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition"
             title={t('zoomOutTitle')}
           >
@@ -470,7 +630,7 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
           </button>
 
           <button 
-            onClick={() => setScale(s => Math.min(3.0, s + 0.15))}
+            onClick={() => setScale(s => Math.min(3.5, Number((s + 0.15).toFixed(2))))}
             className="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition"
             title={t('zoomInTitle')}
           >
@@ -514,16 +674,29 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
         <div 
           ref={containerRef}
           tabIndex={0}
-          className="flex-1 overflow-y-auto overflow-x-auto p-4 sm:p-6 focus:outline-none scroll-smooth"
+          className="flex-1 overflow-y-auto overflow-x-auto p-4 sm:p-6 focus:outline-none scroll-smooth select-text"
         >
           {loading ? (
-            <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-3 text-neutral-400">
+            <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-3 text-neutral-400 select-none">
               <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
               <p className="text-sm">{t('loadingBook')}</p>
             </div>
           ) : (
             <div className="min-h-full flex justify-center items-start">
-              <div className="relative shadow-2xl rounded">
+              {/* Document Page Wrapper with exact CSS dimensions and PDF.js scale variables */}
+              <div 
+                className="relative shadow-2xl rounded"
+                style={{
+                  width: pageDims.width ? `${pageDims.width}px` : 'auto',
+                  height: pageDims.height ? `${pageDims.height}px` : 'auto',
+                  '--scale-factor': scale,
+                  '--total-scale-factor': scale,
+                  '--user-unit': 1,
+                  '--scale-round-x': '1px',
+                  '--scale-round-y': '1px',
+                }}
+              >
+                {/* Canvas raster background */}
                 <canvas 
                   ref={canvasRef}
                   className="max-w-none transition-filter duration-200 rounded block"
@@ -531,8 +704,25 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
                     filter: invertColors ? 'invert(0.9) hue-rotate(180deg) brightness(0.95) contrast(1.1)' : 'none',
                   }}
                 />
+
+                {/* Text Layer for text selection & copy */}
+                <div 
+                  ref={textLayerRef}
+                  className="textLayer"
+                  style={{
+                    filter: invertColors ? 'invert(0.9) hue-rotate(180deg) brightness(0.95) contrast(1.1)' : 'none',
+                  }}
+                />
+
+                {/* Annotation Layer for clickable links */}
+                <div 
+                  ref={annotationLayerRef}
+                  className="annotationLayer"
+                />
+
+                {/* Rendering indicator badge */}
                 {rendering && (
-                  <div className="absolute top-3 right-3 bg-black/70 backdrop-blur-sm text-neutral-300 text-xs px-2.5 py-1 rounded shadow pointer-events-none">
+                  <div className="absolute top-3 right-3 bg-black/70 backdrop-blur-sm text-neutral-300 text-xs px-2.5 py-1 rounded shadow pointer-events-none z-10 select-none">
                     {t('rendering')}
                   </div>
                 )}
@@ -543,7 +733,7 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
       </div>
 
       {/* Bottom Progress Bar */}
-      <div className="h-1 bg-neutral-950 w-full overflow-hidden">
+      <div className="h-1 bg-neutral-950 w-full overflow-hidden select-none">
         <div 
           className="h-full bg-gradient-to-r from-amber-600 to-amber-400 transition-all duration-300"
           style={{ width: `${progressPercent}%` }}
