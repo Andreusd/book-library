@@ -1,6 +1,6 @@
 import os
 import sys
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Query, Request, status
@@ -14,6 +14,7 @@ import pypdfium2 as pdfium
 from .scanner import LibraryScanner
 from .covers import CoverManager
 from .progress import ProgressTracker
+from .annotations import AnnotationsManager
 
 # Base paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -23,6 +24,7 @@ CLIENT_DIST = os.path.abspath(os.path.join(BASE_DIR, "..", "client", "dist"))
 scanner = LibraryScanner()
 cover_mgr = CoverManager()
 tracker = ProgressTracker()
+annotations_mgr = AnnotationsManager()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -69,6 +71,18 @@ class SettingsPayload(BaseModel):
 
 class ValidatePathPayload(BaseModel):
     path: str
+
+class AnnotationPayload(BaseModel):
+    book_id: str
+    page: int
+    text: str
+    color: str = "yellow"
+    comment: Optional[str] = ""
+    rects: List[Dict[str, Any]] = []
+
+class UpdateAnnotationPayload(BaseModel):
+    comment: Optional[str] = None
+    color: Optional[str] = None
 
 @app.get("/api/settings")
 def get_settings():
@@ -273,6 +287,38 @@ def open_system(payload: OpenSystemPayload):
         return {"status": "opened", "path": b["path"]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/annotations/{book_id}")
+def get_annotations(book_id: str):
+    """Returns all highlights and comments for a book."""
+    return {"annotations": annotations_mgr.get_annotations(book_id)}
+
+@app.post("/api/annotations")
+def create_annotation(payload: AnnotationPayload):
+    """Saves a new highlight or comment for a book."""
+    record = annotations_mgr.add_annotation(payload.book_id, payload.dict())
+    return {"status": "ok", "annotation": record}
+
+@app.put("/api/annotations/{book_id}/{annotation_id}")
+def update_annotation(book_id: str, annotation_id: str, payload: UpdateAnnotationPayload):
+    """Updates an existing annotation's comment or color."""
+    data = {}
+    if payload.comment is not None:
+        data["comment"] = payload.comment
+    if payload.color is not None:
+        data["color"] = payload.color
+    record = annotations_mgr.update_annotation(book_id, annotation_id, data)
+    if not record:
+        raise HTTPException(status_code=404, detail="Annotation not found")
+    return {"status": "ok", "annotation": record}
+
+@app.delete("/api/annotations/{book_id}/{annotation_id}")
+def delete_annotation(book_id: str, annotation_id: str):
+    """Deletes an annotation."""
+    success = annotations_mgr.delete_annotation(book_id, annotation_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Annotation not found")
+    return {"status": "ok"}
 
 # If client production build exists, mount static assets and index.html fallback
 if os.path.exists(CLIENT_DIST):

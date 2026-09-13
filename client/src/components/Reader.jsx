@@ -3,9 +3,13 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { 
   ArrowLeft, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, 
-  Maximize2, Minimize2, ExternalLink, Moon, Sun, ListTree
+  Maximize2, Minimize2, ExternalLink, Moon, Sun, ListTree,
+  MessageSquare
 } from 'lucide-react';
 import PdfOutline from './PdfOutline';
+import HighlightOverlay from './HighlightOverlay';
+import TextSelectionMenu from './TextSelectionMenu';
+import CommentsDrawer from './CommentsDrawer';
 import { useI18n } from '../i18n';
 import 'pdfjs-dist/web/pdf_viewer.css';
 
@@ -120,11 +124,22 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
   const [outline, setOutline] = useState([]);
   const [hasOutline, setHasOutline] = useState(false);
   const [outlineOpen, setOutlineOpen] = useState(false);
+  const [annotations, setAnnotations] = useState([]);
+  const [commentsDrawerOpen, setCommentsDrawerOpen] = useState(false);
+  const [selectionMenu, setSelectionMenu] = useState({
+    isOpen: false,
+    x: 0,
+    y: 0,
+    text: '',
+    rects: [],
+    page: 1,
+  });
 
   const canvasRef = useRef(null);
   const textLayerRef = useRef(null);
   const annotationLayerRef = useRef(null);
   const containerRef = useRef(null);
+  const pageWrapperRef = useRef(null);
   const renderTaskRef = useRef(null);
   const textLayerInstanceRef = useRef(null);
   const annotationLayerInstanceRef = useRef(null);
@@ -234,6 +249,126 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
       loadingTask.destroy();
     };
   }, [book.id]);
+
+  // Load Annotations from Backend
+  const loadAnnotations = useCallback(() => {
+    fetch(`/api/annotations/${book.id}`)
+      .then(r => r.json())
+      .then(data => {
+        setAnnotations(data.annotations || []);
+      })
+      .catch(err => console.error('Failed to load annotations:', err));
+  }, [book.id]);
+
+  useEffect(() => {
+    loadAnnotations();
+  }, [loadAnnotations]);
+
+  // Text selection context menu handler
+  const handleTextContextMenu = (e) => {
+    const selection = window.getSelection();
+    const text = selection ? selection.toString().trim() : '';
+    if (!text || selection.rangeCount === 0) return;
+
+    const range = selection.getRangeAt(0);
+    const wrapper = pageWrapperRef.current;
+    if (!wrapper) return;
+
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const clientRects = Array.from(range.getClientRects());
+    if (clientRects.length === 0) return;
+
+    // Intercept default browser context menu
+    e.preventDefault();
+
+    const rects = clientRects.map(r => ({
+      xPct: Math.max(0, (r.left - wrapperRect.left) / wrapperRect.width),
+      yPct: Math.max(0, (r.top - wrapperRect.top) / wrapperRect.height),
+      wPct: Math.min(1, r.width / wrapperRect.width),
+      hPct: Math.min(1, r.height / wrapperRect.height),
+    })).filter(r => r.wPct > 0.002 && r.hPct > 0.002);
+
+    if (rects.length === 0) return;
+
+    setSelectionMenu({
+      isOpen: true,
+      x: e.clientX,
+      y: e.clientY,
+      text: text,
+      rects: rects,
+      page: currentPage,
+    });
+  };
+
+  // Create new highlight or comment
+  const handleCreateHighlight = (color, comment = '') => {
+    if (!selectionMenu.text || selectionMenu.rects.length === 0) return;
+
+    const payload = {
+      book_id: book.id,
+      page: selectionMenu.page,
+      text: selectionMenu.text,
+      color: color,
+      comment: comment,
+      rects: selectionMenu.rects,
+    };
+
+    fetch('/api/annotations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === 'ok' && data.annotation) {
+        setAnnotations(prev => [...prev, data.annotation]);
+      }
+    })
+    .catch(err => console.error('Failed to create annotation:', err));
+
+    window.getSelection()?.removeAllRanges();
+    setSelectionMenu({ isOpen: false, x: 0, y: 0, text: '', rects: [], page: 1 });
+  };
+
+  // Update existing comment note
+  const handleUpdateComment = (annotationId, newComment) => {
+    fetch(`/api/annotations/${book.id}/${annotationId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ comment: newComment }),
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === 'ok' && data.annotation) {
+        setAnnotations(prev => prev.map(a => a.id === annotationId ? data.annotation : a));
+      }
+    })
+    .catch(err => console.error('Failed to update comment:', err));
+  };
+
+  // Delete an annotation
+  const handleDeleteAnnotation = (annotationId) => {
+    fetch(`/api/annotations/${book.id}/${annotationId}`, {
+      method: 'DELETE',
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === 'ok') {
+        setAnnotations(prev => prev.filter(a => a.id !== annotationId));
+      }
+    })
+    .catch(err => console.error('Failed to delete annotation:', err));
+  };
+
+  // Jump directly to an annotation's page
+  const handleJumpToAnnotation = (ann) => {
+    if (ann.page && ann.page !== currentPage) {
+      setCurrentPage(ann.page);
+    }
+    if (window.innerWidth < 768) {
+      setCommentsDrawerOpen(false);
+    }
+  };
 
   // Save Progress to Backend
   const saveProgress = useCallback((page, total) => {
@@ -706,6 +841,25 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
             <ExternalLink className="w-4 h-4" />
           </button>
 
+          {/* Comments & Highlights Drawer Toggle */}
+          <button 
+            onClick={() => setCommentsDrawerOpen(prev => !prev)}
+            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition text-xs font-medium cursor-pointer ${
+              commentsDrawerOpen 
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
+                : 'hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200'
+            }`}
+            title={commentsDrawerOpen ? t('hideComments') : t('showComments')}
+          >
+            <MessageSquare className="w-4 h-4 text-amber-400" />
+            <span className="hidden sm:inline">{t('comments')}</span>
+            {annotations.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full font-mono text-[10px] bg-amber-500/25 text-amber-300 font-semibold">
+                {annotations.length}
+              </span>
+            )}
+          </button>
+
           {/* Fullscreen */}
           <button 
             onClick={toggleFullscreen}
@@ -733,6 +887,7 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
         <div 
           ref={containerRef}
           tabIndex={0}
+          onContextMenu={handleTextContextMenu}
           className="flex-1 overflow-y-auto overflow-x-auto p-4 sm:p-6 focus:outline-none scroll-smooth select-text"
         >
           {loading ? (
@@ -744,6 +899,7 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
             <div className="min-h-full flex justify-center items-start">
               {/* Document Page Wrapper with exact CSS dimensions and PDF.js scale variables */}
               <div 
+                ref={pageWrapperRef}
                 className="relative shadow-2xl rounded"
                 style={{
                   width: pageDims.width ? `${pageDims.width}px` : 'auto',
@@ -779,6 +935,14 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
                   className="annotationLayer"
                 />
 
+                {/* Visual Highlights & Comment Badges Overlay */}
+                <HighlightOverlay
+                  annotations={annotations.filter(a => a.page === currentPage)}
+                  onUpdateComment={handleUpdateComment}
+                  onDeleteAnnotation={handleDeleteAnnotation}
+                  invertColors={invertColors}
+                />
+
                 {/* Rendering indicator badge */}
                 {rendering && (
                   <div className="absolute top-3 right-3 bg-black/70 backdrop-blur-sm text-neutral-300 text-xs px-2.5 py-1 rounded shadow pointer-events-none z-10 select-none">
@@ -789,7 +953,28 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
             </div>
           )}
         </div>
+
+        {/* Toggleable Right Comments & Highlights Drawer */}
+        <CommentsDrawer
+          annotations={annotations}
+          isOpen={commentsDrawerOpen}
+          onClose={() => setCommentsDrawerOpen(false)}
+          onJumpToAnnotation={handleJumpToAnnotation}
+          onUpdateComment={handleUpdateComment}
+          onDeleteAnnotation={handleDeleteAnnotation}
+        />
       </div>
+
+      {/* Floating Context Menu for Text Selection */}
+      {selectionMenu.isOpen && (
+        <TextSelectionMenu
+          x={selectionMenu.x}
+          y={selectionMenu.y}
+          selectedText={selectionMenu.text}
+          onHighlight={handleCreateHighlight}
+          onClose={() => setSelectionMenu({ isOpen: false, x: 0, y: 0, text: '', rects: [], page: 1 })}
+        />
+      )}
 
       {/* Bottom Progress Bar */}
       <div className="h-1 bg-neutral-950 w-full overflow-hidden select-none">
