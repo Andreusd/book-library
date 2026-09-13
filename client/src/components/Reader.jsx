@@ -156,6 +156,8 @@ export default function Reader({
   const scaleRef = useRef(scale);
   const lastWheelTimeRef = useRef(0);
   const lastSwipeTimeRef = useRef(0);
+  const accumulatedDeltaXRef = useRef(0);
+  const clearSwipeTimerRef = useRef(null);
 
   useEffect(() => {
     scaleRef.current = scale;
@@ -171,16 +173,24 @@ export default function Reader({
     }
   }, [isFavorite]);
 
-  // Lock body/html scroll while Reader is mounted to prevent background library scrollbar from leaking
+  // Lock body/html scroll and overscroll-behavior while Reader is mounted
+  // to prevent background scroll leaks and browser back/forward swipe navigation gestures
   useEffect(() => {
     const originalBodyOverflow = document.body.style.overflow;
     const originalHtmlOverflow = document.documentElement.style.overflow;
+    const originalBodyOverscroll = document.body.style.overscrollBehavior;
+    const originalHtmlOverscroll = document.documentElement.style.overscrollBehavior;
+
     document.body.style.overflow = 'hidden';
     document.documentElement.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
+    document.documentElement.style.overscrollBehavior = 'none';
 
     return () => {
       document.body.style.overflow = originalBodyOverflow;
       document.documentElement.style.overflow = originalHtmlOverflow;
+      document.body.style.overscrollBehavior = originalBodyOverscroll;
+      document.documentElement.style.overscrollBehavior = originalHtmlOverscroll;
     };
   }, []);
 
@@ -696,39 +706,40 @@ export default function Reader({
       const absX = Math.abs(e.deltaX);
       const absY = Math.abs(e.deltaY);
 
-      if (absX > 25 && absX > absY * 1.2) {
+      if (absX > absY && absX > 2) {
+        const isHorizScrollable = container.scrollWidth > container.clientWidth + 10;
+        const atRightEdge = container.scrollLeft + container.clientWidth >= container.scrollWidth - 10;
+        const atLeftEdge = container.scrollLeft <= 10;
+
+        // Block Chrome/Edge browser back/forward swipe gesture immediately on every horizontal event
+        if (!isHorizScrollable || (e.deltaX > 0 && atRightEdge) || (e.deltaX < 0 && atLeftEdge)) {
+          e.preventDefault();
+        }
+
         const now = Date.now();
-        if (now - lastSwipeTimeRef.current > 380) {
-          const isHorizScrollable = container.scrollWidth > container.clientWidth + 10;
-          if (!isHorizScrollable) {
-            e.preventDefault();
-            lastSwipeTimeRef.current = now;
-            if (e.deltaX > 0) {
-              goToNextPage();
-            } else {
-              goToPrevPage();
-            }
-            return;
-          } else {
-            const atRightEdge = container.scrollLeft + container.clientWidth >= container.scrollWidth - 15;
-            const atLeftEdge = container.scrollLeft <= 15;
-            if (e.deltaX > 0 && atRightEdge) {
-              e.preventDefault();
+        if (now - lastSwipeTimeRef.current > 350) {
+          accumulatedDeltaXRef.current += e.deltaX;
+
+          if (clearSwipeTimerRef.current) clearTimeout(clearSwipeTimerRef.current);
+          clearSwipeTimerRef.current = setTimeout(() => {
+            accumulatedDeltaXRef.current = 0;
+          }, 150);
+
+          if (Math.abs(accumulatedDeltaXRef.current) > 28) {
+            if (!isHorizScrollable || (accumulatedDeltaXRef.current > 0 && atRightEdge) || (accumulatedDeltaXRef.current < 0 && atLeftEdge)) {
               lastSwipeTimeRef.current = now;
-              goToNextPage();
-              return;
-            } else if (e.deltaX < 0 && atLeftEdge) {
-              e.preventDefault();
-              lastSwipeTimeRef.current = now;
-              goToPrevPage();
+              const dir = accumulatedDeltaXRef.current;
+              accumulatedDeltaXRef.current = 0;
+              if (dir > 0) {
+                goToNextPage();
+              } else {
+                goToPrevPage();
+              }
               return;
             }
           }
-        } else {
-          // Debounce active swipe to prevent browser back/forward navigation
-          e.preventDefault();
-          return;
         }
+        return;
       }
 
       // 2. Normal Wheel on non-scrollable page to flip pages
@@ -778,7 +789,7 @@ export default function Reader({
   const progressPercent = totalPages > 0 ? Math.round((currentPage / totalPages) * 100) : 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-neutral-950 text-neutral-100 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex flex-col bg-neutral-950 text-neutral-100 overflow-hidden overscroll-none touch-pan-y">
       {/* Top Header / Toolbar */}
       <header className="h-14 px-4 bg-neutral-900/90 backdrop-blur-md border-b border-neutral-850 flex items-center justify-between z-20 shrink-0 select-none">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -950,13 +961,13 @@ export default function Reader({
         )}
 
         {/* Document Area & Floating Navigation Stage */}
-        <div className="relative flex-1 flex flex-col min-w-0 h-full overflow-hidden group/stage">
+        <div className="relative flex-1 flex flex-col min-w-0 h-full overflow-hidden group/stage overscroll-none touch-pan-y">
           {/* Scrollable Document Container */}
           <div 
             ref={containerRef}
             tabIndex={0}
             onContextMenu={handleTextContextMenu}
-            className="flex-1 overflow-y-auto overflow-x-auto p-4 sm:p-6 focus:outline-none scroll-smooth select-text"
+            className="flex-1 overflow-y-auto overflow-x-auto p-4 sm:p-6 focus:outline-none scroll-smooth select-text overscroll-none touch-pan-y"
           >
             {loading ? (
               <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-3 text-neutral-400 select-none">
