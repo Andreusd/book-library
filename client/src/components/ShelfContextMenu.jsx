@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { FolderEdit, RotateCcw, Folder } from 'lucide-react';
+import { FolderEdit, RotateCcw, Palette } from 'lucide-react';
+import ShelfIcon from './ShelfIcon';
 import { useI18n } from '../i18n';
 
 export default function ShelfContextMenu({ 
@@ -7,7 +8,8 @@ export default function ShelfContextMenu({
   y, 
   shelf, 
   onClose, 
-  onOpenRename, 
+  onOpenRename,
+  onOpenIconModal,
   onResetName 
 }) {
   const menuRef = useRef(null);
@@ -36,7 +38,7 @@ export default function ShelfContextMenu({
   }, [onClose]);
 
   const menuWidth = 220;
-  const menuHeight = 120;
+  const menuHeight = 160;
   const posX = Math.min(Math.max(10, x), window.innerWidth - menuWidth - 10);
   const posY = Math.min(Math.max(10, y), window.innerHeight - menuHeight - 10);
 
@@ -49,7 +51,7 @@ export default function ShelfContextMenu({
       {/* Shelf header snippet */}
       <div className="px-3 py-1.5 border-b border-neutral-800/80 mb-1">
         <p className="font-semibold text-neutral-100 truncate text-[11px] leading-tight flex items-center gap-1.5">
-          <Folder className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+          <ShelfIcon icon={shelf.icon} className="w-3.5 h-3.5 text-amber-500 shrink-0" />
           <span>{shelf.name}</span>
         </p>
         <span className="text-[10px] text-neutral-400 font-mono">
@@ -57,13 +59,25 @@ export default function ShelfContextMenu({
         </span>
       </div>
 
+      {/* Choose Icon Action */}
+      <button
+        onClick={() => {
+          onClose();
+          onOpenIconModal(shelf);
+        }}
+        className="w-full px-3 py-1.5 flex items-center gap-2.5 hover:bg-amber-500/15 hover:text-amber-300 text-left transition cursor-pointer"
+      >
+        <Palette className="w-4 h-4 text-amber-400 shrink-0" />
+        <span>{t('chooseShelfIcon')}</span>
+      </button>
+
       {/* Rename Action */}
       <button
         onClick={() => {
           onClose();
           onOpenRename(shelf);
         }}
-        className="w-full px-3 py-1.5 flex items-center gap-2.5 hover:bg-amber-500/15 hover:text-amber-300 text-left transition"
+        className="w-full px-3 py-1.5 flex items-center gap-2.5 hover:bg-amber-500/15 hover:text-amber-300 text-left transition cursor-pointer"
       >
         <FolderEdit className="w-4 h-4 text-amber-400 shrink-0" />
         <span>{t('renameShelfVirtual')}</span>

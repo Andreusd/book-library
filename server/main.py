@@ -65,6 +65,10 @@ class RenameShelfPayload(BaseModel):
     shelf_id: str
     custom_name: str
 
+class SetShelfIconPayload(BaseModel):
+    shelf_id: str
+    icon: str
+
 class ToggleFavoritePayload(BaseModel):
     book_id: str
 
@@ -141,6 +145,17 @@ def rename_shelf(payload: RenameShelfPayload):
         "shelves": scanner.get_shelves(),
         "shelf_id": payload.shelf_id,
         "name": scanner.get_shelf_display_name(payload.shelf_id)
+    }
+
+@app.post("/api/shelves/icon")
+def set_shelf_icon(payload: SetShelfIconPayload):
+    """Sets or resets the icon for a bookshelf without changing the physical folder."""
+    icon = scanner.set_shelf_icon(payload.shelf_id, payload.icon)
+    return {
+        "status": "ok",
+        "shelves": scanner.get_shelves(),
+        "shelf_id": payload.shelf_id,
+        "icon": icon
     }
 
 @app.get("/api/books")

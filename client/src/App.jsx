@@ -13,6 +13,8 @@ import Reader from './components/Reader';
 import ContextMenu from './components/ContextMenu';
 import ShelfContextMenu from './components/ShelfContextMenu';
 import ShelfRenameModal from './components/ShelfRenameModal';
+import ShelfIconModal from './components/ShelfIconModal';
+import ShelfIcon from './components/ShelfIcon';
 import SettingsModal from './components/SettingsModal';
 import LanguageSelector from './components/LanguageSelector';
 import { useI18n } from './i18n';
@@ -75,6 +77,7 @@ export default function App() {
   const [contextMenu, setContextMenu] = useState({ isOpen: false, x: 0, y: 0, book: null });
   const [shelfContextMenu, setShelfContextMenu] = useState({ isOpen: false, x: 0, y: 0, shelf: null });
   const [renameModal, setRenameModal] = useState({ isOpen: false, shelf: null });
+  const [iconModal, setIconModal] = useState({ isOpen: false, shelf: null });
 
   const searchInputRef = useRef(null);
 
@@ -365,6 +368,23 @@ export default function App() {
     handleSaveShelfName(shelf.id, '');
   };
 
+  // Save shelf icon
+  const handleSaveShelfIcon = (shelfId, iconName) => {
+    fetch('/api/shelves/icon', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shelf_id: shelfId, icon: iconName })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === 'ok') {
+        setShelves(data.shelves);
+        setIconModal({ isOpen: false, shelf: null });
+      }
+    })
+    .catch(err => console.error('Failed to save shelf icon:', err));
+  };
+
   // Find active shelf metadata
   const currentShelfObj = shelves.find(s => s.id === selectedShelf);
 
@@ -437,7 +457,7 @@ export default function App() {
                 ) : (
                   <>
                     {currentShelfObj ? (
-                      <BookOpen className="w-4 h-4 text-amber-500 shrink-0" />
+                      <ShelfIcon icon={currentShelfObj.icon} className="w-4 h-4 text-amber-500 shrink-0" />
                     ) : (
                       <Home className="w-4 h-4 text-amber-500 shrink-0" />
                     )}
@@ -646,6 +666,7 @@ export default function App() {
           shelf={shelfContextMenu.shelf}
           onClose={() => setShelfContextMenu({ isOpen: false, x: 0, y: 0, shelf: null })}
           onOpenRename={(shelf) => setRenameModal({ isOpen: true, shelf: shelf })}
+          onOpenIconModal={(shelf) => setIconModal({ isOpen: true, shelf: shelf })}
           onResetName={handleResetShelfName}
         />
       )}
@@ -656,6 +677,14 @@ export default function App() {
         isOpen={renameModal.isOpen}
         onClose={() => setRenameModal({ isOpen: false, shelf: null })}
         onSave={handleSaveShelfName}
+      />
+
+      {/* Shelf Icon Picker Modal */}
+      <ShelfIconModal
+        shelf={iconModal.shelf}
+        isOpen={iconModal.isOpen}
+        onClose={() => setIconModal({ isOpen: false, shelf: null })}
+        onSave={handleSaveShelfIcon}
       />
 
       {/* Library Settings Modal */}

@@ -8,6 +8,7 @@ import threading
 from .config import ConfigManager
 
 ALIASES_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".cache", "shelf_aliases.json"))
+ICONS_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".cache", "shelf_icons.json"))
 
 def format_size(bytes_size: int) -> str:
     """Format file size in human-readable units."""
@@ -38,12 +39,14 @@ def compute_book_id(shelf: str, filename: str) -> str:
     return hashlib.sha1(raw.encode('utf-8')).hexdigest()[:16]
 
 class LibraryScanner:
-    def __init__(self, config_mgr: Optional[ConfigManager] = None, aliases_path: str = ALIASES_PATH):
+    def __init__(self, config_mgr: Optional[ConfigManager] = None, aliases_path: str = ALIASES_PATH, icons_path: str = ICONS_PATH):
         self.config_mgr = config_mgr or ConfigManager()
         self.library_path = self.config_mgr.get_library_path()
         self.aliases_path = aliases_path
+        self.icons_path = icons_path
         self._lock = threading.RLock()
         self._aliases = self._load_aliases()
+        self._icons = self._load_icons()
 
     def set_library_path(self, new_path: str) -> str:
         """Sets and persists a new book library folder path."""
@@ -68,6 +71,39 @@ class LibraryScanner:
                 json.dump(self._aliases, f, indent=2, ensure_ascii=False)
         except Exception as e:
             print(f"Error saving shelf aliases: {e}")
+
+    def _load_icons(self) -> Dict[str, str]:
+        if os.path.exists(self.icons_path):
+            try:
+                with open(self.icons_path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"Error loading shelf icons: {e}")
+        return {}
+
+    def _save_icons(self):
+        os.makedirs(os.path.dirname(self.icons_path), exist_ok=True)
+        try:
+            with open(self.icons_path, "w", encoding="utf-8") as f:
+                json.dump(self._icons, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"Error saving shelf icons: {e}")
+
+    def set_shelf_icon(self, shelf_id: str, icon_name: str) -> str:
+        """Sets or resets an icon name for a bookshelf."""
+        with self._lock:
+            icon_name = icon_name.strip()
+            if icon_name and icon_name.lower() != "folder":
+                self._icons[shelf_id] = icon_name
+            elif shelf_id in self._icons:
+                del self._icons[shelf_id]
+            self._save_icons()
+            return self._icons.get(shelf_id, "")
+
+    def get_shelf_icon(self, shelf_id: str) -> str:
+        """Returns the icon name for a shelf, or empty string if default."""
+        with self._lock:
+            return self._icons.get(shelf_id, "")
 
     def set_shelf_alias(self, shelf_id: str, custom_name: str) -> str:
         """Sets or resets a virtual custom name for a bookshelf."""
@@ -98,6 +134,7 @@ class LibraryScanner:
 
         with self._lock:
             aliases = dict(self._aliases)
+            icons = dict(self._icons)
 
         # Check for direct PDFs in root directory
         root_pdfs = [f for f in entries if f.lower().endswith('.pdf') and os.path.isfile(os.path.join(self.library_path, f))]
@@ -111,6 +148,7 @@ class LibraryScanner:
                 "custom_name": custom_name,
                 "folder": "_general",
                 "book_count": len(root_pdfs),
+                "icon": icons.get("_general", "BookOpen"),
             })
 
         for entry in entries:
@@ -131,6 +169,7 @@ class LibraryScanner:
                         "custom_name": custom_name,
                         "folder": entry,
                         "book_count": pdf_count,
+                        "icon": icons.get(entry, ""),
                     })
         return shelves
 

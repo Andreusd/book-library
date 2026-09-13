@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Library, Layers, Search, Folder, Heart, Bookmark, Home } from 'lucide-react';
+import ShelfIcon from './ShelfIcon';
 import { useI18n } from '../i18n';
 
 export default function Sidebar({ 
@@ -178,7 +179,7 @@ export default function Sidebar({
                   title={s.custom_name ? `${s.name} (${t('originalFolderLabel', { folder: s.folder })})` : s.name}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <Folder className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-amber-400' : 'text-neutral-500'}`} />
+                    <ShelfIcon icon={s.icon} className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-amber-400' : 'text-neutral-400'}`} />
                     <span className="truncate text-left">{s.name}</span>
                   </div>
                   <div className="flex items-center shrink-0 ml-2">
