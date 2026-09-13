@@ -19,30 +19,65 @@ import SettingsModal from './components/SettingsModal';
 import LanguageSelector from './components/LanguageSelector';
 import { useI18n } from './i18n';
 
-// Helper to extract book ID from URL route (/book/:id, #/book/:id, ?book=:id)
-function getBookIdFromRoute() {
-  if (typeof window === 'undefined') return null;
-  const pathMatch = window.location.pathname.match(/\/book\/([^/?#]+)/);
-  if (pathMatch && pathMatch[1]) {
-    return decodeURIComponent(pathMatch[1]);
+// Helper to extract view & route information from URL (/shelf/:id, /continue-reading, /favorites, /book/:id)
+function parseRoute() {
+  if (typeof window === 'undefined') return { view: 'home', bookId: null, shelfId: null };
+
+  const pathname = window.location.pathname;
+  const hash = window.location.hash;
+
+  // 1. Book detail / reader
+  const bookMatch = pathname.match(/\/book\/([^/?#]+)/) || hash.match(/#\/?book\/([^/?#]+)/);
+  if (bookMatch && bookMatch[1]) {
+    return { view: 'book', bookId: decodeURIComponent(bookMatch[1]), shelfId: null };
   }
-  const hashMatch = window.location.hash.match(/#\/?book\/([^/?#]+)/);
-  if (hashMatch && hashMatch[1]) {
-    return decodeURIComponent(hashMatch[1]);
+
+  // 2. Continue Reading
+  if (pathname === '/continue-reading' || hash === '#/continue-reading') {
+    return { view: 'continue-reading', bookId: null, shelfId: 'continue-reading' };
   }
+
+  // 3. Favorites
+  if (pathname === '/favorites' || hash === '#/favorites') {
+    return { view: 'favorites', bookId: null, shelfId: 'favorites' };
+  }
+
+  // 4. Specific Bookshelf (/shelf/:id)
+  const shelfMatch = pathname.match(/\/shelf\/([^/?#]+)/) || hash.match(/#\/?shelf\/([^/?#]+)/);
+  if (shelfMatch && shelfMatch[1]) {
+    return { view: 'shelf', bookId: null, shelfId: decodeURIComponent(shelfMatch[1]) };
+  }
+
+  // Legacy query params support (?book=... or ?shelf=...)
   const searchParams = new URLSearchParams(window.location.search);
   const qBook = searchParams.get('book');
   if (qBook) {
-    return qBook;
+    return { view: 'book', bookId: qBook, shelfId: null };
   }
-  return null;
+  const qShelf = searchParams.get('shelf');
+  if (qShelf) {
+    if (qShelf === 'continue-reading' || qShelf === 'favorites') {
+      return { view: qShelf, bookId: null, shelfId: qShelf };
+    }
+    return { view: 'shelf', bookId: null, shelfId: qShelf };
+  }
+
+  // 5. Default Home
+  return { view: 'home', bookId: null, shelfId: null };
+}
+
+function getPathForShelf(shelfId) {
+  if (!shelfId) return '/';
+  if (shelfId === 'continue-reading') return '/continue-reading';
+  if (shelfId === 'favorites') return '/favorites';
+  return `/shelf/${encodeURIComponent(shelfId)}`;
 }
 
 export default function App() {
   const { t } = useI18n();
   const [shelves, setShelves] = useState([]);
   const [totalBooks, setTotalBooks] = useState(0);
-  const [selectedShelf, setSelectedShelf] = useState(null);
+  const [selectedShelf, setSelectedShelf] = useState(() => parseRoute().shelfId);
   const [books, setBooks] = useState([]);
   const [continueReading, setContinueReading] = useState([]);
   const [favorites, setFavorites] = useState([]);
@@ -53,7 +88,7 @@ export default function App() {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [sortBy, setSortBy] = useState('title_asc');
   const [activeBook, setActiveBook] = useState(null);
-  const [routeLoading, setRouteLoading] = useState(() => Boolean(getBookIdFromRoute()));
+  const [routeLoading, setRouteLoading] = useState(() => Boolean(parseRoute().bookId));
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     try {
       const saved = localStorage.getItem('sidebar_open');
@@ -172,33 +207,48 @@ export default function App() {
     .catch(err => console.error('Failed to toggle favorite:', err));
   }, [loadFavorites, selectedShelf]);
 
+  // Navigate to shelf and update browser URL
+  const navigateToShelf = useCallback((shelfId, replace = false) => {
+    setSelectedShelf(shelfId);
+    setSearchQuery('');
+    const targetPath = getPathForShelf(shelfId);
+    if (window.location.pathname !== targetPath) {
+      if (replace) {
+        window.history.replaceState({ shelfId }, '', targetPath);
+      } else {
+        window.history.pushState({ shelfId }, '', targetPath);
+      }
+    }
+  }, []);
+
   // Open reader and update browser route to /book/:id
   const openReader = useCallback((book) => {
     if (!book) return;
     setActiveBook(book);
     const targetPath = `/book/${encodeURIComponent(book.id)}`;
     if (window.location.pathname !== targetPath) {
-      window.history.pushState({ bookId: book.id }, '', targetPath);
+      window.history.pushState({ bookId: book.id, shelfId: selectedShelf }, '', targetPath);
     }
-  }, []);
+  }, [selectedShelf]);
 
-  // Close reader and reset route to /
+  // Close reader and return to current shelf route
   const closeReader = useCallback(() => {
     setActiveBook(null);
-    if (window.location.pathname.startsWith('/book/') || window.location.search.includes('book=') || window.location.hash.includes('book/')) {
-      window.history.pushState(null, '', '/');
+    const targetPath = getPathForShelf(selectedShelf);
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({ shelfId: selectedShelf }, '', targetPath);
     }
     loadContinueReading();
     loadFavorites();
-  }, [loadContinueReading, loadFavorites]);
+  }, [selectedShelf, loadContinueReading, loadFavorites]);
 
   // Handle browser Back and Forward navigation (popstate)
   useEffect(() => {
     const handlePopState = () => {
-      const bookId = getBookIdFromRoute();
-      if (bookId) {
-        if (!activeBook || activeBook.id !== bookId) {
-          fetch(`/api/book/${encodeURIComponent(bookId)}`)
+      const route = parseRoute();
+      if (route.bookId) {
+        if (!activeBook || activeBook.id !== route.bookId) {
+          fetch(`/api/book/${encodeURIComponent(route.bookId)}`)
             .then(res => {
               if (!res.ok) throw new Error('Book not found');
               return res.json();
@@ -208,7 +258,7 @@ export default function App() {
             })
             .catch(() => {
               setActiveBook(null);
-              window.history.replaceState(null, '', '/');
+              window.history.replaceState(null, '', getPathForShelf(selectedShelf));
             });
         }
       } else {
@@ -217,18 +267,20 @@ export default function App() {
           loadContinueReading();
           loadFavorites();
         }
+        setSelectedShelf(route.shelfId);
+        setSearchQuery('');
       }
     };
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [activeBook, loadContinueReading, loadFavorites]);
+  }, [activeBook, selectedShelf, loadContinueReading, loadFavorites]);
 
   // Load book directly from route on initial page load / reload
   useEffect(() => {
-    const initialBookId = getBookIdFromRoute();
-    if (initialBookId) {
-      fetch(`/api/book/${encodeURIComponent(initialBookId)}`)
+    const route = parseRoute();
+    if (route.bookId) {
+      fetch(`/api/book/${encodeURIComponent(route.bookId)}`)
         .then(res => {
           if (!res.ok) throw new Error('Book not found');
           return res.json();
@@ -236,11 +288,12 @@ export default function App() {
         .then(book => {
           if (book && book.id) {
             setActiveBook(book);
+            setSelectedShelf(prev => prev || book.shelf || null);
           }
         })
         .catch(err => {
           console.error('Failed to load book from route:', err);
-          window.history.replaceState(null, '', '/');
+          window.history.replaceState(null, '', getPathForShelf(route.shelfId));
         })
         .finally(() => {
           setRouteLoading(false);
@@ -426,8 +479,7 @@ export default function App() {
         continueReadingCount={continueReading.length}
         selectedShelf={selectedShelf}
         onSelectShelf={(id) => {
-          setSelectedShelf(id);
-          setSearchQuery('');
+          navigateToShelf(id);
           if (window.innerWidth < 1024) {
             setSidebarOpen(false);
           }
@@ -456,28 +508,49 @@ export default function App() {
 
             {/* Breadcrumb / Current Shelf Title */}
             <div className="min-w-0">
-              <h2 className="text-sm sm:text-base font-bold text-neutral-100 truncate flex items-center gap-2">
-                {selectedShelf === 'continue-reading' ? (
+              <nav aria-label="Breadcrumb" className="text-sm sm:text-base font-bold text-neutral-100 truncate flex items-center gap-1.5">
+                {selectedShelf ? (
                   <>
-                    <Bookmark className="w-4 h-4 text-emerald-500 fill-emerald-500 shrink-0" />
-                    <span>{t('continueReading')}</span>
-                  </>
-                ) : selectedShelf === 'favorites' ? (
-                  <>
-                    <Heart className="w-4 h-4 text-rose-500 fill-rose-500 shrink-0" />
-                    <span>{t('favorites')}</span>
+                    <button
+                      onClick={() => navigateToShelf(null)}
+                      className="flex items-center gap-1.5 text-neutral-400 hover:text-amber-400 transition-colors cursor-pointer"
+                      title={t('allBooks')}
+                    >
+                      <Home className="w-4 h-4 shrink-0" />
+                      <span className="hidden sm:inline font-medium text-xs sm:text-sm">{t('allBooks')}</span>
+                    </button>
+                    <span className="text-neutral-600">/</span>
+                    <span className="truncate flex items-center gap-1.5 text-neutral-100">
+                      {selectedShelf === 'continue-reading' ? (
+                        <>
+                          <Bookmark className="w-4 h-4 text-emerald-500 fill-emerald-500 shrink-0" />
+                          <span>{t('continueReading')}</span>
+                        </>
+                      ) : selectedShelf === 'favorites' ? (
+                        <>
+                          <Heart className="w-4 h-4 text-rose-500 fill-rose-500 shrink-0" />
+                          <span>{t('favorites')}</span>
+                        </>
+                      ) : (
+                        <>
+                          {currentShelfObj ? (
+                            <ShelfIcon icon={currentShelfObj.icon} className="w-4 h-4 text-amber-500 shrink-0" />
+                          ) : null}
+                          <span>{currentShelfObj ? currentShelfObj.name : selectedShelf}</span>
+                        </>
+                      )}
+                    </span>
                   </>
                 ) : (
-                  <>
-                    {currentShelfObj ? (
-                      <ShelfIcon icon={currentShelfObj.icon} className="w-4 h-4 text-amber-500 shrink-0" />
-                    ) : (
-                      <Home className="w-4 h-4 text-amber-500 shrink-0" />
-                    )}
-                    <span>{currentShelfObj ? currentShelfObj.name : t('allBooks')}</span>
-                  </>
+                  <button
+                    onClick={() => navigateToShelf(null)}
+                    className="flex items-center gap-2 text-neutral-100 hover:text-amber-400 transition-colors cursor-pointer"
+                  >
+                    <Home className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>{t('allBooks')}</span>
+                  </button>
                 )}
-              </h2>
+              </nav>
             </div>
           </div>
 
@@ -540,7 +613,7 @@ export default function App() {
               books={continueReading} 
               onSelectBook={(book) => openReader(book)} 
               onContextMenu={handleContextMenu}
-              onViewAll={() => setSelectedShelf('continue-reading')}
+              onViewAll={() => navigateToShelf('continue-reading')}
             />
           )}
 
@@ -551,7 +624,7 @@ export default function App() {
               onSelectBook={(book) => openReader(book)}
               onContextMenu={handleContextMenu}
               onToggleFavorite={handleToggleFavorite}
-              onViewAll={() => setSelectedShelf('favorites')}
+              onViewAll={() => navigateToShelf('favorites')}
             />
           )}
 
