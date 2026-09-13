@@ -607,7 +607,7 @@ export default function Reader({
   // Keyboard navigation & smart scrolling
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.target.tagName === 'INPUT') return;
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
       const container = containerRef.current;
       const isScrollable = container && container.scrollHeight > container.clientHeight + 10;
@@ -641,26 +641,14 @@ export default function Reader({
           goToPrevPage();
         }
       } else if (e.key === 'ArrowDown') {
-        if (isScrollable) {
-          const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 10;
-          if (atBottom) {
-            goToNextPage();
-          } else {
-            container.scrollBy({ top: 120, behavior: 'smooth' });
-          }
-        } else {
-          goToNextPage();
+        e.preventDefault();
+        if (container) {
+          container.scrollBy({ top: 120, behavior: 'smooth' });
         }
       } else if (e.key === 'ArrowUp') {
-        if (isScrollable) {
-          const atTop = container.scrollTop <= 10;
-          if (atTop) {
-            goToPrevPage();
-          } else {
-            container.scrollBy({ top: -120, behavior: 'smooth' });
-          }
-        } else {
-          goToPrevPage();
+        e.preventDefault();
+        if (container) {
+          container.scrollBy({ top: -120, behavior: 'smooth' });
         }
       } else if (e.key === 'Escape') {
         onClose();

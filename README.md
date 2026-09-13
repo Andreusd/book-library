@@ -68,6 +68,7 @@ export BOOK_LIBRARY_PATH="/path/to/your/books"
 | `Ctrl + B` | Toggle sidebar / Alternar menu lateral |
 | `Right Arrow` / `Space` / `Page Down` | Next page in reader / Próxima página no leitor |
 | `Left Arrow` / `Page Up` | Previous page in reader / Página anterior no leitor |
+| `Up Arrow` / `Down Arrow` | Scroll page up/down (pure scrolling) / Rolar página para cima/baixo (rolagem suave) |
 | `+` / `-` | Zoom in / Zoom out |
 | `Ctrl + Scroll Wheel` | PDF smooth zoom / Zoom suave do PDF |
 | `Esc` | Close reader & return to library / Voltar à estante |
