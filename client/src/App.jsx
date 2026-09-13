@@ -426,7 +426,7 @@ export default function App() {
               <h2 className="text-sm sm:text-base font-bold text-neutral-100 truncate flex items-center gap-2">
                 {selectedShelf === 'continue-reading' ? (
                   <>
-                    <Bookmark className="w-4 h-4 text-amber-500 shrink-0" />
+                    <Bookmark className="w-4 h-4 text-emerald-500 fill-emerald-500 shrink-0" />
                     <span>{t('continueReading')}</span>
                   </>
                 ) : selectedShelf === 'favorites' ? (

@@ -105,17 +105,17 @@ export default function Sidebar({
                 className={`
                   w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors
                   ${selectedShelf === 'continue-reading' 
-                    ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' 
+                    ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' 
                     : 'text-neutral-300 hover:bg-neutral-850 hover:text-white'}
                 `}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <Bookmark className={`w-4 h-4 shrink-0 ${selectedShelf === 'continue-reading' ? 'text-amber-400' : 'text-neutral-400'}`} />
+                  <Bookmark className={`w-4 h-4 shrink-0 ${selectedShelf === 'continue-reading' ? 'fill-emerald-500 text-emerald-500' : 'text-emerald-400'}`} />
                   <span className="truncate">{t('continueReading')}</span>
                 </div>
                 <span className={`
                   text-[11px] px-2 py-0.5 rounded-full font-mono font-semibold
-                  ${selectedShelf === 'continue-reading' ? 'bg-amber-500/20 text-amber-300' : 'bg-neutral-800 text-neutral-400'}
+                  ${selectedShelf === 'continue-reading' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-neutral-800 text-neutral-400'}
                 `}>
                   {continueReadingCount}
                 </span>

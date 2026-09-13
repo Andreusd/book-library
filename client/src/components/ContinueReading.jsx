@@ -19,7 +19,7 @@ export default function ContinueReading({ books, onSelectBook, onContextMenu, on
     <section className="mb-8">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Bookmark className="w-5 h-5 text-amber-500" />
+          <Bookmark className="w-5 h-5 text-emerald-500 fill-emerald-500" />
           <h2 className="text-base font-semibold text-neutral-100">{t('continueReading')}</h2>
           <span className="text-xs text-neutral-500 font-normal">
             {t('booksInProgress', { count: inProgressBooks.length })}
@@ -28,7 +28,7 @@ export default function ContinueReading({ books, onSelectBook, onContextMenu, on
         {onViewAll && inProgressBooks.length > 1 && (
           <button
             onClick={onViewAll}
-            className="text-xs font-medium text-amber-400 hover:text-amber-300 flex items-center gap-1 transition-colors cursor-pointer"
+            className="text-xs font-medium text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors cursor-pointer"
           >
             <span>{t('viewAll')}</span>
             <ChevronRight className="w-3.5 h-3.5" />
@@ -55,7 +55,7 @@ export default function ContinueReading({ books, onSelectBook, onContextMenu, on
                   onContextMenu(e, book);
                 }
               }}
-              className={`group cursor-pointer bg-neutral-900/60 hover:bg-neutral-850 border border-neutral-800 hover:border-amber-500/40 rounded-xl p-3 gap-3.5 transition-all duration-200 shadow-sm hover:shadow-md ${visibilityClass}`}
+              className={`group cursor-pointer bg-neutral-900/60 hover:bg-neutral-850 border border-neutral-800 hover:border-emerald-500/40 rounded-xl p-3 gap-3.5 transition-all duration-200 shadow-sm hover:shadow-md ${visibilityClass}`}
             >
               {/* Mini Cover */}
               <div className="w-16 aspect-[1/1.45] rounded-md overflow-hidden bg-neutral-950 shrink-0 border border-neutral-800 shadow relative">
@@ -70,10 +70,10 @@ export default function ContinueReading({ books, onSelectBook, onContextMenu, on
               {/* Info & Progress */}
               <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
                 <div>
-                  <span className="text-[10px] font-medium text-amber-500/90 uppercase tracking-wider">
+                  <span className="text-[10px] font-medium text-emerald-500/90 uppercase tracking-wider">
                     {book.shelf_display}
                   </span>
-                  <h3 className="text-xs font-semibold text-neutral-200 group-hover:text-amber-400 transition-colors line-clamp-2 leading-tight mt-0.5">
+                  <h3 className="text-xs font-semibold text-neutral-200 group-hover:text-emerald-400 transition-colors line-clamp-2 leading-tight mt-0.5">
                     {book.title}
                   </h3>
                 </div>
@@ -83,13 +83,13 @@ export default function ContinueReading({ books, onSelectBook, onContextMenu, on
                     <span>
                       {t('pageOf', { page: book.progress?.page || 1, total: book.progress?.total_pages || '?' })}
                     </span>
-                    <span className="font-semibold text-amber-400">{percent}%</span>
+                    <span className="font-semibold text-emerald-400">{percent}%</span>
                   </div>
 
                   {/* Progress Bar */}
                   <div className="w-full h-1.5 bg-neutral-800 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-amber-600 to-amber-400 rounded-full"
+                      className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full"
                       style={{ width: `${percent}%` }}
                     />
                   </div>
