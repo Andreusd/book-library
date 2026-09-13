@@ -53,8 +53,6 @@ class ConfigManager:
             os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "books")),
             os.path.expanduser("~/Books"),
             os.path.expanduser("~/Documents/Books"),
-            # Preserve existing user's local directory if present
-            os.path.join(os.environ.get("USERPROFILE", ""), "OneDrive", "Andreusd", "Livros"),
         ]
         for candidate in candidates:
             if candidate and os.path.isdir(candidate):
