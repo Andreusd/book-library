@@ -171,6 +171,13 @@ export default function Reader({
       return true;
     }
   });
+  const [upDownFlipEnabled, setUpDownFlipEnabled] = useState(() => {
+    try {
+      return localStorage.getItem('reader_up_down_flip') === 'true'; // false by default
+    } catch (e) {
+      return false;
+    }
+  });
 
   const toggleTrackpadSwipe = () => {
     setTrackpadSwipeEnabled(prev => {
@@ -187,6 +194,16 @@ export default function Reader({
       const next = !prev;
       try {
         localStorage.setItem('reader_floating_buttons', String(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  const toggleUpDownFlip = () => {
+    setUpDownFlipEnabled(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('reader_up_down_flip', String(next));
       } catch (e) {}
       return next;
     });
@@ -730,13 +747,39 @@ export default function Reader({
         }
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
-        if (container) {
-          container.scrollBy({ top: 120, behavior: 'smooth' });
+        if (upDownFlipEnabled) {
+          if (isScrollable) {
+            const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 10;
+            if (atBottom) {
+              goToNextPage();
+            } else {
+              container.scrollBy({ top: 120, behavior: 'smooth' });
+            }
+          } else {
+            goToNextPage();
+          }
+        } else {
+          if (container) {
+            container.scrollBy({ top: 120, behavior: 'smooth' });
+          }
         }
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        if (container) {
-          container.scrollBy({ top: -120, behavior: 'smooth' });
+        if (upDownFlipEnabled) {
+          if (isScrollable) {
+            const atTop = container.scrollTop <= 10;
+            if (atTop) {
+              goToPrevPage();
+            } else {
+              container.scrollBy({ top: -120, behavior: 'smooth' });
+            }
+          } else {
+            goToPrevPage();
+          }
+        } else {
+          if (container) {
+            container.scrollBy({ top: -120, behavior: 'smooth' });
+          }
         }
       } else if (e.key === 'Escape') {
         onClose();
@@ -758,7 +801,7 @@ export default function Reader({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [goToNextPage, goToPrevPage, onClose]);
+  }, [goToNextPage, goToPrevPage, onClose, upDownFlipEnabled]);
 
   // Native wheel listener for smooth scrolling, edge-flipping, and Ctrl+Wheel PDF zoom
   useEffect(() => {
@@ -1104,6 +1147,27 @@ export default function Reader({
                           type="checkbox"
                           checked={floatingButtonsEnabled}
                           onChange={toggleFloatingButtons}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
+                      </div>
+                    </label>
+
+                    {/* Toggle Up/Down Arrow Page Flip */}
+                    <label className="flex items-start justify-between gap-3 p-2.5 rounded-xl hover:bg-neutral-800/60 transition-colors cursor-pointer group">
+                      <div className="min-w-0 flex-1">
+                        <span className="text-xs font-semibold text-neutral-100 block group-hover:text-amber-300 transition-colors">
+                          {t('upDownPageFlip')}
+                        </span>
+                        <span className="text-[11px] text-neutral-300 leading-snug block mt-0.5">
+                          {t('upDownPageFlipDesc')}
+                        </span>
+                      </div>
+                      <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                        <input 
+                          type="checkbox"
+                          checked={upDownFlipEnabled}
+                          onChange={toggleUpDownFlip}
                           className="sr-only peer"
                         />
                         <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
