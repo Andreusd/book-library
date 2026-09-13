@@ -164,6 +164,19 @@ export default function Reader({
     onProgressUpdateRef.current = onProgressUpdate;
   }, [onProgressUpdate]);
 
+  // Lock body/html scroll while Reader is mounted to prevent background library scrollbar from leaking
+  useEffect(() => {
+    const originalBodyOverflow = document.body.style.overflow;
+    const originalHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = originalBodyOverflow;
+      document.documentElement.style.overflow = originalHtmlOverflow;
+    };
+  }, []);
+
   // Page Navigation handlers
   const goToNextPage = useCallback(() => {
     setCurrentPage(prev => (prev < totalPages ? prev + 1 : prev));
@@ -731,7 +744,7 @@ export default function Reader({
   const progressPercent = totalPages > 0 ? Math.round((currentPage / totalPages) * 100) : 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-neutral-950 text-neutral-100">
+    <div className="fixed inset-0 z-50 flex flex-col bg-neutral-950 text-neutral-100 overflow-hidden">
       {/* Top Header / Toolbar */}
       <header className="h-14 px-4 bg-neutral-900/90 backdrop-blur-md border-b border-neutral-850 flex items-center justify-between z-20 shrink-0 select-none">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
