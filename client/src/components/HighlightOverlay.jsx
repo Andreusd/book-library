@@ -54,7 +54,7 @@ export default function HighlightOverlay({
   };
 
   const handleSaveEdit = (e) => {
-    e.stopPropagation();
+    if (e && e.stopPropagation) e.stopPropagation();
     if (activeAnnotation && onUpdateComment) {
       onUpdateComment(activeAnnotation.id, editText.trim());
       setActiveAnnotation(prev => prev ? { ...prev, comment: editText.trim() } : null);
@@ -159,6 +159,12 @@ export default function HighlightOverlay({
                 <textarea
                   value={editText}
                   onChange={(e) => setEditText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSaveEdit(e);
+                    }
+                  }}
                   placeholder={t('addCommentPlaceholder')}
                   rows={3}
                   className="w-full p-2 text-xs bg-neutral-950 border border-neutral-750 rounded-lg text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-amber-500"
@@ -174,6 +180,7 @@ export default function HighlightOverlay({
                   <button
                     onClick={handleSaveEdit}
                     className="px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-400 text-neutral-950 font-semibold text-xs flex items-center gap-1"
+                    title={`${t('saveComment')} (Ctrl+Enter)`}
                   >
                     <Check className="w-3 h-3" />
                     <span>{t('saveComment')}</span>

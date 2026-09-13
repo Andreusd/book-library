@@ -68,7 +68,7 @@ export default function TextSelectionMenu({
   };
 
   const handleSaveComment = (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     onHighlight(selectedColor, commentText.trim());
     onClose();
   };
@@ -153,6 +153,12 @@ export default function TextSelectionMenu({
           <textarea
             value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
+            onKeyDown={(e) => {
+              if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                handleSaveComment(e);
+              }
+            }}
             placeholder={t('addCommentPlaceholder')}
             rows={3}
             className="w-full p-2 text-xs bg-neutral-950 border border-neutral-750 rounded-lg text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-amber-500"
@@ -170,6 +176,7 @@ export default function TextSelectionMenu({
             <button
               type="submit"
               className="px-3 py-1 text-xs font-semibold rounded bg-amber-500 hover:bg-amber-400 text-neutral-950 flex items-center gap-1 cursor-pointer"
+              title={`${t('saveComment')} (Ctrl+Enter)`}
             >
               <Check className="w-3 h-3" />
               <span>{t('saveComment')}</span>

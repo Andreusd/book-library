@@ -164,6 +164,12 @@ export default function CommentsDrawer({
                       <textarea
                         value={editText}
                         onChange={(e) => setEditText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                            e.preventDefault();
+                            saveEdit(ann.id);
+                          }
+                        }}
                         placeholder={t('addCommentPlaceholder')}
                         rows={2}
                         className="w-full p-2 text-xs bg-neutral-950 border border-neutral-750 rounded-lg text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-amber-500"
@@ -179,6 +185,7 @@ export default function CommentsDrawer({
                         <button
                           onClick={() => saveEdit(ann.id)}
                           className="px-2.5 py-0.5 rounded bg-amber-500 hover:bg-amber-400 text-neutral-950 font-semibold text-[11px] flex items-center gap-1"
+                          title={`${t('saveComment')} (Ctrl+Enter)`}
                         >
                           <Check className="w-3 h-3" />
                           <span>{t('saveComment')}</span>
