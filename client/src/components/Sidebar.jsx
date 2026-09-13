@@ -33,7 +33,7 @@ export default function Sidebar({
 
       {/* Sidebar Container */}
       <aside className={`
-        fixed top-0 bottom-0 left-0 z-40 bg-neutral-925 border-r border-neutral-850 flex flex-col transition-all duration-300 ease-in-out shrink-0 overflow-hidden
+        fixed top-0 bottom-0 left-0 z-40 bg-neutral-900 border-r border-neutral-800 flex flex-col transition-all duration-300 ease-in-out shrink-0 overflow-hidden
         lg:static lg:h-screen lg:sticky lg:top-0
         ${isOpen 
           ? 'w-72 translate-x-0 opacity-100' 
@@ -43,7 +43,7 @@ export default function Sidebar({
         {/* Inner wrapper to keep content width consistent during smooth collapse animation */}
         <div className="w-72 flex flex-col h-full shrink-0">
           {/* Brand Header */}
-          <div className="h-16 px-5 border-b border-neutral-850 flex items-center shrink-0 bg-neutral-900/40">
+          <div className="h-16 px-5 border-b border-neutral-800 flex items-center shrink-0 bg-neutral-900/40">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center shadow-lg shadow-amber-500/20 text-neutral-950 shrink-0">
                 <Library className="w-5 h-5 font-bold" />
@@ -58,7 +58,7 @@ export default function Sidebar({
           </div>
 
           {/* Shelf Filter Input */}
-          <div className="p-3 border-b border-neutral-850/60">
+          <div className="p-3 border-b border-neutral-800">
             <div className="relative">
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
               <input
@@ -82,7 +82,7 @@ export default function Sidebar({
                 w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors
                 ${selectedShelf === null 
                   ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' 
-                  : 'text-neutral-300 hover:bg-neutral-850 hover:text-white'}
+                  : 'text-neutral-300 hover:bg-neutral-800 hover:text-white'}
               `}
             >
               <div className="flex items-center gap-2.5 min-w-0">
@@ -107,7 +107,7 @@ export default function Sidebar({
                   w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors
                   ${selectedShelf === 'continue-reading' 
                     ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' 
-                    : 'text-neutral-300 hover:bg-neutral-850 hover:text-white'}
+                    : 'text-neutral-300 hover:bg-neutral-800 hover:text-white'}
                 `}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -133,7 +133,7 @@ export default function Sidebar({
                   w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors
                   ${selectedShelf === 'favorites' 
                     ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30' 
-                    : 'text-neutral-300 hover:bg-neutral-850 hover:text-white'}
+                    : 'text-neutral-300 hover:bg-neutral-800 hover:text-white'}
                 `}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -174,7 +174,7 @@ export default function Sidebar({
                     w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors
                     ${isSelected 
                       ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' 
-                      : 'text-neutral-300 hover:bg-neutral-850 hover:text-white'}
+                      : 'text-neutral-300 hover:bg-neutral-800 hover:text-white'}
                   `}
                   title={s.custom_name ? `${s.name} (${t('originalFolderLabel', { folder: s.folder })})` : s.name}
                 >
@@ -185,7 +185,7 @@ export default function Sidebar({
                   <div className="flex items-center shrink-0 ml-2">
                     <span className={`
                       text-[11px] px-1.5 py-0.2 rounded font-mono
-                      ${isSelected ? 'bg-amber-500/20 text-amber-300' : 'bg-neutral-850 text-neutral-400'}
+                      ${isSelected ? 'bg-amber-500/20 text-amber-300' : 'bg-neutral-800 text-neutral-400'}
                     `}>
                       {s.book_count}
                     </span>

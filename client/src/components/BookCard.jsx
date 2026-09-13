@@ -37,7 +37,7 @@ export default function BookCard({
         
         {/* Skeleton loading animation */}
         {!imageLoaded && !imageError && (
-          <div className="absolute inset-0 bg-neutral-850 animate-pulse flex flex-col items-center justify-center p-4 text-center">
+          <div className="absolute inset-0 bg-neutral-800 animate-pulse flex flex-col items-center justify-center p-4 text-center">
             <BookOpen className="w-8 h-8 text-neutral-600 mb-2" />
             <span className="text-[11px] text-neutral-500 line-clamp-3">{book.title}</span>
           </div>

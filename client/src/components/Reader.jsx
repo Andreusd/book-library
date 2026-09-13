@@ -870,7 +870,7 @@ export default function Reader({
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-neutral-950 text-neutral-100 overflow-hidden overscroll-none touch-pan-y">
       {/* Top Header / Toolbar */}
-      <header className="h-14 px-4 bg-neutral-900/90 backdrop-blur-md border-b border-neutral-850 flex items-center justify-between z-20 shrink-0 select-none">
+      <header className="h-14 px-4 bg-neutral-900 border-b border-neutral-800 flex items-center justify-between z-30 shrink-0 select-none">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <button 
             onClick={onClose}
@@ -1050,14 +1050,14 @@ export default function Reader({
             {readerSettingsOpen && (
               <>
                 <div 
-                  className="fixed inset-0 z-30" 
+                  className="fixed inset-0 z-40 bg-transparent" 
                   onClick={() => setReaderSettingsOpen(false)}
                 />
-                <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-neutral-925/95 backdrop-blur-xl border border-neutral-800 rounded-2xl shadow-2xl p-4 z-40 text-left select-none animate-in fade-in zoom-in-95 duration-150">
-                  <div className="flex items-center justify-between pb-3 mb-3 border-b border-neutral-800">
+                <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-neutral-900 border border-neutral-700 rounded-2xl shadow-2xl shadow-black/80 p-3.5 z-50 text-left select-none animate-in fade-in zoom-in-95 duration-150">
+                  <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-neutral-800">
                     <div className="flex items-center gap-2">
                       <SlidersHorizontal className="w-4 h-4 text-amber-400" />
-                      <h3 className="text-xs font-bold text-neutral-200 uppercase tracking-wider">{t('readerSettings')}</h3>
+                      <h3 className="text-xs font-bold text-neutral-100 uppercase tracking-wider">{t('readerSettings')}</h3>
                     </div>
                     <button 
                       onClick={() => setReaderSettingsOpen(false)}
@@ -1067,14 +1067,14 @@ export default function Reader({
                     </button>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-1.5">
                     {/* Toggle Trackpad Swipe */}
-                    <label className="flex items-start justify-between gap-3 cursor-pointer group">
+                    <label className="flex items-start justify-between gap-3 p-2.5 rounded-xl hover:bg-neutral-800/60 transition-colors cursor-pointer group">
                       <div className="min-w-0 flex-1">
-                        <span className="text-xs font-semibold text-neutral-200 block group-hover:text-amber-400 transition-colors">
+                        <span className="text-xs font-semibold text-neutral-100 block group-hover:text-amber-300 transition-colors">
                           {t('trackpadSwipe')}
                         </span>
-                        <span className="text-[11px] text-neutral-400 leading-tight block mt-0.5">
+                        <span className="text-[11px] text-neutral-300 leading-snug block mt-0.5">
                           {t('trackpadSwipeDesc')}
                         </span>
                       </div>
@@ -1085,17 +1085,17 @@ export default function Reader({
                           onChange={toggleTrackpadSwipe}
                           className="sr-only peer"
                         />
-                        <div className="w-9 h-5 bg-neutral-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                        <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
                       </div>
                     </label>
 
                     {/* Toggle Floating Side Buttons */}
-                    <label className="flex items-start justify-between gap-3 cursor-pointer group">
+                    <label className="flex items-start justify-between gap-3 p-2.5 rounded-xl hover:bg-neutral-800/60 transition-colors cursor-pointer group">
                       <div className="min-w-0 flex-1">
-                        <span className="text-xs font-semibold text-neutral-200 block group-hover:text-amber-400 transition-colors">
+                        <span className="text-xs font-semibold text-neutral-100 block group-hover:text-amber-300 transition-colors">
                           {t('floatingSideButtons')}
                         </span>
-                        <span className="text-[11px] text-neutral-400 leading-tight block mt-0.5">
+                        <span className="text-[11px] text-neutral-300 leading-snug block mt-0.5">
                           {t('floatingSideButtonsDesc')}
                         </span>
                       </div>
@@ -1106,7 +1106,7 @@ export default function Reader({
                           onChange={toggleFloatingButtons}
                           className="sr-only peer"
                         />
-                        <div className="w-9 h-5 bg-neutral-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                        <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
                       </div>
                     </label>
                   </div>
@@ -1210,7 +1210,7 @@ export default function Reader({
                 e.stopPropagation();
                 goToPrevPage();
               }}
-              className="absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 z-20 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-neutral-900/80 hover:bg-neutral-850/95 backdrop-blur-md border border-neutral-750/80 hover:border-amber-500/60 text-neutral-300 hover:text-white shadow-2xl flex items-center justify-center transition-all duration-200 opacity-60 hover:opacity-100 sm:opacity-0 sm:group-hover/stage:opacity-80 sm:hover:!opacity-100 hover:scale-110 active:scale-95 cursor-pointer select-none"
+              className="absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 z-20 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-neutral-900/80 hover:bg-neutral-800 backdrop-blur-md border border-neutral-700 hover:border-amber-500/60 text-neutral-300 hover:text-white shadow-2xl flex items-center justify-center transition-all duration-200 opacity-60 hover:opacity-100 sm:opacity-0 sm:group-hover/stage:opacity-80 sm:hover:!opacity-100 hover:scale-110 active:scale-95 cursor-pointer select-none"
               title={t('prevPageTitle')}
               aria-label={t('prevPageTitle')}
             >
@@ -1226,7 +1226,7 @@ export default function Reader({
                 e.stopPropagation();
                 goToNextPage();
               }}
-              className="absolute right-3 sm:right-5 top-1/2 -translate-y-1/2 z-20 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-neutral-900/80 hover:bg-neutral-850/95 backdrop-blur-md border border-neutral-750/80 hover:border-amber-500/60 text-neutral-300 hover:text-white shadow-2xl flex items-center justify-center transition-all duration-200 opacity-60 hover:opacity-100 sm:opacity-0 sm:group-hover/stage:opacity-80 sm:hover:!opacity-100 hover:scale-110 active:scale-95 cursor-pointer select-none"
+              className="absolute right-3 sm:right-5 top-1/2 -translate-y-1/2 z-20 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-neutral-900/80 hover:bg-neutral-800 backdrop-blur-md border border-neutral-700 hover:border-amber-500/60 text-neutral-300 hover:text-white shadow-2xl flex items-center justify-center transition-all duration-200 opacity-60 hover:opacity-100 sm:opacity-0 sm:group-hover/stage:opacity-80 sm:hover:!opacity-100 hover:scale-110 active:scale-95 cursor-pointer select-none"
               title={t('nextPageTitle')}
               aria-label={t('nextPageTitle')}
             >

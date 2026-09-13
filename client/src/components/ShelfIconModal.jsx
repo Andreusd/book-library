@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Palette, X, Check, Search, RotateCcw } from 'lucide-react';
 import ShelfIcon, { AVAILABLE_SHELF_ICONS } from './ShelfIcon';
 import { useI18n } from '../i18n';
@@ -75,7 +75,7 @@ export default function ShelfIconModal({ shelf, isOpen, onClose, onSave }) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800 bg-neutral-925/80">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800 bg-neutral-900">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30">
               <Palette className="w-5 h-5" />
@@ -99,7 +99,7 @@ export default function ShelfIconModal({ shelf, isOpen, onClose, onSave }) {
         </div>
 
         {/* Search & Categories Bar */}
-        <div className="p-4 border-b border-neutral-800/80 bg-neutral-900/50 space-y-3">
+        <div className="p-4 border-b border-neutral-800 bg-neutral-900/50 space-y-3">
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" />
             <input
@@ -108,7 +108,7 @@ export default function ShelfIconModal({ shelf, isOpen, onClose, onSave }) {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder={t('searchIconsPlaceholder')}
-              className="w-full pl-10 pr-9 py-2 bg-neutral-950 border border-neutral-750 rounded-xl text-xs text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50 transition"
+              className="w-full pl-10 pr-9 py-2 bg-neutral-950 border border-neutral-700 rounded-xl text-xs text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/50 transition"
             />
             {searchTerm && (
               <button
@@ -131,7 +131,7 @@ export default function ShelfIconModal({ shelf, isOpen, onClose, onSave }) {
                   className={`px-2.5 py-1 rounded-lg font-medium whitespace-nowrap transition-colors cursor-pointer ${
                     active
                       ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                      : 'bg-neutral-850 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200'
+                      : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 hover:text-neutral-200'
                   }`}
                 >
                   {language === 'pt' ? cat.labelPt : cat.labelEn}
@@ -160,7 +160,7 @@ export default function ShelfIconModal({ shelf, isOpen, onClose, onSave }) {
                       group relative flex flex-col items-center justify-center p-3 rounded-xl border transition-all duration-150 cursor-pointer
                       ${isSelected
                         ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-md ring-1 ring-amber-500/50'
-                        : 'bg-neutral-925/70 border-neutral-800/80 text-neutral-400 hover:bg-neutral-800 hover:border-neutral-700 hover:text-neutral-100'}
+                        : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:bg-neutral-800 hover:border-neutral-700 hover:text-neutral-100'}
                     `}
                     title={`${item.name} - ${language === 'pt' ? item.label : item.labelEn}`}
                   >
@@ -184,7 +184,7 @@ export default function ShelfIconModal({ shelf, isOpen, onClose, onSave }) {
         </div>
 
         {/* Live Preview & Footer */}
-        <div className="px-6 py-3.5 border-t border-neutral-800 bg-neutral-925/90 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="px-6 py-3.5 border-t border-neutral-800 bg-neutral-900 flex flex-col sm:flex-row items-center justify-between gap-3">
           {/* Live Preview of the Shelf Button */}
           <div className="flex items-center gap-2.5 w-full sm:w-auto">
             <span className="text-[11px] text-neutral-400 font-medium shrink-0">

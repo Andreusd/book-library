@@ -492,13 +492,13 @@ export default function App() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
         {/* Top Navigation Bar */}
-        <header className="h-16 px-4 sm:px-6 bg-neutral-925/80 backdrop-blur-md border-b border-neutral-850 sticky top-0 z-20 flex items-center justify-between gap-4">
+        <header className="h-16 px-4 sm:px-6 bg-neutral-900/90 backdrop-blur-md border-b border-neutral-800 sticky top-0 z-20 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             <button
               onClick={toggleSidebar}
               className={`p-2 rounded-lg transition-colors border ${
                 sidebarOpen 
-                  ? 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-100 hover:bg-neutral-850' 
+                  ? 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800' 
                   : 'bg-amber-500/15 border-amber-500/30 text-amber-400 hover:bg-amber-500/25'
               }`}
               title={sidebarOpen ? t('collapseSidebar') : t('expandSidebar')}
@@ -629,7 +629,7 @@ export default function App() {
           )}
 
           {/* Shelf Section Title & Count */}
-          <div className="flex items-center justify-between mb-6 pb-2 border-b border-neutral-850">
+          <div className="flex items-center justify-between mb-6 pb-2 border-b border-neutral-800">
             <div>
               <h2 className="text-lg sm:text-xl font-bold text-neutral-100 tracking-tight">
                 {selectedShelf === 'continue-reading'

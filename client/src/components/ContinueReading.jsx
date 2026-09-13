@@ -55,7 +55,7 @@ export default function ContinueReading({ books, onSelectBook, onContextMenu, on
                   onContextMenu(e, book);
                 }
               }}
-              className={`group cursor-pointer bg-neutral-900/60 hover:bg-neutral-850 border border-neutral-800 hover:border-emerald-500/40 rounded-xl p-3 gap-3.5 transition-all duration-200 shadow-sm hover:shadow-md ${visibilityClass}`}
+              className={`group cursor-pointer bg-neutral-900/60 hover:bg-neutral-800 border border-neutral-800 hover:border-emerald-500/40 rounded-xl p-3 gap-3.5 transition-all duration-200 shadow-sm hover:shadow-md ${visibilityClass}`}
             >
               {/* Mini Cover */}
               <div className="w-16 aspect-[1/1.45] rounded-md overflow-hidden bg-neutral-950 shrink-0 border border-neutral-800 shadow relative">

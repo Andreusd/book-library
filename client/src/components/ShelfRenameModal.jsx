@@ -59,7 +59,7 @@ export default function ShelfRenameModal({ shelf, isOpen, onClose, onSave }) {
         </div>
 
         {/* Informative Note */}
-        <div className="my-3.5 p-2.5 rounded-xl bg-neutral-850/70 border border-neutral-800 flex items-start gap-2 text-xs text-neutral-400">
+        <div className="my-3.5 p-2.5 rounded-xl bg-neutral-950/60 border border-neutral-800 flex items-start gap-2 text-xs text-neutral-400">
           <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
           <span>{t('renameDisclaimer')}</span>
         </div>

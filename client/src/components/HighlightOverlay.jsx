@@ -190,7 +190,7 @@ export default function HighlightOverlay({
             ) : (
               <div className="mb-3">
                 {activeAnnotation.comment ? (
-                  <p className="text-xs text-neutral-100 whitespace-pre-wrap bg-neutral-950/60 p-2.5 rounded-lg border border-neutral-850">
+                  <p className="text-xs text-neutral-100 whitespace-pre-wrap bg-neutral-950/60 p-2.5 rounded-lg border border-neutral-800">
                     {activeAnnotation.comment}
                   </p>
                 ) : (

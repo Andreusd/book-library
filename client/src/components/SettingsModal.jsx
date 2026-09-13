@@ -110,7 +110,7 @@ export default function SettingsModal({ isOpen, onClose, onSaved }) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-neutral-800 flex items-center justify-between bg-neutral-925">
+        <div className="px-6 py-4 border-b border-neutral-800 flex items-center justify-between bg-neutral-900">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
               <Settings className="w-4 h-4" />
@@ -188,7 +188,7 @@ export default function SettingsModal({ isOpen, onClose, onSaved }) {
           )}
 
           {/* Safety Notice */}
-          <div className="p-3 bg-neutral-950/60 border border-neutral-850 rounded-xl flex items-center gap-2.5 text-[11px] text-neutral-400">
+          <div className="p-3 bg-neutral-950/60 border border-neutral-800 rounded-xl flex items-center gap-2.5 text-[11px] text-neutral-400">
             <ShieldCheck className="w-4 h-4 text-sky-400 shrink-0" />
             <span>{t('librarySafe')}</span>
           </div>

@@ -169,11 +169,11 @@ export default function PdfOutline({
 
       {/* Slide-out Sidebar Drawer */}
       <aside className={`
-        fixed top-14 bottom-1 left-0 z-40 w-72 sm:w-80 bg-neutral-925/95 backdrop-blur-xl border-r border-neutral-850 flex flex-col shadow-2xl transition-all duration-300 ease-in-out
+        fixed top-14 bottom-1 left-0 z-40 w-72 sm:w-80 bg-neutral-900 border-r border-neutral-800 flex flex-col shadow-2xl transition-all duration-300 ease-in-out
         md:static md:h-full md:z-10
       `}>
         {/* Drawer Header */}
-        <div className="h-12 px-4 border-b border-neutral-850 flex items-center justify-between shrink-0 bg-neutral-900/50">
+        <div className="h-12 px-4 border-b border-neutral-800 flex items-center justify-between shrink-0 bg-neutral-900/50">
           <div className="flex items-center gap-2 min-w-0">
             <ListTree className="w-4 h-4 text-amber-400 shrink-0" />
             <h2 className="text-xs font-bold text-neutral-100 uppercase tracking-wider truncate">
@@ -190,7 +190,7 @@ export default function PdfOutline({
         </div>
 
         {/* Chapter Search Filter */}
-        <div className="p-2.5 border-b border-neutral-850/60 shrink-0">
+        <div className="p-2.5 border-b border-neutral-800 shrink-0">
           <div className="relative">
             <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
             <input
