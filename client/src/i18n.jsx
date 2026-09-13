@@ -193,7 +193,7 @@ export const translations = {
     nextPageTitle: 'Próxima página (Seta direita)',
     resetWidth: 'Redefinir Largura',
     resetWidthTitle: 'Redefinir zoom para o padrão (100%)',
-    fitWidth: 'Ajustar',
+    fitWidth: 'Ajustar Largura',
     readerSettings: 'Configurações do Leitor',
     trackpadSwipe: 'Gesto de 2 Dedos no Trackpad',
     trackpadSwipeDesc: 'Deslizar 2 dedos para os lados para virar páginas',
