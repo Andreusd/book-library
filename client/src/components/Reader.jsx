@@ -4,7 +4,7 @@ import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { 
   ArrowLeft, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, 
   Maximize2, Minimize2, Moon, Sun, ListTree,
-  MessageSquare, Heart
+  MessageSquare, Heart, Settings, SlidersHorizontal, X
 } from 'lucide-react';
 import PdfOutline from './PdfOutline';
 import HighlightOverlay from './HighlightOverlay';
@@ -141,6 +141,42 @@ export default function Reader({
     rects: [],
     page: 1,
   });
+
+  const [readerSettingsOpen, setReaderSettingsOpen] = useState(false);
+  const [trackpadSwipeEnabled, setTrackpadSwipeEnabled] = useState(() => {
+    try {
+      return localStorage.getItem('reader_trackpad_swipe') !== 'false';
+    } catch (e) {
+      return true;
+    }
+  });
+  const [floatingButtonsEnabled, setFloatingButtonsEnabled] = useState(() => {
+    try {
+      return localStorage.getItem('reader_floating_buttons') !== 'false';
+    } catch (e) {
+      return true;
+    }
+  });
+
+  const toggleTrackpadSwipe = () => {
+    setTrackpadSwipeEnabled(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('reader_trackpad_swipe', String(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  const toggleFloatingButtons = () => {
+    setFloatingButtonsEnabled(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('reader_floating_buttons', String(next));
+      } catch (e) {}
+      return next;
+    });
+  };
 
   const canvasRef = useRef(null);
   const textLayerRef = useRef(null);
@@ -716,26 +752,28 @@ export default function Reader({
           e.preventDefault();
         }
 
-        const now = Date.now();
-        if (now - lastSwipeTimeRef.current > 350) {
-          accumulatedDeltaXRef.current += e.deltaX;
+        if (trackpadSwipeEnabled) {
+          const now = Date.now();
+          if (now - lastSwipeTimeRef.current > 350) {
+            accumulatedDeltaXRef.current += e.deltaX;
 
-          if (clearSwipeTimerRef.current) clearTimeout(clearSwipeTimerRef.current);
-          clearSwipeTimerRef.current = setTimeout(() => {
-            accumulatedDeltaXRef.current = 0;
-          }, 150);
-
-          if (Math.abs(accumulatedDeltaXRef.current) > 28) {
-            if (!isHorizScrollable || (accumulatedDeltaXRef.current > 0 && atRightEdge) || (accumulatedDeltaXRef.current < 0 && atLeftEdge)) {
-              lastSwipeTimeRef.current = now;
-              const dir = accumulatedDeltaXRef.current;
+            if (clearSwipeTimerRef.current) clearTimeout(clearSwipeTimerRef.current);
+            clearSwipeTimerRef.current = setTimeout(() => {
               accumulatedDeltaXRef.current = 0;
-              if (dir > 0) {
-                goToNextPage();
-              } else {
-                goToPrevPage();
+            }, 150);
+
+            if (Math.abs(accumulatedDeltaXRef.current) > 28) {
+              if (!isHorizScrollable || (accumulatedDeltaXRef.current > 0 && atRightEdge) || (accumulatedDeltaXRef.current < 0 && atLeftEdge)) {
+                lastSwipeTimeRef.current = now;
+                const dir = accumulatedDeltaXRef.current;
+                accumulatedDeltaXRef.current = 0;
+                if (dir > 0) {
+                  goToNextPage();
+                } else {
+                  goToPrevPage();
+                }
+                return;
               }
-              return;
             }
           }
         }
@@ -762,7 +800,7 @@ export default function Reader({
     return () => {
       window.removeEventListener('wheel', handleNativeWheel);
     };
-  }, [goToNextPage, goToPrevPage]);
+  }, [goToNextPage, goToPrevPage, trackpadSwipeEnabled]);
 
   // Fit Width
   const fitWidth = () => {
@@ -879,8 +917,16 @@ export default function Reader({
           </button>
           
           <button 
+            onClick={() => setScale(1.2)}
+            className="px-2 py-1 text-xs rounded bg-neutral-800/60 hover:bg-neutral-800 text-neutral-300 transition hidden sm:inline-block cursor-pointer"
+            title={t('resetWidthTitle')}
+          >
+            {t('resetWidth')}
+          </button>
+
+          <button 
             onClick={fitWidth}
-            className="px-2 py-1 text-xs rounded bg-neutral-800/60 hover:bg-neutral-800 text-neutral-300 transition hidden sm:inline-block"
+            className="px-2 py-1 text-xs rounded bg-neutral-800/60 hover:bg-neutral-800 text-neutral-300 transition hidden sm:inline-block cursor-pointer"
             title={t('fitWidth')}
           >
             {t('fitWidth')}
@@ -888,7 +934,7 @@ export default function Reader({
 
           <button 
             onClick={() => setScale(s => Math.min(3.5, Number((s + 0.15).toFixed(2))))}
-            className="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition"
+            className="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition cursor-pointer"
             title={t('zoomInTitle')}
           >
             <ZoomIn className="w-4 h-4" />
@@ -899,7 +945,7 @@ export default function Reader({
           {/* Invert Dark / Light */}
           <button 
             onClick={() => setInvertColors(!invertColors)}
-            className={`p-1.5 rounded-lg transition ${invertColors ? 'bg-amber-500/20 text-amber-300' : 'hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200'}`}
+            className={`p-1.5 rounded-lg transition cursor-pointer ${invertColors ? 'bg-amber-500/20 text-amber-300' : 'hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200'}`}
             title={t('nightModeTitle')}
           >
             <Moon className="w-4 h-4" />
@@ -908,7 +954,7 @@ export default function Reader({
           {/* Favorite Toggle */}
           <button 
             onClick={handleToggleFav}
-            className={`p-1.5 rounded-lg transition ${
+            className={`p-1.5 rounded-lg transition cursor-pointer ${
               favState 
                 ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' 
                 : 'hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200'
@@ -940,11 +986,93 @@ export default function Reader({
           {/* Fullscreen */}
           <button 
             onClick={toggleFullscreen}
-            className="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition"
+            className="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition cursor-pointer"
             title={t('fullscreenTitle')}
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
+
+          {/* Reader Settings Popover */}
+          <div className="relative">
+            <button 
+              onClick={() => setReaderSettingsOpen(prev => !prev)}
+              className={`p-1.5 rounded-lg transition cursor-pointer ${
+                readerSettingsOpen 
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
+                  : 'hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200'
+              }`}
+              title={t('readerSettings')}
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+
+            {readerSettingsOpen && (
+              <>
+                <div 
+                  className="fixed inset-0 z-30" 
+                  onClick={() => setReaderSettingsOpen(false)}
+                />
+                <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-neutral-925/95 backdrop-blur-xl border border-neutral-800 rounded-2xl shadow-2xl p-4 z-40 text-left select-none animate-in fade-in zoom-in-95 duration-150">
+                  <div className="flex items-center justify-between pb-3 mb-3 border-b border-neutral-800">
+                    <div className="flex items-center gap-2">
+                      <SlidersHorizontal className="w-4 h-4 text-amber-400" />
+                      <h3 className="text-xs font-bold text-neutral-200 uppercase tracking-wider">{t('readerSettings')}</h3>
+                    </div>
+                    <button 
+                      onClick={() => setReaderSettingsOpen(false)}
+                      className="p-1 rounded-md text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 transition cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {/* Toggle Trackpad Swipe */}
+                    <label className="flex items-start justify-between gap-3 cursor-pointer group">
+                      <div className="min-w-0 flex-1">
+                        <span className="text-xs font-semibold text-neutral-200 block group-hover:text-amber-400 transition-colors">
+                          {t('trackpadSwipe')}
+                        </span>
+                        <span className="text-[11px] text-neutral-400 leading-tight block mt-0.5">
+                          {t('trackpadSwipeDesc')}
+                        </span>
+                      </div>
+                      <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                        <input 
+                          type="checkbox"
+                          checked={trackpadSwipeEnabled}
+                          onChange={toggleTrackpadSwipe}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-neutral-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                      </div>
+                    </label>
+
+                    {/* Toggle Floating Side Buttons */}
+                    <label className="flex items-start justify-between gap-3 cursor-pointer group">
+                      <div className="min-w-0 flex-1">
+                        <span className="text-xs font-semibold text-neutral-200 block group-hover:text-amber-400 transition-colors">
+                          {t('floatingSideButtons')}
+                        </span>
+                        <span className="text-[11px] text-neutral-400 leading-tight block mt-0.5">
+                          {t('floatingSideButtonsDesc')}
+                        </span>
+                      </div>
+                      <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                        <input 
+                          type="checkbox"
+                          checked={floatingButtonsEnabled}
+                          onChange={toggleFloatingButtons}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-neutral-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </header>
 
@@ -1034,7 +1162,7 @@ export default function Reader({
           </div>
 
           {/* Floating Left Navigation Button */}
-          {currentPage > 1 && (
+          {floatingButtonsEnabled && currentPage > 1 && (
             <button
               type="button"
               onClick={(e) => {
@@ -1050,7 +1178,7 @@ export default function Reader({
           )}
 
           {/* Floating Right Navigation Button */}
-          {currentPage < totalPages && (
+          {floatingButtonsEnabled && currentPage < totalPages && (
             <button
               type="button"
               onClick={(e) => {
