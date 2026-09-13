@@ -1,4 +1,4 @@
-# 📚 Digital Bookshelf / Estante Digital
+# 📚 Digital Library / Biblioteca Digital
 
 A modern, fast, responsive, and lightweight web application to organize, browse, and read your personal collection of PDF books.
 

@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 export const translations = {
   en: {
     // Sidebar
-    appTitle: 'Digital Bookshelf',
+    appTitle: 'Digital Library',
     shelfCount: '{books} books • {shelves} shelves',
     filterShelvesPlaceholder: 'Filter shelves...',
     allShelves: 'Home',
@@ -48,7 +48,7 @@ export const translations = {
     noBooksFound: 'No books found',
     noBooksDesc: "We couldn't find any books matching your search or in this bookshelf.",
     clearSearch: 'Clear search',
-    setupPromptTitle: 'Welcome to Digital Bookshelf',
+    setupPromptTitle: 'Welcome to Digital Library',
     setupPromptDesc: 'To get started, configure the folder where your PDF books are located.',
     configureLibrary: 'Configure Library Folder',
 
@@ -137,7 +137,7 @@ export const translations = {
   },
   pt: {
     // Sidebar
-    appTitle: 'Estante Digital',
+    appTitle: 'Biblioteca Digital',
     shelfCount: '{books} livros • {shelves} estantes',
     filterShelvesPlaceholder: 'Filtrar estantes...',
     allShelves: 'Início',
@@ -182,7 +182,7 @@ export const translations = {
     noBooksFound: 'Nenhum livro encontrado',
     noBooksDesc: 'Não encontramos nenhum livro correspondente à sua busca ou nesta estante.',
     clearSearch: 'Limpar pesquisa',
-    setupPromptTitle: 'Bem-vindo à Estante Digital',
+    setupPromptTitle: 'Bem-vindo à Biblioteca Digital',
     setupPromptDesc: 'Para começar, configure a pasta onde seus livros em PDF estão localizados.',
     configureLibrary: 'Configurar Pasta de Livros',
 

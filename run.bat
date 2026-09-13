@@ -1,5 +1,5 @@
 @echo off
-title Book Library - Estante Digital
+title Digital Library - Biblioteca Digital
 echo ========================================================
 echo         Iniciando Biblioteca Digital de Livros
 echo ========================================================
