@@ -125,6 +125,8 @@ export const translations = {
     // Settings
     settings: 'Settings',
     settingsTitle: 'Library Settings',
+    settingsSubtitle: 'Configure your library folder and interface preferences',
+    languageLabel: 'Interface Language',
     libraryPathLabel: 'Books Directory Path',
     libraryPathPlaceholder: 'e.g. C:\\Books or /home/user/books',
     libraryPathHelp: 'Enter the folder where your PDF books or bookshelf folders are stored.',
@@ -259,6 +261,8 @@ export const translations = {
     // Settings
     settings: 'Configurações',
     settingsTitle: 'Configurações da Biblioteca',
+    settingsSubtitle: 'Configure a pasta de livros e preferências da interface',
+    languageLabel: 'Idioma da Interface',
     libraryPathLabel: 'Caminho da Pasta de Livros',
     libraryPathPlaceholder: 'Ex: C:\\Livros ou /home/usuario/livros',
     libraryPathHelp: 'Insira a pasta onde seus livros em PDF ou pastas de estantes estão armazenados.',

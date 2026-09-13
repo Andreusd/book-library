@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Settings, Folder, CheckCircle, AlertCircle, AlertTriangle, 
-  X, RefreshCw, Save, ShieldCheck 
+  X, RefreshCw, Save, ShieldCheck, Globe
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 
 export default function SettingsModal({ isOpen, onClose, onSaved }) {
-  const { t } = useI18n();
+  const { t, lang, setLang } = useI18n();
   const [pathInput, setPathInput] = useState('');
   const [initialPath, setInitialPath] = useState('');
   const [validation, setValidation] = useState(null);
@@ -117,7 +117,7 @@ export default function SettingsModal({ isOpen, onClose, onSaved }) {
             </div>
             <div>
               <h3 className="text-sm font-bold text-neutral-100">{t('settingsTitle')}</h3>
-              <p className="text-[11px] text-neutral-400">{t('libraryPathHelp')}</p>
+              <p className="text-[11px] text-neutral-400">{t('settingsSubtitle') || t('libraryPathHelp')}</p>
             </div>
           </div>
           <button
@@ -130,11 +130,64 @@ export default function SettingsModal({ isOpen, onClose, onSaved }) {
 
         {/* Body Form */}
         <form onSubmit={handleSave} className="p-6 space-y-5">
+          {/* Language Selection */}
           <div>
-            <label className="block text-xs font-semibold text-neutral-300 mb-1.5 flex items-center gap-1.5">
+            <label className="block text-xs font-semibold text-neutral-300 mb-2 flex items-center gap-1.5">
+              <Globe className="w-3.5 h-3.5 text-amber-400" />
+              <span>{t('languageLabel')}</span>
+            </label>
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => setLang('pt')}
+                className={`flex items-center justify-between p-3 rounded-xl border text-xs font-medium transition cursor-pointer ${
+                  lang === 'pt'
+                    ? 'bg-amber-500/15 border-amber-500 text-amber-300 ring-1 ring-amber-500/40'
+                    : 'bg-neutral-950/60 border-neutral-800 text-neutral-400 hover:bg-neutral-800/80 hover:text-neutral-200'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="text-base leading-none">🇧🇷</span>
+                  <div className="text-left">
+                    <span className="font-semibold block text-neutral-100">Português</span>
+                    <span className="text-[10px] text-neutral-400">Brasil</span>
+                  </div>
+                </div>
+                {lang === 'pt' && <CheckCircle className="w-4 h-4 text-amber-400 shrink-0" />}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setLang('en')}
+                className={`flex items-center justify-between p-3 rounded-xl border text-xs font-medium transition cursor-pointer ${
+                  lang === 'en'
+                    ? 'bg-amber-500/15 border-amber-500 text-amber-300 ring-1 ring-amber-500/40'
+                    : 'bg-neutral-950/60 border-neutral-800 text-neutral-400 hover:bg-neutral-800/80 hover:text-neutral-200'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="text-base leading-none">🇺🇸</span>
+                  <div className="text-left">
+                    <span className="font-semibold block text-neutral-100">English</span>
+                    <span className="text-[10px] text-neutral-400">United States</span>
+                  </div>
+                </div>
+                {lang === 'en' && <CheckCircle className="w-4 h-4 text-amber-400 shrink-0" />}
+              </button>
+            </div>
+          </div>
+
+          <div className="h-px bg-neutral-800/80 my-1" />
+
+          {/* Library Path */}
+          <div>
+            <label className="block text-xs font-semibold text-neutral-300 mb-1 flex items-center gap-1.5">
               <Folder className="w-3.5 h-3.5 text-amber-400" />
               <span>{t('libraryPathLabel')}</span>
             </label>
+            <p className="text-[11px] text-neutral-400 mb-2 leading-relaxed">
+              {t('libraryPathHelp')}
+            </p>
             <div className="relative">
               <input
                 type="text"

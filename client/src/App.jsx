@@ -16,7 +16,6 @@ import ShelfRenameModal from './components/ShelfRenameModal';
 import ShelfIconModal from './components/ShelfIconModal';
 import ShelfIcon from './components/ShelfIcon';
 import SettingsModal from './components/SettingsModal';
-import LanguageSelector from './components/LanguageSelector';
 import { useI18n } from './i18n';
 
 // Helper to extract view & route information from URL (/shelf/:id, /continue-reading, /favorites, /book/:id)
@@ -577,7 +576,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* Sort Selector & Language Selector */}
+          {/* Sort Selector & Settings Button */}
           <div className="flex items-center gap-2.5">
             <div className="relative flex items-center">
               <select
@@ -592,12 +591,10 @@ export default function App() {
               </select>
             </div>
 
-            <LanguageSelector />
-
             {/* Settings Button */}
             <button
               onClick={() => setSettingsOpen(true)}
-              className="p-1.5 rounded-lg bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-amber-400 hover:border-amber-500/30 transition shadow-sm"
+              className="p-1.5 rounded-lg bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-amber-400 hover:border-amber-500/30 transition shadow-sm cursor-pointer"
               title={t('settings')}
             >
               <Settings className="w-4 h-4" />
