@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Library, Layers, Search, Folder, PanelLeftClose } from 'lucide-react';
+import { Library, Layers, Search, Folder } from 'lucide-react';
 import { useI18n } from '../i18n';
 
 export default function Sidebar({ 
@@ -39,8 +39,8 @@ export default function Sidebar({
       `}>
         {/* Inner wrapper to keep content width consistent during smooth collapse animation */}
         <div className="w-72 flex flex-col h-full shrink-0">
-          {/* Brand Header with Close/Collapse Button */}
-          <div className="h-16 px-4 border-b border-neutral-850 flex items-center justify-between shrink-0 bg-neutral-900/40">
+          {/* Brand Header */}
+          <div className="h-16 px-5 border-b border-neutral-850 flex items-center shrink-0 bg-neutral-900/40">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center shadow-lg shadow-amber-500/20 text-neutral-950 shrink-0">
                 <Library className="w-5 h-5 font-bold" />
@@ -52,13 +52,6 @@ export default function Sidebar({
                 </p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800/80 transition shrink-0 ml-1"
-              title={t('collapseSidebar')}
-            >
-              <PanelLeftClose className="w-4 h-4" />
-            </button>
           </div>
 
           {/* Shelf Filter Input */}
