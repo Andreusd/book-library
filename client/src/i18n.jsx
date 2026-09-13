@@ -57,6 +57,13 @@ export const translations = {
     fullscreenTitle: 'Toggle Fullscreen',
     loadingBook: 'Loading book...',
     rendering: 'Rendering...',
+    tableOfContents: 'Table of Contents',
+    index: 'Index',
+    showIndex: 'Show Table of Contents',
+    hideIndex: 'Hide Table of Contents',
+    filterIndexPlaceholder: 'Filter chapters...',
+    noIndexItemsFound: 'No chapters match your search',
+    noIndexAvailable: 'No table of contents available for this document',
 
     // Book Context Menu
     readNow: 'Read Now',
@@ -148,6 +155,13 @@ export const translations = {
     fullscreenTitle: 'Tela cheia',
     loadingBook: 'Carregando livro...',
     rendering: 'Renderizando...',
+    tableOfContents: 'Sumário',
+    index: 'Sumário',
+    showIndex: 'Mostrar Sumário',
+    hideIndex: 'Ocultar Sumário',
+    filterIndexPlaceholder: 'Filtrar capítulos...',
+    noIndexItemsFound: 'Nenhum capítulo corresponde à pesquisa',
+    noIndexAvailable: 'Nenhum sumário disponível para este documento',
 
     // Book Context Menu
     readNow: 'Ler Agora',

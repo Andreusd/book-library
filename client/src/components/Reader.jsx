@@ -3,8 +3,9 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { 
   ArrowLeft, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, 
-  Maximize2, Minimize2, ExternalLink, Moon, Sun
+  Maximize2, Minimize2, ExternalLink, Moon, Sun, ListTree
 } from 'lucide-react';
+import PdfOutline from './PdfOutline';
 import { useI18n } from '../i18n';
 import 'pdfjs-dist/web/pdf_viewer.css';
 
@@ -116,6 +117,9 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
   const [invertColors, setInvertColors] = useState(false);
   const [pageInput, setPageInput] = useState(String(book.progress?.page || 1));
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [outline, setOutline] = useState([]);
+  const [hasOutline, setHasOutline] = useState(false);
+  const [outlineOpen, setOutlineOpen] = useState(false);
 
   const canvasRef = useRef(null);
   const textLayerRef = useRef(null);
@@ -158,6 +162,18 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
     }
   }, [goToNextPage, goToPrevPage, totalPages]);
 
+  // Handle PDF index/outline item click
+  const handleOutlineClick = useCallback((item) => {
+    if (item.url) {
+      window.open(item.url, '_blank', 'noopener,noreferrer');
+    } else if (item.dest) {
+      linkServiceRef.current.goToDestination(item.dest);
+    }
+    if (window.innerWidth < 768) {
+      setOutlineOpen(false);
+    }
+  }, []);
+
   useEffect(() => {
     linkServiceRef.current.setNavigate(handleLinkNavigate);
   }, [handleLinkNavigate]);
@@ -188,6 +204,23 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
         setCurrentPage(startPage);
         setPageInput(String(startPage));
         setLoading(false);
+
+        // Fetch PDF Index / Table of Contents if available
+        doc.getOutline().then((outlineData) => {
+          if (!active) return;
+          if (Array.isArray(outlineData) && outlineData.length > 0) {
+            setOutline(outlineData);
+            setHasOutline(true);
+          } else {
+            setOutline([]);
+            setHasOutline(false);
+          }
+        }).catch(() => {
+          if (active) {
+            setOutline([]);
+            setHasOutline(false);
+          }
+        });
       },
       (error) => {
         if (!active) return;
@@ -551,7 +584,7 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
     <div className="fixed inset-0 z-50 flex flex-col bg-neutral-950 text-neutral-100">
       {/* Top Header / Toolbar */}
       <header className="h-14 px-4 bg-neutral-900/90 backdrop-blur-md border-b border-neutral-850 flex items-center justify-between z-20 shrink-0 select-none">
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <button 
             onClick={onClose}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 hover:text-white transition text-sm font-medium"
@@ -560,8 +593,24 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
             <ArrowLeft className="w-4 h-4" />
             <span className="hidden sm:inline">{t('backToLibrary')}</span>
           </button>
+
+          {/* Toggle PDF Index / Table of Contents Button (if available) */}
+          {hasOutline && (
+            <button
+              onClick={() => setOutlineOpen(prev => !prev)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${
+                outlineOpen
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  : 'bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 hover:text-white'
+              }`}
+              title={outlineOpen ? t('hideIndex') : t('showIndex')}
+            >
+              <ListTree className="w-4 h-4 text-amber-400" />
+              <span className="hidden md:inline">{t('index')}</span>
+            </button>
+          )}
           
-          <div className="h-4 w-px bg-neutral-700 mx-1 hidden sm:block" />
+          <div className="h-4 w-px bg-neutral-700 mx-0.5 hidden sm:block" />
 
           <div className="min-w-0">
             <h1 className="text-sm font-semibold truncate text-neutral-100 max-w-xs sm:max-w-md md:max-w-lg">
@@ -670,6 +719,16 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
 
       {/* Main Reader Stage */}
       <div className="relative flex-1 flex overflow-hidden bg-neutral-900">
+        {/* Toggleable Left Index / Table of Contents Drawer */}
+        {hasOutline && (
+          <PdfOutline
+            outline={outline}
+            isOpen={outlineOpen}
+            onClose={() => setOutlineOpen(false)}
+            onItemClick={handleOutlineClick}
+          />
+        )}
+
         {/* Scrollable Document Container */}
         <div 
           ref={containerRef}
