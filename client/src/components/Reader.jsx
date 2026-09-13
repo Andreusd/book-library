@@ -302,10 +302,19 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
         }
       } else if (e.key === 'Escape') {
         onClose();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+' || e.key === 'Add')) {
+        e.preventDefault();
+        setScale(s => Math.min(3.5, Number((s + 0.15).toFixed(2))));
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === '-' || e.key === 'Subtract')) {
+        e.preventDefault();
+        setScale(s => Math.max(0.5, Number((s - 0.15).toFixed(2))));
+      } else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+        e.preventDefault();
+        setScale(1.2);
       } else if (e.key === '+' || e.key === '=') {
-        setScale(s => Math.min(3.0, s + 0.15));
+        setScale(s => Math.min(3.5, Number((s + 0.15).toFixed(2))));
       } else if (e.key === '-') {
-        setScale(s => Math.max(0.5, s - 0.15));
+        setScale(s => Math.max(0.5, Number((s - 0.15).toFixed(2))));
       }
     };
 
@@ -313,25 +322,46 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [goToNextPage, goToPrevPage, onClose]);
 
-  // Handle wheel on non-scrollable page to flip pages
-  const handleWheel = (e) => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const isScrollable = container.scrollHeight > container.clientHeight + 10;
-    if (!isScrollable) {
-      const now = Date.now();
-      if (now - lastWheelTimeRef.current < 450) return;
-
-      if (e.deltaY > 25) {
-        lastWheelTimeRef.current = now;
-        goToNextPage();
-      } else if (e.deltaY < -25) {
-        lastWheelTimeRef.current = now;
-        goToPrevPage();
+  // Native wheel listener for smooth scrolling, edge-flipping, and Ctrl+Wheel PDF zoom
+  useEffect(() => {
+    const handleNativeWheel = (e) => {
+      // Ctrl + Scroll Wheel (or Touchpad pinch gesture) -> Zoom PDF viewer
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        if (e.deltaY < 0) {
+          // Wheel Up -> Zoom In
+          setScale(s => Math.min(3.5, Number((s + 0.1).toFixed(2))));
+        } else if (e.deltaY > 0) {
+          // Wheel Down -> Zoom Out
+          setScale(s => Math.max(0.5, Number((s - 0.1).toFixed(2))));
+        }
+        return;
       }
-    }
-  };
+
+      // Normal Wheel on non-scrollable page to flip pages
+      const container = containerRef.current;
+      if (!container) return;
+
+      const isScrollable = container.scrollHeight > container.clientHeight + 10;
+      if (!isScrollable) {
+        const now = Date.now();
+        if (now - lastWheelTimeRef.current < 450) return;
+
+        if (e.deltaY > 25) {
+          lastWheelTimeRef.current = now;
+          goToNextPage();
+        } else if (e.deltaY < -25) {
+          lastWheelTimeRef.current = now;
+          goToPrevPage();
+        }
+      }
+    };
+
+    window.addEventListener('wheel', handleNativeWheel, { passive: false });
+    return () => {
+      window.removeEventListener('wheel', handleNativeWheel);
+    };
+  }, [goToNextPage, goToPrevPage]);
 
   // Fit Width
   const fitWidth = () => {
@@ -484,7 +514,6 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
         <div 
           ref={containerRef}
           tabIndex={0}
-          onWheel={handleWheel}
           className="flex-1 overflow-y-auto overflow-x-auto p-4 sm:p-6 focus:outline-none scroll-smooth"
         >
           {loading ? (
