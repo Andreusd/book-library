@@ -127,10 +127,7 @@ export default function Sidebar({
                     <Folder className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-amber-400' : 'text-neutral-500'}`} />
                     <span className="truncate text-left">{s.name}</span>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                    {s.custom_name && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" title={t('customNameNotice')} />
-                    )}
+                  <div className="flex items-center shrink-0 ml-2">
                     <span className={`
                       text-[11px] px-1.5 py-0.2 rounded font-mono
                       ${isSelected ? 'bg-amber-500/20 text-amber-300' : 'bg-neutral-850 text-neutral-400'}
