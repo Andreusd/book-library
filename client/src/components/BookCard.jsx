@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, ExternalLink, CheckCircle } from 'lucide-react';
+import { BookOpen, CheckCircle } from 'lucide-react';
 import { useI18n } from '../i18n';
 
 export default function BookCard({ book, onSelectBook, onContextMenu }) {
@@ -11,15 +11,6 @@ export default function BookCard({ book, onSelectBook, onContextMenu }) {
   const isNotStarted = Boolean(!book.progress || book.progress.status === 'not_started' || (book.progress.page <= 1 && !isFinished));
   const hasProgress = !isNotStarted && Boolean(book.progress && (book.progress.page > 1 || isFinished));
   const percent = book.progress ? Math.round(book.progress.percent) : 0;
-
-  const handleOpenSystem = (e) => {
-    e.stopPropagation();
-    fetch('/api/open-system', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ book_id: book.id })
-    }).catch(err => console.error('Failed to open system viewer:', err));
-  };
 
   const handleContextMenu = (e) => {
     if (onContextMenu) {
@@ -86,16 +77,8 @@ export default function BookCard({ book, onSelectBook, onContextMenu }) {
           </div>
         )}
 
-        {/* Quick Hover Action Buttons */}
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-2.5">
-          <button
-            onClick={handleOpenSystem}
-            className="p-1.5 rounded-lg bg-neutral-900/90 text-neutral-300 hover:text-white hover:bg-neutral-800 transition shadow-md"
-            title={t('openInSystemTitle')}
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-          </button>
-          
+        {/* Quick Hover Action Button */}
+        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-end p-2.5">
           <div className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-semibold transition flex items-center gap-1 shadow-lg">
             <BookOpen className="w-3.5 h-3.5" />
             <span>{t('readButton')}</span>

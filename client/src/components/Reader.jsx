@@ -3,7 +3,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { 
   ArrowLeft, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, 
-  Maximize2, Minimize2, ExternalLink, Moon, Sun, ListTree,
+  Maximize2, Minimize2, Moon, Sun, ListTree,
   MessageSquare
 } from 'lucide-react';
 import PdfOutline from './PdfOutline';
@@ -562,14 +562,6 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
     }
   };
 
-  const openInSystem = () => {
-    fetch('/api/open-system', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ book_id: book.id })
-    }).catch(err => console.error('Failed to open locally:', err));
-  };
-
   // Keyboard navigation & smart scrolling
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -830,15 +822,6 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
             title={t('nightModeTitle')}
           >
             <Moon className="w-4 h-4" />
-          </button>
-
-          {/* Open in Windows default viewer */}
-          <button 
-            onClick={openInSystem}
-            className="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition hidden sm:flex"
-            title={t('openInWindowsTitle')}
-          >
-            <ExternalLink className="w-4 h-4" />
           </button>
 
           {/* Comments & Highlights Drawer Toggle */}

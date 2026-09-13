@@ -50,7 +50,6 @@ export BOOK_LIBRARY_PATH="/path/to/your/books"
   * **Per-Book Zoom Memory**: Remembers your preferred zoom factor for each book.
   * **Ctrl + Wheel Smooth Zoom**: Zoom seamlessly inside the viewer without scaling the browser page.
   * **Night Mode**: Instant high-contrast dark reading mode.
-  * **Open in Windows Viewer**: One-click shortcut to launch the book in your default PDF app (Acrobat, Sumatra, Firefox).
 * **Reading Progress & "Continue Reading"**:
   * Tracks current page and reading percentage.
   * Books advance to the *Continue Reading* shelf only after reading beyond page 1 (covers don't mark books as started).

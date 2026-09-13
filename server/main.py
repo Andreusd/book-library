@@ -63,9 +63,6 @@ class RenameShelfPayload(BaseModel):
     shelf_id: str
     custom_name: str
 
-class OpenSystemPayload(BaseModel):
-    book_id: str
-
 class SettingsPayload(BaseModel):
     library_path: str
 
@@ -274,19 +271,6 @@ def update_book_status(payload: StatusPayload):
         return {"status": "ok", "progress": rec}
     else:
         raise HTTPException(status_code=400, detail="Invalid status. Must be 'not_started' or 'completed'")
-
-@app.post("/api/open-system")
-def open_system(payload: OpenSystemPayload):
-    """Launches the book in the default Windows PDF application."""
-    b = scanner.find_book(payload.book_id)
-    if not b or not os.path.exists(b["path"]):
-        raise HTTPException(status_code=404, detail="Book not found")
-
-    try:
-        os.startfile(b["path"])
-        return {"status": "opened", "path": b["path"]}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/annotations/{book_id}")
 def get_annotations(book_id: str):

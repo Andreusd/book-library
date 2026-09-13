@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { 
-  BookOpen, ExternalLink, RotateCcw, CheckCircle2, 
+  BookOpen, RotateCcw, CheckCircle2, 
   Copy, Check 
 } from 'lucide-react';
 import { useI18n } from '../i18n';
@@ -11,7 +11,6 @@ export default function ContextMenu({
   book, 
   onClose, 
   onOpenReader, 
-  onOpenSystem, 
   onMarkStatus 
 }) {
   const menuRef = useRef(null);
@@ -49,7 +48,7 @@ export default function ContextMenu({
 
   // Adjust coordinates to ensure the menu stays within viewport boundaries
   const menuWidth = 230;
-  const menuHeight = 240;
+  const menuHeight = 190;
   const posX = Math.min(Math.max(10, x), window.innerWidth - menuWidth - 10);
   const posY = Math.min(Math.max(10, y), window.innerHeight - menuHeight - 10);
 
@@ -59,29 +58,23 @@ export default function ContextMenu({
         setCopied(true);
         setTimeout(() => {
           onClose();
-        }, 600);
+        }, 800);
       });
     }
   };
 
-  const isCompleted = Boolean(
-    book.progress && (book.progress.percent >= 100 || book.progress.status === 'completed')
-  );
-  const isNotStarted = Boolean(
-    !book.progress || 
-    book.progress.status === 'not_started' || 
-    (book.progress.page <= 1 && (book.progress.percent || 0) === 0)
-  );
+  const isCompleted = book.progress?.status === 'completed' || (book.progress?.percent && book.progress.percent >= 100);
+  const isNotStarted = !book.progress || book.progress?.status === 'not_started' || (book.progress?.page <= 1 && !isCompleted);
 
   return (
     <div
       ref={menuRef}
       style={{ left: `${posX}px`, top: `${posY}px` }}
-      className="fixed z-50 w-56 bg-neutral-900/95 backdrop-blur-xl border border-neutral-750 rounded-xl shadow-2xl py-1.5 text-xs text-neutral-200 select-none animate-in fade-in zoom-in-95 duration-100"
+      className="fixed z-50 w-[230px] bg-neutral-900 border border-neutral-750 rounded-xl shadow-2xl py-1.5 text-xs text-neutral-200 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md select-none"
     >
-      {/* Book header snippet */}
-      <div className="px-3 py-1.5 border-b border-neutral-800/80 mb-1">
-        <p className="font-semibold text-neutral-100 truncate text-[11px] leading-tight" title={book.title}>
+      {/* Header with truncated title */}
+      <div className="px-3 py-1.5 border-b border-neutral-800">
+        <p className="font-semibold text-neutral-100 truncate text-[11px]" title={book.title}>
           {book.title}
         </p>
         <span className="text-[10px] text-amber-500 font-medium">{book.shelf_display}</span>
@@ -97,17 +90,6 @@ export default function ContextMenu({
       >
         <BookOpen className="w-4 h-4 text-amber-400 shrink-0" />
         <span>{t('readNow')}</span>
-      </button>
-
-      <button
-        onClick={() => {
-          onOpenSystem(book);
-          onClose();
-        }}
-        className="w-full px-3 py-1.5 flex items-center gap-2.5 hover:bg-neutral-800 text-neutral-300 hover:text-neutral-100 text-left transition"
-      >
-        <ExternalLink className="w-4 h-4 text-neutral-400 shrink-0" />
-        <span>{t('openInWindowsApp')}</span>
       </button>
 
       <div className="my-1 border-t border-neutral-800" />

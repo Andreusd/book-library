@@ -198,15 +198,6 @@ export default function App() {
     });
   };
 
-  // Open in system viewer
-  const handleOpenSystem = (book) => {
-    fetch('/api/open-system', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ book_id: book.id })
-    }).catch(err => console.error('Failed to open system viewer:', err));
-  };
-
   // Shelf right-click context menu handler
   const handleShelfContextMenu = (e, shelf) => {
     setShelfContextMenu({
@@ -456,7 +447,6 @@ export default function App() {
           book={contextMenu.book}
           onClose={() => setContextMenu({ isOpen: false, x: 0, y: 0, book: null })}
           onOpenReader={(book) => setActiveBook(book)}
-          onOpenSystem={handleOpenSystem}
           onMarkStatus={handleMarkStatus}
         />
       )}

@@ -34,7 +34,6 @@ export const translations = {
     completed: 'Completed',
     pageBadge: 'p. {page}',
     readButton: 'Read',
-    openInSystemTitle: 'Open in Windows default app (Firefox, Acrobat)',
 
     // Empty state & Onboarding
     noBooksFound: 'No books found',
@@ -53,7 +52,6 @@ export const translations = {
     zoomInTitle: 'Zoom In (+)',
     zoomOutTitle: 'Zoom Out (-)',
     nightModeTitle: 'Night Reading Mode (Invert PDF colors)',
-    openInWindowsTitle: 'Open in Windows default viewer (Firefox, Acrobat, etc.)',
     fullscreenTitle: 'Toggle Fullscreen',
     loadingBook: 'Loading book...',
     rendering: 'Rendering...',
@@ -82,7 +80,6 @@ export const translations = {
 
     // Book Context Menu
     readNow: 'Read Now',
-    openInWindowsApp: 'Open in Windows App',
     markNotStarted: 'Mark as Not Started',
     markCompleted: 'Mark as Completed',
     copyFilePath: 'Copy File Path',
@@ -147,7 +144,6 @@ export const translations = {
     completed: 'Concluído',
     pageBadge: 'p. {page}',
     readButton: 'Ler',
-    openInSystemTitle: 'Abrir no app padrão do Windows (Firefox, Acrobat)',
 
     // Empty state & Onboarding
     noBooksFound: 'Nenhum livro encontrado',
@@ -166,7 +162,6 @@ export const translations = {
     zoomInTitle: 'Aumentar Zoom (+)',
     zoomOutTitle: 'Diminuir Zoom (-)',
     nightModeTitle: 'Modo Leitura Noturna (Inverter cores do PDF)',
-    openInWindowsTitle: 'Abrir no leitor padrão do Windows (Firefox, Acrobat, etc.)',
     fullscreenTitle: 'Tela cheia',
     loadingBook: 'Carregando livro...',
     rendering: 'Renderizando...',
@@ -195,7 +190,6 @@ export const translations = {
 
     // Book Context Menu
     readNow: 'Ler Agora',
-    openInWindowsApp: 'Abrir no App do Windows',
     markNotStarted: 'Marcar como Não Iniciado',
     markCompleted: 'Marcar como Concluído',
     copyFilePath: 'Copiar Caminho do Arquivo',
