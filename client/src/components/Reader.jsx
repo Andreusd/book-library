@@ -122,10 +122,24 @@ export default function Reader({
     return 1.2;
   };
 
+  const getInitialInvertColors = () => {
+    try {
+      const localInvert = localStorage.getItem(`book_invert_${book.id}`);
+      if (localInvert !== null) {
+        return localInvert === 'true';
+      }
+    } catch (e) {}
+
+    if (book.progress?.invert_colors !== undefined) {
+      return Boolean(book.progress.invert_colors);
+    }
+    return false;
+  };
+
   const [scale, setScale] = useState(getInitialZoom);
   const [loading, setLoading] = useState(true);
   const [rendering, setRendering] = useState(false);
-  const [invertColors, setInvertColors] = useState(false);
+  const [invertColors, setInvertColors] = useState(getInitialInvertColors);
   const [pageInput, setPageInput] = useState(String(book.progress?.page || 1));
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [outline, setOutline] = useState([]);
@@ -190,6 +204,7 @@ export default function Reader({
   const lastRenderedPageRef = useRef(null);
   const onProgressUpdateRef = useRef(onProgressUpdate);
   const scaleRef = useRef(scale);
+  const invertColorsRef = useRef(invertColors);
   const lastWheelTimeRef = useRef(0);
   const lastSwipeTimeRef = useRef(0);
   const accumulatedDeltaXRef = useRef(0);
@@ -198,6 +213,10 @@ export default function Reader({
   useEffect(() => {
     scaleRef.current = scale;
   }, [scale]);
+
+  useEffect(() => {
+    invertColorsRef.current = invertColors;
+  }, [invertColors]);
 
   useEffect(() => {
     onProgressUpdateRef.current = onProgressUpdate;
@@ -453,7 +472,8 @@ export default function Reader({
         book_id: book.id,
         page: page,
         total_pages: total,
-        zoom: scaleRef.current
+        zoom: scaleRef.current,
+        invert_colors: invertColorsRef.current
       })
     })
     .then(r => r.json())
@@ -624,6 +644,27 @@ export default function Reader({
 
     return () => clearTimeout(timer);
   }, [book.id, scale, pdfDoc]);
+
+  // Persist night reading mode (invertColors) to localStorage and backend with debounce
+  useEffect(() => {
+    if (!pdfDoc) return;
+    try {
+      localStorage.setItem(`book_invert_${book.id}`, String(invertColors));
+    } catch (e) {}
+
+    const timer = setTimeout(() => {
+      fetch('/api/book/night-mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          book_id: book.id,
+          invert_colors: invertColors
+        })
+      }).catch(err => console.error('Failed to save night mode:', err));
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [book.id, invertColors, pdfDoc]);
 
   const handlePageSubmit = (e) => {
     e.preventDefault();

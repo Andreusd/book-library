@@ -52,10 +52,15 @@ class ProgressPayload(BaseModel):
     page: int
     total_pages: int
     zoom: Optional[float] = None
+    invert_colors: Optional[bool] = None
 
 class ZoomPayload(BaseModel):
     book_id: str
     zoom: float
+
+class NightModePayload(BaseModel):
+    book_id: str
+    invert_colors: bool
 
 class StatusPayload(BaseModel):
     book_id: str
@@ -234,6 +239,57 @@ def continue_reading():
             results.append(b_copy)
     return {"books": results}
 
+@app.post("/api/progress")
+def save_progress(payload: ProgressPayload):
+    """Saves the current reading page, zoom, and night reading mode for a book."""
+    record = tracker.set_progress(
+        payload.book_id, 
+        payload.page, 
+        payload.total_pages, 
+        payload.zoom,
+        payload.invert_colors
+    )
+    return {"status": "ok", "progress": record}
+
+@app.post("/api/book/zoom")
+def save_zoom(payload: ZoomPayload):
+    """Saves the preferred zoom level for a book."""
+    record = tracker.set_zoom(payload.book_id, payload.zoom)
+    return {"status": "ok", "record": record}
+
+@app.post("/api/book/night-mode")
+def save_night_mode(payload: NightModePayload):
+    """Saves the preferred night reading mode (invert colors) for a book."""
+    record = tracker.set_night_mode(payload.book_id, payload.invert_colors)
+    return {"status": "ok", "record": record}
+
+@app.post("/api/book/status")
+def update_book_status(payload: StatusPayload):
+    """Marks a book as not started or completed."""
+    b = scanner.find_book(payload.book_id)
+    if not b:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    if payload.status == "not_started":
+        rec = tracker.reset_progress(payload.book_id)
+        return {
+            "status": "ok",
+            "progress": rec
+        }
+    elif payload.status == "completed":
+        total_pages = 1
+        try:
+            pdf = pdfium.PdfDocument(b["path"])
+            total_pages = len(pdf)
+            pdf.close()
+        except Exception as e:
+            print(f"Could not read total pages for {b['title']}: {e}")
+
+        rec = tracker.mark_completed(payload.book_id, total_pages)
+        return {"status": "ok", "progress": rec}
+    else:
+        raise HTTPException(status_code=400, detail="Invalid status. Must be 'not_started' or 'completed'")
+
 @app.get("/api/book/{book_id}")
 def get_book(book_id: str):
     """Returns details for a single book."""
@@ -274,45 +330,6 @@ def stream_pdf(book_id: str):
         content_disposition_type="inline",
         filename=b["filename"]
     )
-
-@app.post("/api/progress")
-def save_progress(payload: ProgressPayload):
-    """Saves the current reading page and zoom for a book."""
-    record = tracker.set_progress(payload.book_id, payload.page, payload.total_pages, payload.zoom)
-    return {"status": "ok", "progress": record}
-
-@app.post("/api/book/zoom")
-def save_zoom(payload: ZoomPayload):
-    """Saves the preferred zoom level for a book."""
-    record = tracker.set_zoom(payload.book_id, payload.zoom)
-    return {"status": "ok", "record": record}
-
-@app.post("/api/book/status")
-def update_book_status(payload: StatusPayload):
-    """Marks a book as not started or completed."""
-    b = scanner.find_book(payload.book_id)
-    if not b:
-        raise HTTPException(status_code=404, detail="Book not found")
-
-    if payload.status == "not_started":
-        rec = tracker.reset_progress(payload.book_id)
-        return {
-            "status": "ok",
-            "progress": rec
-        }
-    elif payload.status == "completed":
-        total_pages = 1
-        try:
-            pdf = pdfium.PdfDocument(b["path"])
-            total_pages = len(pdf)
-            pdf.close()
-        except Exception as e:
-            print(f"Could not read total pages for {b['title']}: {e}")
-
-        rec = tracker.mark_completed(payload.book_id, total_pages)
-        return {"status": "ok", "progress": rec}
-    else:
-        raise HTTPException(status_code=400, detail="Invalid status. Must be 'not_started' or 'completed'")
 
 @app.get("/api/favorites")
 def get_favorites():
