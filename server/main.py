@@ -179,7 +179,10 @@ def list_books(
 
     # Sort
     if sort == "title_asc":
-        books.sort(key=lambda x: x["title"].lower())
+        if shelf == "continue-reading":
+            books.sort(key=lambda x: x["progress"].get("updated_at", ""), reverse=True)
+        else:
+            books.sort(key=lambda x: x["title"].lower())
     elif sort == "title_desc":
         books.sort(key=lambda x: x["title"].lower(), reverse=True)
     elif sort == "size_desc":
