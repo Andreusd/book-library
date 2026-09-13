@@ -151,13 +151,26 @@ export default function App() {
       if (data.status === 'ok') {
         const nextIds = new Set(data.favorite_ids || []);
         setFavoriteIds(nextIds);
-        setBooks(prev => prev.map(b => b.id === book.id ? { ...b, is_favorite: data.is_favorite } : b));
+        setBooks(prev => {
+          const updated = prev.map(b => b.id === book.id ? { ...b, is_favorite: data.is_favorite } : b);
+          if (selectedShelf === 'favorites') {
+            return updated.filter(b => b.is_favorite);
+          }
+          if (selectedShelf && selectedShelf !== 'continue-reading') {
+            return [...updated].sort((a, b) => {
+              const aFav = nextIds.has(a.id) ? 0 : 1;
+              const bFav = nextIds.has(b.id) ? 0 : 1;
+              return aFav - bFav;
+            });
+          }
+          return updated;
+        });
         setContinueReading(prev => prev.map(b => b.id === book.id ? { ...b, is_favorite: data.is_favorite } : b));
         loadFavorites();
       }
     })
     .catch(err => console.error('Failed to toggle favorite:', err));
-  }, [loadFavorites]);
+  }, [loadFavorites, selectedShelf]);
 
   // Open reader and update browser route to /book/:id
   const openReader = useCallback((book) => {

@@ -205,6 +205,10 @@ def list_books(
     elif sort == "recent":
         books.sort(key=lambda x: x["progress"].get("updated_at", ""), reverse=True)
 
+    # Show favorites first inside each shelf (stable sort preserves primary ordering)
+    if shelf and shelf not in ("continue-reading", "favorites"):
+        books.sort(key=lambda x: 0 if x.get("is_favorite") else 1)
+
     return {
         "books": books,
         "count": len(books),
