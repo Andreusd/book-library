@@ -7,7 +7,7 @@ export const translations = {
     shelfCount: '{books} books • {shelves} shelves',
     filterShelvesPlaceholder: 'Filter shelves...',
     allShelves: 'All Shelves',
-    categories: 'Categories ({count})',
+    categories: 'Bookshelves ({count})',
     librarySafe: 'Source Folder Protected (Read-Only)',
     customNameNotice: 'Custom display name in app',
     originalFolderLabel: 'Original Folder: {folder}',
@@ -44,7 +44,7 @@ export const translations = {
 
     // Empty state & Onboarding
     noBooksFound: 'No books found',
-    noBooksDesc: "We couldn't find any books matching your search or in this category.",
+    noBooksDesc: "We couldn't find any books matching your search or in this bookshelf.",
     clearSearch: 'Clear search',
     setupPromptTitle: 'Welcome to Digital Bookshelf',
     setupPromptDesc: 'To get started, configure the folder where your PDF books are located.',
@@ -110,7 +110,7 @@ export const translations = {
     settingsTitle: 'Library Settings',
     libraryPathLabel: 'Books Directory Path',
     libraryPathPlaceholder: 'e.g. C:\\Books or /home/user/books',
-    libraryPathHelp: 'Enter the folder where your PDF books or category folders are stored.',
+    libraryPathHelp: 'Enter the folder where your PDF books or bookshelf folders are stored.',
     validFolder: 'Valid folder: {books} books across {shelves} shelves found',
     noPdfsFound: 'Directory exists, but no PDF files were found inside',
     pathNotFound: 'Directory does not exist on disk',
@@ -124,7 +124,7 @@ export const translations = {
     shelfCount: '{books} livros • {shelves} estantes',
     filterShelvesPlaceholder: 'Filtrar estantes...',
     allShelves: 'Todas as Estantes',
-    categories: 'Categorias ({count})',
+    categories: 'Estantes ({count})',
     librarySafe: 'Pasta de Origem Protegida (Modo Leitura)',
     customNameNotice: 'Nome personalizado no app',
     originalFolderLabel: 'Pasta Original: {folder}',
@@ -161,7 +161,7 @@ export const translations = {
 
     // Empty state & Onboarding
     noBooksFound: 'Nenhum livro encontrado',
-    noBooksDesc: 'Não encontramos nenhum livro correspondente à sua busca ou nesta categoria.',
+    noBooksDesc: 'Não encontramos nenhum livro correspondente à sua busca ou nesta estante.',
     clearSearch: 'Limpar pesquisa',
     setupPromptTitle: 'Bem-vindo à Estante Digital',
     setupPromptDesc: 'Para começar, configure a pasta onde seus livros em PDF estão localizados.',
@@ -227,7 +227,7 @@ export const translations = {
     settingsTitle: 'Configurações da Biblioteca',
     libraryPathLabel: 'Caminho da Pasta de Livros',
     libraryPathPlaceholder: 'Ex: C:\\Livros ou /home/usuario/livros',
-    libraryPathHelp: 'Insira a pasta onde seus livros em PDF ou pastas de categorias estão armazenados.',
+    libraryPathHelp: 'Insira a pasta onde seus livros em PDF ou pastas de estantes estão armazenados.',
     validFolder: 'Pasta válida: {books} livros encontrados em {shelves} estantes',
     noPdfsFound: 'A pasta existe, mas nenhum arquivo PDF foi encontrado dentro',
     pathNotFound: 'O diretório não existe no disco',
