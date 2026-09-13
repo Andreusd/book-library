@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Search, SlidersHorizontal, Menu, X, BookOpen, 
   ArrowUpDown, FolderOpen, RefreshCw, PanelLeftClose, PanelLeftOpen,
-  Settings 
+  Settings, Heart, Bookmark 
 } from 'lucide-react';
 
 import Sidebar from './components/Sidebar';
@@ -372,6 +372,8 @@ export default function App() {
   useEffect(() => {
     if (activeBook) {
       document.title = `${activeBook.title} - ${t('appTitle')}`;
+    } else if (selectedShelf === 'continue-reading') {
+      document.title = `${t('continueReading')} - ${t('appTitle')}`;
     } else if (selectedShelf === 'favorites') {
       document.title = `${t('favorites')} - ${t('appTitle')}`;
     } else if (currentShelfObj) {
@@ -388,6 +390,7 @@ export default function App() {
         shelves={shelves}
         totalBooks={totalBooks}
         favoriteCount={favorites.length}
+        continueReadingCount={continueReading.length}
         selectedShelf={selectedShelf}
         onSelectShelf={(id) => {
           setSelectedShelf(id);
@@ -421,8 +424,22 @@ export default function App() {
             {/* Breadcrumb / Current Shelf Title */}
             <div className="min-w-0">
               <h2 className="text-sm sm:text-base font-bold text-neutral-100 truncate flex items-center gap-2">
-                <FolderOpen className="w-4 h-4 text-amber-500 shrink-0" />
-                <span>{currentShelfObj ? currentShelfObj.name : t('allShelves')}</span>
+                {selectedShelf === 'continue-reading' ? (
+                  <>
+                    <Bookmark className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>{t('continueReading')}</span>
+                  </>
+                ) : selectedShelf === 'favorites' ? (
+                  <>
+                    <Heart className="w-4 h-4 text-rose-500 fill-rose-500 shrink-0" />
+                    <span>{t('favorites')}</span>
+                  </>
+                ) : (
+                  <>
+                    <BookOpen className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>{currentShelfObj ? currentShelfObj.name : t('allBooks')}</span>
+                  </>
+                )}
               </h2>
             </div>
           </div>
@@ -486,6 +503,7 @@ export default function App() {
               books={continueReading} 
               onSelectBook={(book) => openReader(book)} 
               onContextMenu={handleContextMenu}
+              onViewAll={() => setSelectedShelf('continue-reading')}
             />
           )}
 
@@ -496,6 +514,7 @@ export default function App() {
               onSelectBook={(book) => openReader(book)}
               onContextMenu={handleContextMenu}
               onToggleFavorite={handleToggleFavorite}
+              onViewAll={() => setSelectedShelf('favorites')}
             />
           )}
 
@@ -503,11 +522,13 @@ export default function App() {
           <div className="flex items-center justify-between mb-6 pb-2 border-b border-neutral-850">
             <div>
               <h2 className="text-lg sm:text-xl font-bold text-neutral-100 tracking-tight">
-                {selectedShelf === 'favorites' 
-                  ? t('favorites') 
-                  : currentShelfObj 
-                    ? currentShelfObj.name 
-                    : t('fullLibrary')}
+                {selectedShelf === 'continue-reading'
+                  ? t('continueReading')
+                  : selectedShelf === 'favorites' 
+                    ? t('favorites') 
+                    : currentShelfObj 
+                      ? currentShelfObj.name 
+                      : t('allBooks')}
               </h2>
               <p className="text-xs text-neutral-400 mt-0.5">
                 {debouncedQuery 

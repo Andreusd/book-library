@@ -152,6 +152,15 @@ def list_books(
     """Returns books enriched with reading progress, favorite status, and cover URLs."""
     if shelf == "favorites":
         books = [b for b in scanner.get_books() if favorites_mgr.is_favorite(b["id"])]
+    elif shelf == "continue-reading":
+        all_prog = tracker.get_all()
+        in_prog_ids = {
+            b_id for b_id, p in all_prog.items()
+            if p.get("status") not in ("not_started", "completed")
+            and p.get("page", 1) > 1
+            and p.get("percent", 0) < 100
+        }
+        books = [b for b in scanner.get_books() if b["id"] in in_prog_ids]
     else:
         books = scanner.get_books(shelf_filter=shelf)
     all_progress = tracker.get_all()

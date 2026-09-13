@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Library, Layers, Search, Folder, Heart } from 'lucide-react';
+import { Library, Layers, Search, Folder, Heart, Bookmark, BookOpen } from 'lucide-react';
 import { useI18n } from '../i18n';
 
 export default function Sidebar({ 
   shelves, 
   totalBooks, 
   favoriteCount = 0,
+  continueReadingCount = 0,
   selectedShelf, 
   onSelectShelf,
   onShelfContextMenu,
@@ -84,8 +85,8 @@ export default function Sidebar({
               `}
             >
               <div className="flex items-center gap-2.5 min-w-0">
-                <Layers className={`w-4 h-4 shrink-0 ${selectedShelf === null ? 'text-amber-400' : 'text-neutral-400'}`} />
-                <span className="truncate">{t('allShelves')}</span>
+                <BookOpen className={`w-4 h-4 shrink-0 ${selectedShelf === null ? 'text-amber-400' : 'text-neutral-400'}`} />
+                <span className="truncate">{t('allBooks')}</span>
               </div>
               <span className={`
                 text-[11px] px-2 py-0.5 rounded-full font-mono font-semibold
@@ -95,29 +96,57 @@ export default function Sidebar({
               </span>
             </button>
 
-            {/* Favorites Option */}
-            <button
-              onClick={() => {
-                onSelectShelf('favorites');
-              }}
-              className={`
-                w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors
-                ${selectedShelf === 'favorites' 
-                  ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30' 
-                  : 'text-neutral-300 hover:bg-neutral-850 hover:text-white'}
-              `}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <Heart className={`w-4 h-4 shrink-0 ${selectedShelf === 'favorites' ? 'fill-rose-500 text-rose-500' : 'text-rose-400'}`} />
-                <span className="truncate">{t('favorites')}</span>
-              </div>
-              <span className={`
-                text-[11px] px-2 py-0.5 rounded-full font-mono font-semibold
-                ${selectedShelf === 'favorites' ? 'bg-rose-500/20 text-rose-300' : 'bg-neutral-800 text-neutral-400'}
-              `}>
-                {favoriteCount}
-              </span>
-            </button>
+            {/* Continue Reading Option (if any) */}
+            {continueReadingCount > 0 && (
+              <button
+                onClick={() => {
+                  onSelectShelf('continue-reading');
+                }}
+                className={`
+                  w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors
+                  ${selectedShelf === 'continue-reading' 
+                    ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' 
+                    : 'text-neutral-300 hover:bg-neutral-850 hover:text-white'}
+                `}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Bookmark className={`w-4 h-4 shrink-0 ${selectedShelf === 'continue-reading' ? 'text-amber-400' : 'text-neutral-400'}`} />
+                  <span className="truncate">{t('continueReading')}</span>
+                </div>
+                <span className={`
+                  text-[11px] px-2 py-0.5 rounded-full font-mono font-semibold
+                  ${selectedShelf === 'continue-reading' ? 'bg-amber-500/20 text-amber-300' : 'bg-neutral-800 text-neutral-400'}
+                `}>
+                  {continueReadingCount}
+                </span>
+              </button>
+            )}
+
+            {/* Favorites Option (if any) */}
+            {favoriteCount > 0 && (
+              <button
+                onClick={() => {
+                  onSelectShelf('favorites');
+                }}
+                className={`
+                  w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors
+                  ${selectedShelf === 'favorites' 
+                    ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30' 
+                    : 'text-neutral-300 hover:bg-neutral-850 hover:text-white'}
+                `}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Heart className={`w-4 h-4 shrink-0 ${selectedShelf === 'favorites' ? 'fill-rose-500 text-rose-500' : 'text-rose-400'}`} />
+                  <span className="truncate">{t('favorites')}</span>
+                </div>
+                <span className={`
+                  text-[11px] px-2 py-0.5 rounded-full font-mono font-semibold
+                  ${selectedShelf === 'favorites' ? 'bg-rose-500/20 text-rose-300' : 'bg-neutral-800 text-neutral-400'}
+                `}>
+                  {favoriteCount}
+                </span>
+              </button>
+            )}
 
             <div className="pt-2 pb-1 px-3">
               <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider">

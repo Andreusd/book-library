@@ -1,8 +1,8 @@
 import React from 'react';
-import { Bookmark } from 'lucide-react';
+import { Bookmark, ChevronRight } from 'lucide-react';
 import { useI18n } from '../i18n';
 
-export default function ContinueReading({ books, onSelectBook, onContextMenu }) {
+export default function ContinueReading({ books, onSelectBook, onContextMenu, onViewAll }) {
   const { t } = useI18n();
 
   const inProgressBooks = (books || []).filter(
@@ -17,17 +17,33 @@ export default function ContinueReading({ books, onSelectBook, onContextMenu }) 
 
   return (
     <section className="mb-8">
-      <div className="flex items-center gap-2 mb-4">
-        <Bookmark className="w-5 h-5 text-amber-500" />
-        <h2 className="text-base font-semibold text-neutral-100">{t('continueReading')}</h2>
-        <span className="text-xs text-neutral-500 font-normal">
-          {t('booksInProgress', { count: inProgressBooks.length })}
-        </span>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Bookmark className="w-5 h-5 text-amber-500" />
+          <h2 className="text-base font-semibold text-neutral-100">{t('continueReading')}</h2>
+          <span className="text-xs text-neutral-500 font-normal">
+            {t('booksInProgress', { count: inProgressBooks.length })}
+          </span>
+        </div>
+        {onViewAll && inProgressBooks.length > 1 && (
+          <button
+            onClick={onViewAll}
+            className="text-xs font-medium text-amber-400 hover:text-amber-300 flex items-center gap-1 transition-colors cursor-pointer"
+          >
+            <span>{t('viewAll')}</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {inProgressBooks.map((book) => {
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 overflow-hidden">
+        {inProgressBooks.slice(0, 4).map((book, idx) => {
           const percent = book.progress ? Math.round(book.progress.percent) : 0;
+          const visibilityClass = 
+            idx === 0 ? 'flex' :
+            idx === 1 ? 'hidden sm:flex' :
+            idx === 2 ? 'hidden lg:flex' :
+            'hidden xl:flex';
 
           return (
             <div
@@ -39,7 +55,7 @@ export default function ContinueReading({ books, onSelectBook, onContextMenu }) 
                   onContextMenu(e, book);
                 }
               }}
-              className="group cursor-pointer bg-neutral-900/60 hover:bg-neutral-850 border border-neutral-800 hover:border-amber-500/40 rounded-xl p-3 flex gap-3.5 transition-all duration-200 shadow-sm hover:shadow-md"
+              className={`group cursor-pointer bg-neutral-900/60 hover:bg-neutral-850 border border-neutral-800 hover:border-amber-500/40 rounded-xl p-3 gap-3.5 transition-all duration-200 shadow-sm hover:shadow-md ${visibilityClass}`}
             >
               {/* Mini Cover */}
               <div className="w-16 aspect-[1/1.45] rounded-md overflow-hidden bg-neutral-950 shrink-0 border border-neutral-800 shadow relative">
