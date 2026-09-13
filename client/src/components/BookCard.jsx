@@ -1,12 +1,19 @@
 import React, { useState } from 'react';
-import { BookOpen, CheckCircle } from 'lucide-react';
+import { BookOpen, CheckCircle, Heart } from 'lucide-react';
 import { useI18n } from '../i18n';
 
-export default function BookCard({ book, onSelectBook, onContextMenu }) {
+export default function BookCard({ 
+  book, 
+  isFavorite, 
+  onSelectBook, 
+  onContextMenu, 
+  onToggleFavorite 
+}) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const { t } = useI18n();
 
+  const isFav = isFavorite !== undefined ? isFavorite : Boolean(book.is_favorite);
   const isFinished = Boolean(book.progress && (book.progress.percent >= 100 || book.progress.status === 'completed'));
   const isNotStarted = Boolean(!book.progress || book.progress.status === 'not_started' || (book.progress.page <= 1 && !isFinished));
   const hasProgress = !isNotStarted && Boolean(book.progress && (book.progress.page > 1 || isFinished));
@@ -56,6 +63,22 @@ export default function BookCard({ book, onSelectBook, onContextMenu }) {
 
         {/* Realistic Left Book Spine Highlight / Shadow Overlay */}
         <div className="absolute inset-y-0 left-0 w-4 book-spine-highlight pointer-events-none" />
+
+        {/* Favorite Toggle Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onToggleFavorite) onToggleFavorite(book);
+          }}
+          className={`absolute top-2 left-2 p-1.5 rounded-full backdrop-blur-md transition-all duration-200 z-20 cursor-pointer ${
+            isFav 
+              ? 'bg-neutral-900/90 text-rose-500 border border-rose-500/40 opacity-100 shadow-lg hover:scale-110' 
+              : 'bg-neutral-900/80 text-neutral-400 hover:text-rose-400 hover:scale-110 border border-neutral-700/50 opacity-0 group-hover:opacity-100 shadow-md'
+          }`}
+          title={isFav ? t('removeFromFavorites') : t('addToFavorites')}
+        >
+          <Heart className={`w-3.5 h-3.5 ${isFav ? 'fill-rose-500 text-rose-500' : ''}`} />
+        </button>
 
         {/* Reading Progress Badge / Ribbon */}
         {hasProgress && (

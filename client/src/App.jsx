@@ -8,6 +8,7 @@ import {
 import Sidebar from './components/Sidebar';
 import BookCard from './components/BookCard';
 import ContinueReading from './components/ContinueReading';
+import FavoriteBooks from './components/FavoriteBooks';
 import Reader from './components/Reader';
 import ContextMenu from './components/ContextMenu';
 import ShelfContextMenu from './components/ShelfContextMenu';
@@ -23,6 +24,8 @@ export default function App() {
   const [selectedShelf, setSelectedShelf] = useState(null);
   const [books, setBooks] = useState([]);
   const [continueReading, setContinueReading] = useState([]);
+  const [favorites, setFavorites] = useState([]);
+  const [favoriteIds, setFavoriteIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -101,6 +104,38 @@ export default function App() {
       .catch(err => console.error('Failed to load continue reading:', err));
   }, []);
 
+  // Load Favorites
+  const loadFavorites = useCallback(() => {
+    fetch('/api/favorites')
+      .then(res => res.json())
+      .then(data => {
+        setFavorites(data.books || []);
+        setFavoriteIds(new Set(data.favorite_ids || []));
+      })
+      .catch(err => console.error('Failed to load favorites:', err));
+  }, []);
+
+  // Toggle Favorite
+  const handleToggleFavorite = useCallback((book) => {
+    if (!book) return;
+    fetch('/api/favorites/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ book_id: book.id })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === 'ok') {
+        const nextIds = new Set(data.favorite_ids || []);
+        setFavoriteIds(nextIds);
+        setBooks(prev => prev.map(b => b.id === book.id ? { ...b, is_favorite: data.is_favorite } : b));
+        setContinueReading(prev => prev.map(b => b.id === book.id ? { ...b, is_favorite: data.is_favorite } : b));
+        loadFavorites();
+      }
+    })
+    .catch(err => console.error('Failed to toggle favorite:', err));
+  }, [loadFavorites]);
+
   // Load Books
   const loadBooks = useCallback(() => {
     setLoading(true);
@@ -124,7 +159,8 @@ export default function App() {
   useEffect(() => {
     loadShelves();
     loadContinueReading();
-  }, [loadShelves, loadContinueReading]);
+    loadFavorites();
+  }, [loadShelves, loadContinueReading, loadFavorites]);
 
   useEffect(() => {
     loadBooks();
@@ -238,12 +274,14 @@ export default function App() {
   useEffect(() => {
     if (activeBook) {
       document.title = `${activeBook.title} - ${t('appTitle')}`;
+    } else if (selectedShelf === 'favorites') {
+      document.title = `${t('favorites')} - ${t('appTitle')}`;
     } else if (currentShelfObj) {
       document.title = `${currentShelfObj.name} - ${t('appTitle')}`;
     } else {
       document.title = t('appTitle');
     }
-  }, [activeBook, currentShelfObj, t]);
+  }, [activeBook, selectedShelf, currentShelfObj, t]);
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col lg:flex-row">
@@ -251,6 +289,7 @@ export default function App() {
       <Sidebar
         shelves={shelves}
         totalBooks={totalBooks}
+        favoriteCount={favorites.length}
         selectedShelf={selectedShelf}
         onSelectShelf={(id) => {
           setSelectedShelf(id);
@@ -352,11 +391,25 @@ export default function App() {
             />
           )}
 
+          {/* Favorite Books Shelf (displayed below Continue Reading) */}
+          {!selectedShelf && !debouncedQuery && favorites.length > 0 && (
+            <FavoriteBooks
+              books={favorites}
+              onSelectBook={(book) => setActiveBook(book)}
+              onContextMenu={handleContextMenu}
+              onToggleFavorite={handleToggleFavorite}
+            />
+          )}
+
           {/* Shelf Section Title & Count */}
           <div className="flex items-center justify-between mb-6 pb-2 border-b border-neutral-850">
             <div>
               <h2 className="text-lg sm:text-xl font-bold text-neutral-100 tracking-tight">
-                {currentShelfObj ? currentShelfObj.name : t('fullLibrary')}
+                {selectedShelf === 'favorites' 
+                  ? t('favorites') 
+                  : currentShelfObj 
+                    ? currentShelfObj.name 
+                    : t('fullLibrary')}
               </h2>
               <p className="text-xs text-neutral-400 mt-0.5">
                 {debouncedQuery 
@@ -383,8 +436,10 @@ export default function App() {
                 <BookCard
                   key={book.id}
                   book={book}
+                  isFavorite={favoriteIds.has(book.id)}
                   onSelectBook={(selected) => setActiveBook(selected)}
                   onContextMenu={handleContextMenu}
+                  onToggleFavorite={handleToggleFavorite}
                 />
               ))}
             </div>
@@ -431,11 +486,14 @@ export default function App() {
       {activeBook && (
         <Reader
           book={activeBook}
+          isFavorite={favoriteIds.has(activeBook.id)}
           onClose={() => {
             setActiveBook(null);
             loadContinueReading();
+            loadFavorites();
           }}
           onProgressUpdate={handleProgressUpdate}
+          onToggleFavorite={handleToggleFavorite}
         />
       )}
 
@@ -445,9 +503,11 @@ export default function App() {
           x={contextMenu.x}
           y={contextMenu.y}
           book={contextMenu.book}
+          isFavorite={favoriteIds.has(contextMenu.book.id)}
           onClose={() => setContextMenu({ isOpen: false, x: 0, y: 0, book: null })}
           onOpenReader={(book) => setActiveBook(book)}
           onMarkStatus={handleMarkStatus}
+          onToggleFavorite={handleToggleFavorite}
         />
       )}
 

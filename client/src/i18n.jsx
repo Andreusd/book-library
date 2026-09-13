@@ -30,6 +30,13 @@ export const translations = {
     booksInProgress: '({count} books in progress)',
     pageOf: 'Page {page} of {total}',
 
+    // Favorites
+    favorites: 'Favorites',
+    favoriteBooksCount: '({count} favorite books)',
+    addToFavorites: 'Add to Favorites',
+    removeFromFavorites: 'Remove from Favorites',
+    favoriteShelfTitle: 'Favorite Books',
+
     // Book Card
     completed: 'Completed',
     pageBadge: 'p. {page}',
@@ -139,6 +146,13 @@ export const translations = {
     continueReading: 'Continuar Lendo',
     booksInProgress: '({count} livros em progresso)',
     pageOf: 'Pág. {page} de {total}',
+
+    // Favorites
+    favorites: 'Favoritos',
+    favoriteBooksCount: '({count} livros favoritos)',
+    addToFavorites: 'Adicionar aos Favoritos',
+    removeFromFavorites: 'Remover dos Favoritos',
+    favoriteShelfTitle: 'Livros Favoritos',
 
     // Book Card
     completed: 'Concluído',

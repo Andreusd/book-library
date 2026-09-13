@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { 
-  BookOpen, RotateCcw, CheckCircle2, 
+  BookOpen, Heart, RotateCcw, CheckCircle2, 
   Copy, Check 
 } from 'lucide-react';
 import { useI18n } from '../i18n';
@@ -9,9 +9,11 @@ export default function ContextMenu({
   x, 
   y, 
   book, 
+  isFavorite,
   onClose, 
   onOpenReader, 
-  onMarkStatus 
+  onMarkStatus,
+  onToggleFavorite
 }) {
   const menuRef = useRef(null);
   const [copied, setCopied] = useState(false);
@@ -48,7 +50,7 @@ export default function ContextMenu({
 
   // Adjust coordinates to ensure the menu stays within viewport boundaries
   const menuWidth = 230;
-  const menuHeight = 190;
+  const menuHeight = 225;
   const posX = Math.min(Math.max(10, x), window.innerWidth - menuWidth - 10);
   const posY = Math.min(Math.max(10, y), window.innerHeight - menuHeight - 10);
 
@@ -63,6 +65,7 @@ export default function ContextMenu({
     }
   };
 
+  const isFav = isFavorite !== undefined ? isFavorite : Boolean(book?.is_favorite);
   const isCompleted = book.progress?.status === 'completed' || (book.progress?.percent && book.progress.percent >= 100);
   const isNotStarted = !book.progress || book.progress?.status === 'not_started' || (book.progress?.page <= 1 && !isCompleted);
 
@@ -90,6 +93,17 @@ export default function ContextMenu({
       >
         <BookOpen className="w-4 h-4 text-amber-400 shrink-0" />
         <span>{t('readNow')}</span>
+      </button>
+
+      <button
+        onClick={() => {
+          if (onToggleFavorite) onToggleFavorite(book);
+          onClose();
+        }}
+        className="w-full px-3 py-1.5 flex items-center gap-2.5 hover:bg-neutral-800 text-neutral-300 hover:text-neutral-100 text-left transition"
+      >
+        <Heart className={`w-4 h-4 shrink-0 ${isFav ? 'fill-rose-500 text-rose-500' : 'text-neutral-400'}`} />
+        <span>{isFav ? t('removeFromFavorites') : t('addToFavorites')}</span>
       </button>
 
       <div className="my-1 border-t border-neutral-800" />

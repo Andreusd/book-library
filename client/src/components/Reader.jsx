@@ -4,7 +4,7 @@ import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { 
   ArrowLeft, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, 
   Maximize2, Minimize2, Moon, Sun, ListTree,
-  MessageSquare
+  MessageSquare, Heart
 } from 'lucide-react';
 import PdfOutline from './PdfOutline';
 import HighlightOverlay from './HighlightOverlay';
@@ -58,7 +58,7 @@ class SimpleLinkService {
 
   addLinkAttributes(link, url, newWindow = true) {
     link.href = url;
-    link.target = '_blank';
+    link.target = newWindow ? '_blank' : '_self';
     link.rel = 'noopener noreferrer nofollow';
   }
 
@@ -88,8 +88,15 @@ class SimpleLinkService {
   }
 }
 
-export default function Reader({ book, onClose, onProgressUpdate }) {
+export default function Reader({ 
+  book, 
+  onClose, 
+  onProgressUpdate, 
+  onToggleFavorite, 
+  isFavorite 
+}) {
   const { t } = useI18n();
+  const [favState, setFavState] = useState(isFavorite !== undefined ? isFavorite : Boolean(book.is_favorite));
   const [pdfDoc, setPdfDoc] = useState(null);
   const [currentPage, setCurrentPage] = useState(book.progress?.page || 1);
   const [totalPages, setTotalPages] = useState(book.progress?.total_pages || 1);
@@ -562,6 +569,22 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
     }
   };
 
+  const handleToggleFav = () => {
+    fetch('/api/favorites/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ book_id: book.id })
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === 'ok') {
+        setFavState(data.is_favorite);
+        if (onToggleFavorite) onToggleFavorite(book);
+      }
+    })
+    .catch(err => console.error('Failed to toggle favorite:', err));
+  };
+
   // Keyboard navigation & smart scrolling
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -822,6 +845,19 @@ export default function Reader({ book, onClose, onProgressUpdate }) {
             title={t('nightModeTitle')}
           >
             <Moon className="w-4 h-4" />
+          </button>
+
+          {/* Favorite Toggle */}
+          <button 
+            onClick={handleToggleFav}
+            className={`p-1.5 rounded-lg transition ${
+              favState 
+                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' 
+                : 'hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200'
+            }`}
+            title={favState ? t('removeFromFavorites') : t('addToFavorites')}
+          >
+            <Heart className={`w-4 h-4 ${favState ? 'fill-rose-500 text-rose-500' : ''}`} />
           </button>
 
           {/* Comments & Highlights Drawer Toggle */}

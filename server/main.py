@@ -15,6 +15,7 @@ from .scanner import LibraryScanner
 from .covers import CoverManager
 from .progress import ProgressTracker
 from .annotations import AnnotationsManager
+from .favorites import FavoritesManager
 
 # Base paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -25,6 +26,7 @@ scanner = LibraryScanner()
 cover_mgr = CoverManager()
 tracker = ProgressTracker()
 annotations_mgr = AnnotationsManager()
+favorites_mgr = FavoritesManager()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -62,6 +64,9 @@ class StatusPayload(BaseModel):
 class RenameShelfPayload(BaseModel):
     shelf_id: str
     custom_name: str
+
+class ToggleFavoritePayload(BaseModel):
+    book_id: str
 
 class SettingsPayload(BaseModel):
     library_path: str
@@ -144,15 +149,19 @@ def list_books(
     query: Optional[str] = Query(None, description="Search query across titles"),
     sort: Optional[str] = Query("title_asc", description="Sort order: title_asc, title_desc, size_desc, recent")
 ):
-    """Returns books enriched with reading progress and cover URLs."""
-    books = scanner.get_books(shelf_filter=shelf)
+    """Returns books enriched with reading progress, favorite status, and cover URLs."""
+    if shelf == "favorites":
+        books = [b for b in scanner.get_books() if favorites_mgr.is_favorite(b["id"])]
+    else:
+        books = scanner.get_books(shelf_filter=shelf)
     all_progress = tracker.get_all()
 
-    # Enrich each book with reading progress and cover URL
+    # Enrich each book with reading progress, favorite status, and cover URL
     for b in books:
         prog = all_progress.get(b["id"])
         b["progress"] = prog if prog else {"page": 1, "total_pages": 0, "percent": 0}
         b["cover_url"] = f"/api/cover/{b['id']}"
+        b["is_favorite"] = favorites_mgr.is_favorite(b["id"])
 
     # Filter by search query if provided
     if query:
@@ -190,6 +199,7 @@ def continue_reading():
                 "updated_at": r["updated_at"]
             }
             b_copy["cover_url"] = f"/api/cover/{b['id']}"
+            b_copy["is_favorite"] = favorites_mgr.is_favorite(b["id"])
             results.append(b_copy)
     return {"books": results}
 
@@ -203,6 +213,7 @@ def get_book(book_id: str):
     prog = tracker.get_progress(book_id)
     b_copy["progress"] = prog if prog else {"page": 1, "total_pages": 0, "percent": 0}
     b_copy["cover_url"] = f"/api/cover/{book_id}"
+    b_copy["is_favorite"] = favorites_mgr.is_favorite(book_id)
     return b_copy
 
 @app.get("/api/cover/{book_id}")
@@ -271,6 +282,38 @@ def update_book_status(payload: StatusPayload):
         return {"status": "ok", "progress": rec}
     else:
         raise HTTPException(status_code=400, detail="Invalid status. Must be 'not_started' or 'completed'")
+
+@app.get("/api/favorites")
+def get_favorites():
+    """Returns list of favorite book IDs and favorite books enriched with progress and covers."""
+    fav_ids = favorites_mgr.get_favorite_ids()
+    books = []
+    all_progress = tracker.get_all()
+    for bid in fav_ids:
+        b = scanner.find_book(bid)
+        if b:
+            b_copy = dict(b)
+            prog = all_progress.get(bid)
+            b_copy["progress"] = prog if prog else {"page": 1, "total_pages": 0, "percent": 0}
+            b_copy["cover_url"] = f"/api/cover/{bid}"
+            b_copy["is_favorite"] = True
+            books.append(b_copy)
+    return {
+        "favorite_ids": fav_ids,
+        "books": books,
+        "count": len(books)
+    }
+
+@app.post("/api/favorites/toggle")
+def toggle_favorite(payload: ToggleFavoritePayload):
+    """Toggles a book's favorite status."""
+    is_fav = favorites_mgr.toggle_favorite(payload.book_id)
+    return {
+        "status": "ok",
+        "book_id": payload.book_id,
+        "is_favorite": is_fav,
+        "favorite_ids": favorites_mgr.get_favorite_ids()
+    }
 
 @app.get("/api/annotations/{book_id}")
 def get_annotations(book_id: str):
