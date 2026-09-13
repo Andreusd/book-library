@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Search, SlidersHorizontal, Menu, X, BookOpen, 
   ArrowUpDown, FolderOpen, RefreshCw, PanelLeftClose, PanelLeftOpen,
-  Settings, Heart, Bookmark 
+  Settings, Heart, Bookmark, Home 
 } from 'lucide-react';
 
 import Sidebar from './components/Sidebar';
@@ -436,7 +436,11 @@ export default function App() {
                   </>
                 ) : (
                   <>
-                    <BookOpen className="w-4 h-4 text-amber-500 shrink-0" />
+                    {currentShelfObj ? (
+                      <BookOpen className="w-4 h-4 text-amber-500 shrink-0" />
+                    ) : (
+                      <Home className="w-4 h-4 text-amber-500 shrink-0" />
+                    )}
                     <span>{currentShelfObj ? currentShelfObj.name : t('allBooks')}</span>
                   </>
                 )}

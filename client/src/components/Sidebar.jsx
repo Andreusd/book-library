@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Library, Layers, Search, Folder, Heart, Bookmark, BookOpen } from 'lucide-react';
+import { Library, Layers, Search, Folder, Heart, Bookmark, Home } from 'lucide-react';
 import { useI18n } from '../i18n';
 
 export default function Sidebar({ 
@@ -85,7 +85,7 @@ export default function Sidebar({
               `}
             >
               <div className="flex items-center gap-2.5 min-w-0">
-                <BookOpen className={`w-4 h-4 shrink-0 ${selectedShelf === null ? 'text-amber-400' : 'text-neutral-400'}`} />
+                <Home className={`w-4 h-4 shrink-0 ${selectedShelf === null ? 'text-amber-400' : 'text-neutral-400'}`} />
                 <span className="truncate">{t('allBooks')}</span>
               </div>
               <span className={`
