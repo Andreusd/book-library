@@ -4,7 +4,8 @@ import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { 
   ArrowLeft, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, 
   Maximize2, Minimize2, Moon, Sun, ListTree,
-  MessageSquare, Heart, Settings, SlidersHorizontal, X
+  MessageSquare, Heart, Settings, SlidersHorizontal, X,
+  PanelTopClose, PanelTopOpen, RotateCcw, StretchHorizontal
 } from 'lucide-react';
 import PdfOutline from './PdfOutline';
 import HighlightOverlay from './HighlightOverlay';
@@ -141,7 +142,19 @@ export default function Reader({
   const [rendering, setRendering] = useState(false);
   const [invertColors, setInvertColors] = useState(getInitialInvertColors);
   const [pageInput, setPageInput] = useState(String(book.progress?.page || 1));
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(() => {
+    return typeof document !== 'undefined' ? Boolean(document.fullscreenElement) : false;
+  });
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
   const [outline, setOutline] = useState([]);
   const [hasOutline, setHasOutline] = useState(false);
   const [outlineOpen, setOutlineOpen] = useState(false);
@@ -208,6 +221,136 @@ export default function Reader({
       return next;
     });
   };
+
+  // Header auto-hide / pin state
+  const [headerEnabled, setHeaderEnabled] = useState(() => {
+    try {
+      return localStorage.getItem('reader_header_enabled') !== 'false';
+    } catch (e) {
+      return true;
+    }
+  });
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+
+  const isHeaderVisibleRef = useRef(true);
+  const hideTimerRef = useRef(null);
+  const isMouseOverHeaderRef = useRef(false);
+  const readerSettingsOpenRef = useRef(readerSettingsOpen);
+  const commentsDrawerOpenRef = useRef(commentsDrawerOpen);
+  const outlineOpenRef = useRef(outlineOpen);
+
+  useEffect(() => {
+    isHeaderVisibleRef.current = isHeaderVisible;
+  }, [isHeaderVisible]);
+
+  useEffect(() => {
+    readerSettingsOpenRef.current = readerSettingsOpen;
+  }, [readerSettingsOpen]);
+
+  useEffect(() => {
+    commentsDrawerOpenRef.current = commentsDrawerOpen;
+  }, [commentsDrawerOpen]);
+
+  useEffect(() => {
+    outlineOpenRef.current = outlineOpen;
+  }, [outlineOpen]);
+
+  const clearHideTimer = useCallback(() => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  }, []);
+
+  const showHeader = useCallback(() => {
+    clearHideTimer();
+    setIsHeaderVisible(true);
+    isHeaderVisibleRef.current = true;
+  }, [clearHideTimer]);
+
+  const startHideTimer = useCallback((delay = 3000, reset = false) => {
+    if (hideTimerRef.current && !reset) return;
+    clearHideTimer();
+    hideTimerRef.current = setTimeout(() => {
+      if (
+        isMouseOverHeaderRef.current ||
+        readerSettingsOpenRef.current ||
+        commentsDrawerOpenRef.current ||
+        outlineOpenRef.current
+      ) {
+        return;
+      }
+      setIsHeaderVisible(false);
+      isHeaderVisibleRef.current = false;
+      hideTimerRef.current = null;
+    }, delay);
+  }, [clearHideTimer]);
+
+  const toggleHeaderEnabled = useCallback(() => {
+    setHeaderEnabled(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('reader_header_enabled', String(next));
+      } catch (e) {}
+      if (next) {
+        clearHideTimer();
+        setIsHeaderVisible(true);
+        isHeaderVisibleRef.current = true;
+      } else {
+        showHeader();
+        if (!isMouseOverHeaderRef.current) {
+          startHideTimer(3000, true);
+        }
+      }
+      return next;
+    });
+  }, [clearHideTimer, showHeader, startHideTimer]);
+
+  useEffect(() => {
+    if (headerEnabled) {
+      clearHideTimer();
+      return;
+    }
+
+    // Auto-hide mode is active
+    if (!isMouseOverHeaderRef.current) {
+      startHideTimer(3000, false);
+    }
+
+    const handleMouseMove = (e) => {
+      if (e.clientY <= 56) {
+        showHeader();
+      } else {
+        if (
+          isHeaderVisibleRef.current &&
+          !isMouseOverHeaderRef.current &&
+          !readerSettingsOpenRef.current &&
+          !commentsDrawerOpenRef.current &&
+          !outlineOpenRef.current
+        ) {
+          startHideTimer(3000, false);
+        }
+      }
+    };
+
+    const handleTouchStart = (e) => {
+      const touch = e.touches[0];
+      if (touch && touch.clientY <= 56) {
+        showHeader();
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('touchstart', handleTouchStart);
+      clearHideTimer();
+    };
+  }, [headerEnabled, showHeader, startHideTimer, clearHideTimer]);
+
+  const isHeaderShowing = headerEnabled || isHeaderVisible || readerSettingsOpen || commentsDrawerOpen || outlineOpen;
+
 
   const canvasRef = useRef(null);
   const textLayerRef = useRef(null);
@@ -901,10 +1044,8 @@ export default function Reader({
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(err => console.log(err));
-      setIsFullscreen(true);
     } else {
       document.exitFullscreen().catch(err => console.log(err));
-      setIsFullscreen(false);
     }
   };
 
@@ -913,11 +1054,32 @@ export default function Reader({
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-neutral-950 text-neutral-100 overflow-hidden overscroll-none touch-pan-y">
       {/* Top Header / Toolbar */}
-      <header className="h-14 px-4 bg-neutral-900 border-b border-neutral-800 flex items-center justify-between z-30 shrink-0 select-none">
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+      <header 
+        onMouseEnter={() => {
+          isMouseOverHeaderRef.current = true;
+          clearHideTimer();
+        }}
+        onMouseLeave={() => {
+          isMouseOverHeaderRef.current = false;
+          if (!headerEnabled && !readerSettingsOpen && !commentsDrawerOpen && !outlineOpen) {
+            startHideTimer(3000, true);
+          }
+        }}
+        className={`h-14 px-4 bg-neutral-900 border-b border-neutral-800 flex items-center justify-between z-30 select-none transition-all duration-300 ease-in-out ${
+          headerEnabled 
+            ? 'relative shrink-0 translate-y-0 opacity-100 pointer-events-auto' 
+            : `fixed top-0 left-0 right-0 shadow-2xl shadow-black/80 ${
+                isHeaderShowing 
+                  ? 'translate-y-0 opacity-100 pointer-events-auto' 
+                  : '-translate-y-full opacity-0 pointer-events-none'
+              }`
+        }`}
+      >
+        {/* Left: Navigation & Book Title */}
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 max-w-[calc(50%-90px)] sm:max-w-[calc(50%-110px)] md:max-w-[calc(50%-130px)] z-10">
           <button 
             onClick={onClose}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 hover:text-white transition text-sm font-medium"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 hover:text-white transition text-sm font-medium shrink-0"
             title={t('backToLibraryTitle')}
           >
             <ArrowLeft className="w-4 h-4" />
@@ -928,7 +1090,7 @@ export default function Reader({
           {hasOutline && (
             <button
               onClick={() => setOutlineOpen(prev => !prev)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition shrink-0 ${
                 outlineOpen
                   ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                   : 'bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 hover:text-white'
@@ -940,10 +1102,10 @@ export default function Reader({
             </button>
           )}
           
-          <div className="h-4 w-px bg-neutral-700 mx-0.5 hidden sm:block" />
+          <div className="h-4 w-px bg-neutral-700 mx-0.5 hidden sm:block shrink-0" />
 
-          <div className="min-w-0">
-            <h1 className="text-sm font-semibold truncate text-neutral-100 max-w-xs sm:max-w-md md:max-w-lg">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-sm font-semibold truncate text-neutral-100" title={book.title}>
               {book.title}
             </h1>
             <p className="text-xs text-neutral-400 truncate">
@@ -952,12 +1114,12 @@ export default function Reader({
           </div>
         </div>
 
-        {/* Center Page Controls */}
-        <div className="flex items-center gap-2">
+        {/* Center Page Controls - Always Centralized */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-2 z-10">
           <button 
             onClick={goToPrevPage}
             disabled={currentPage <= 1}
-            className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:hover:bg-neutral-800 transition"
+            className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:hover:bg-neutral-800 transition cursor-pointer"
             title={t('prevPageTitle')}
           >
             <ChevronLeft className="w-4 h-4" />
@@ -978,7 +1140,7 @@ export default function Reader({
           <button 
             onClick={goToNextPage}
             disabled={currentPage >= totalPages}
-            className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:hover:bg-neutral-800 transition"
+            className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:hover:bg-neutral-800 transition cursor-pointer"
             title={t('nextPageTitle')}
           >
             <ChevronRight className="w-4 h-4" />
@@ -990,7 +1152,7 @@ export default function Reader({
         </div>
 
         {/* Right Tools */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 ml-auto z-10">
           {/* Zoom controls */}
           <button 
             onClick={() => setScale(s => Math.max(0.5, Number((s - 0.15).toFixed(2))))}
@@ -1002,18 +1164,18 @@ export default function Reader({
           
           <button 
             onClick={() => setScale(1.2)}
-            className="px-2 py-1 text-xs rounded bg-neutral-800/60 hover:bg-neutral-800 text-neutral-300 transition hidden sm:inline-block cursor-pointer"
+            className="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition cursor-pointer hidden sm:inline-block"
             title={t('resetWidthTitle')}
           >
-            {t('resetWidth')}
+            <RotateCcw className="w-4 h-4" />
           </button>
 
           <button 
             onClick={fitWidth}
-            className="px-2 py-1 text-xs rounded bg-neutral-800/60 hover:bg-neutral-800 text-neutral-300 transition hidden sm:inline-block cursor-pointer"
+            className="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition cursor-pointer hidden sm:inline-block"
             title={t('fitWidth')}
           >
-            {t('fitWidth')}
+            <StretchHorizontal className="w-4 h-4" />
           </button>
 
           <button 
@@ -1026,10 +1188,31 @@ export default function Reader({
 
           <div className="h-4 w-px bg-neutral-700 mx-1 hidden sm:block" />
 
+          {/* Toggle Header Auto-Hide / Keep Header Visible */}
+          <button 
+            onClick={toggleHeaderEnabled}
+            className={`p-1.5 rounded-lg transition cursor-pointer ${
+              !headerEnabled 
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
+                : 'hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200'
+            }`}
+            title={headerEnabled ? t('unpinHeaderTitle') : t('pinHeaderTitle')}
+          >
+            {headerEnabled ? (
+              <PanelTopClose className="w-4 h-4" />
+            ) : (
+              <PanelTopOpen className="w-4 h-4" />
+            )}
+          </button>
+
           {/* Invert Dark / Light */}
           <button 
             onClick={() => setInvertColors(!invertColors)}
-            className={`p-1.5 rounded-lg transition cursor-pointer ${invertColors ? 'bg-amber-500/20 text-amber-300' : 'hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200'}`}
+            className={`p-1.5 rounded-lg transition cursor-pointer ${
+              invertColors 
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
+                : 'hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200'
+            }`}
             title={t('nightModeTitle')}
           >
             <Moon className="w-4 h-4" />
@@ -1051,20 +1234,14 @@ export default function Reader({
           {/* Comments & Highlights Drawer Toggle */}
           <button 
             onClick={() => setCommentsDrawerOpen(prev => !prev)}
-            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition text-xs font-medium cursor-pointer ${
+            className={`p-1.5 rounded-lg transition cursor-pointer ${
               commentsDrawerOpen 
                 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
                 : 'hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200'
             }`}
-            title={commentsDrawerOpen ? t('hideComments') : t('showComments')}
+            title={commentsDrawerOpen ? t('hideComments') : (annotations.length > 0 ? `${t('showComments')} (${annotations.length})` : t('showComments'))}
           >
             <MessageSquare className="w-4 h-4 text-amber-400" />
-            <span className="hidden sm:inline">{t('comments')}</span>
-            {annotations.length > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full font-mono text-[10px] bg-amber-500/25 text-amber-300 font-semibold">
-                {annotations.length}
-              </span>
-            )}
           </button>
 
           {/* Fullscreen */}
@@ -1168,6 +1345,27 @@ export default function Reader({
                           type="checkbox"
                           checked={upDownFlipEnabled}
                           onChange={toggleUpDownFlip}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
+                      </div>
+                    </label>
+
+                    {/* Toggle Auto-Hide Header */}
+                    <label className="flex items-start justify-between gap-3 p-2.5 rounded-xl hover:bg-neutral-800/60 transition-colors cursor-pointer group">
+                      <div className="min-w-0 flex-1">
+                        <span className="text-xs font-semibold text-neutral-100 block group-hover:text-amber-300 transition-colors">
+                          {t('autoHideHeader')}
+                        </span>
+                        <span className="text-[11px] text-neutral-300 leading-snug block mt-0.5">
+                          {t('autoHideHeaderDesc')}
+                        </span>
+                      </div>
+                      <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                        <input 
+                          type="checkbox"
+                          checked={!headerEnabled}
+                          onChange={toggleHeaderEnabled}
                           className="sr-only peer"
                         />
                         <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>

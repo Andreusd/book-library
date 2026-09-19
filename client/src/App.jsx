@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Search, SlidersHorizontal, Menu, X, BookOpen, 
   ArrowUpDown, FolderOpen, RefreshCw, PanelLeftClose, PanelLeftOpen,
-  Settings, Heart, Bookmark, Home 
+  Settings, Heart, Bookmark, Home, Maximize2, Minimize2 
 } from 'lucide-react';
 
 import Sidebar from './components/Sidebar';
@@ -106,6 +106,28 @@ export default function App() {
       } catch (e) {}
       return next;
     });
+  }, []);
+
+  const [isFullscreen, setIsFullscreen] = useState(() => {
+    return typeof document !== 'undefined' ? Boolean(document.fullscreenElement) : false;
+  });
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => console.log(err));
+    } else {
+      document.exitFullscreen().catch(err => console.log(err));
+    }
   }, []);
 
   const [contextMenu, setContextMenu] = useState({ isOpen: false, x: 0, y: 0, book: null });
@@ -576,7 +598,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* Sort Selector & Settings Button */}
+          {/* Sort Selector, Fullscreen & Settings Buttons */}
           <div className="flex items-center gap-2.5">
             <div className="relative flex items-center">
               <select
@@ -590,6 +612,15 @@ export default function App() {
                 <option value="recent">{t('sortRecent')}</option>
               </select>
             </div>
+
+            {/* Toggle Fullscreen Button */}
+            <button
+              onClick={toggleFullscreen}
+              className="p-1.5 rounded-lg bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-amber-400 hover:border-amber-500/30 transition shadow-sm cursor-pointer"
+              title={t('fullscreenTitle')}
+            >
+              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
 
             {/* Settings Button */}
             <button
