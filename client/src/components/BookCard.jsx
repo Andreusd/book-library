@@ -14,9 +14,10 @@ export default function BookCard({
   const { t } = useI18n();
 
   const isFav = isFavorite !== undefined ? isFavorite : Boolean(book.is_favorite);
+  const isEpub = book.format === 'epub' || book.filename?.toLowerCase().endsWith('.epub');
   const isFinished = Boolean(book.progress && (book.progress.percent >= 100 || book.progress.status === 'completed'));
-  const isNotStarted = Boolean(!book.progress || book.progress.status === 'not_started' || (book.progress.page <= 1 && !isFinished));
-  const hasProgress = !isNotStarted && Boolean(book.progress && (book.progress.page > 1 || isFinished));
+  const isNotStarted = Boolean(!book.progress || book.progress.status === 'not_started' || (!isEpub && book.progress.page <= 1 && !isFinished));
+  const hasProgress = !isNotStarted && Boolean(book.progress && (book.progress.percent > 0 || book.progress.page > 1 || isFinished));
   const percent = book.progress ? Math.round(book.progress.percent) : 0;
 
   const handleContextMenu = (e) => {
@@ -55,7 +56,7 @@ export default function BookCard({
           />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-neutral-800 to-neutral-900 p-4 flex flex-col justify-between border-l-4 border-amber-600">
-            <span className="text-xs font-semibold uppercase tracking-wider text-amber-500/80">{book.shelf_display}</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-amber-500/80">{book.shelf_display || book.folder_display}</span>
             <p className="text-xs font-bold text-neutral-200 line-clamp-4 leading-snug">{book.title}</p>
             <span className="text-[10px] text-neutral-500">{book.size_formatted}</span>
           </div>
@@ -89,6 +90,10 @@ export default function BookCard({
               <>
                 <CheckCircle className="w-3 h-3 text-emerald-400" />
                 <span>{t('completed')}</span>
+              </>
+            ) : isEpub ? (
+              <>
+                <span>{percent}%</span>
               </>
             ) : (
               <>
@@ -127,9 +132,21 @@ export default function BookCard({
         >
           {book.title}
         </h3>
+        {book.author && (
+          <p className="text-[11px] text-neutral-400 truncate mt-0.5" title={book.author}>
+            {book.author}
+          </p>
+        )}
         <div className="flex items-center justify-between mt-1 text-[11px] text-neutral-500">
-          <span className="truncate max-w-[70%]">{book.shelf_display}</span>
-          <span className="shrink-0">{book.size_formatted}</span>
+          <span className="truncate max-w-[65%]">{book.shelf_display || book.folder_display}</span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {isEpub && (
+              <span className="px-1.5 py-0.2 text-[9px] font-bold tracking-wider rounded bg-indigo-950/80 border border-indigo-500/40 text-indigo-300 uppercase">
+                EPUB
+              </span>
+            )}
+            <span>{book.size_formatted}</span>
+          </div>
         </div>
       </div>
     </div>

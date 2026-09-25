@@ -36,14 +36,28 @@ class ProgressTracker:
         with self._lock:
             return self._data.get(book_id)
 
-    def set_progress(self, book_id: str, page: int, total_pages: int, zoom: Optional[float] = None, invert_colors: Optional[bool] = None) -> Dict[str, Any]:
+    def set_progress(self, book_id: str, page: int, total_pages: int, zoom: Optional[float] = None, invert_colors: Optional[bool] = None, cfi: Optional[str] = None, percent: Optional[float] = None) -> Dict[str, Any]:
         with self._lock:
             existing = self._data.get(book_id, {})
             current_zoom = round(zoom, 2) if zoom is not None else existing.get("zoom", 1.2)
             current_invert = bool(invert_colors) if invert_colors is not None else existing.get("invert_colors", False)
+            current_cfi = cfi if cfi is not None else existing.get("cfi")
 
-            # A book is only in progress if read beyond page 1 (cover)
-            if page <= 1:
+            # Determine percentage
+            if percent is not None and percent > 0:
+                pct = round(max(0.0, min(100.0, float(percent))), 1)
+            elif percent == 0.0 and (not current_cfi or current_cfi.strip() == ""):
+                pct = 0.0
+            elif existing.get("percent", 0) > 0 and (percent is None or percent == 0.0):
+                pct = existing.get("percent", 0.0)
+            elif percent is not None:
+                pct = round(max(0.0, min(100.0, float(percent))), 1)
+            else:
+                pct = round((page / max(total_pages, 1)) * 100, 1)
+
+            # A book is in progress if read beyond page 1, has cfi, or percent > 0.5%
+            is_in_progress = (page > 1) or (pct > 0.5) or (current_cfi is not None and len(current_cfi) > 0)
+            if not is_in_progress:
                 record = {
                     "page": 1,
                     "total_pages": total_pages,
@@ -52,19 +66,23 @@ class ProgressTracker:
                     "invert_colors": current_invert,
                     "status": "not_started"
                 }
+                if current_cfi:
+                    record["cfi"] = current_cfi
                 self._data[book_id] = record
                 self._save()
                 return record
 
-            pct = round((page / max(total_pages, 1)) * 100, 1)
             record = {
-                "page": page,
-                "total_pages": total_pages,
+                "page": max(1, page),
+                "total_pages": max(1, total_pages),
                 "percent": pct,
                 "zoom": current_zoom,
                 "invert_colors": current_invert,
                 "updated_at": datetime.now().isoformat()
             }
+            if current_cfi:
+                record["cfi"] = current_cfi
+
             self._data[book_id] = record
             self._save()
             return record
@@ -144,7 +162,8 @@ class ProgressTracker:
         with self._lock:
             items = []
             for b_id, info in self._data.items():
-                if info.get("page", 1) <= 1:
+                is_started = info.get("page", 1) > 1 or info.get("percent", 0) > 0.5 or bool(info.get("cfi"))
+                if not is_started:
                     continue
                 if not include_completed and info.get("percent", 0) >= 100:
                     continue

@@ -18,7 +18,7 @@ import ShelfIcon from './components/ShelfIcon';
 import SettingsModal from './components/SettingsModal';
 import { useI18n } from './i18n';
 
-// Helper to extract view & route information from URL (/shelf/:id, /continue-reading, /favorites, /book/:id)
+// Helper to extract view & route information from URL (/folder/:id, /shelf/:id, /continue-reading, /favorites, /book/:id)
 function parseRoute() {
   if (typeof window === 'undefined') return { view: 'home', bookId: null, shelfId: null };
 
@@ -41,24 +41,24 @@ function parseRoute() {
     return { view: 'favorites', bookId: null, shelfId: 'favorites' };
   }
 
-  // 4. Specific Bookshelf (/shelf/:id)
-  const shelfMatch = pathname.match(/\/shelf\/([^/?#]+)/) || hash.match(/#\/?shelf\/([^/?#]+)/);
-  if (shelfMatch && shelfMatch[1]) {
-    return { view: 'shelf', bookId: null, shelfId: decodeURIComponent(shelfMatch[1]) };
+  // 4. Specific Folder (/folder/:id or legacy /shelf/:id)
+  const folderMatch = pathname.match(/\/(?:folder|shelf)\/([^/?#]+)/) || hash.match(/#\/?(?:folder|shelf)\/([^/?#]+)/);
+  if (folderMatch && folderMatch[1]) {
+    return { view: 'folder', bookId: null, shelfId: decodeURIComponent(folderMatch[1]) };
   }
 
-  // Legacy query params support (?book=... or ?shelf=...)
+  // Legacy query params support (?book=... or ?folder=... or ?shelf=...)
   const searchParams = new URLSearchParams(window.location.search);
   const qBook = searchParams.get('book');
   if (qBook) {
     return { view: 'book', bookId: qBook, shelfId: null };
   }
-  const qShelf = searchParams.get('shelf');
-  if (qShelf) {
-    if (qShelf === 'continue-reading' || qShelf === 'favorites') {
-      return { view: qShelf, bookId: null, shelfId: qShelf };
+  const qFolder = searchParams.get('folder') || searchParams.get('shelf');
+  if (qFolder) {
+    if (qFolder === 'continue-reading' || qFolder === 'favorites') {
+      return { view: qFolder, bookId: null, shelfId: qFolder };
     }
-    return { view: 'shelf', bookId: null, shelfId: qShelf };
+    return { view: 'folder', bookId: null, shelfId: qFolder };
   }
 
   // 5. Default Home
@@ -69,13 +69,16 @@ function getPathForShelf(shelfId) {
   if (!shelfId) return '/';
   if (shelfId === 'continue-reading') return '/continue-reading';
   if (shelfId === 'favorites') return '/favorites';
-  return `/shelf/${encodeURIComponent(shelfId)}`;
+  return `/folder/${encodeURIComponent(shelfId)}`;
 }
+const getPathForFolder = getPathForShelf;
 
 export default function App() {
   const { t } = useI18n();
   const [shelves, setShelves] = useState([]);
   const [totalBooks, setTotalBooks] = useState(0);
+  const [libraries, setLibraries] = useState([]);
+  const [activeLibraryId, setActiveLibraryId] = useState('');
   const [selectedShelf, setSelectedShelf] = useState(() => parseRoute().shelfId);
   const [books, setBooks] = useState([]);
   const [continueReading, setContinueReading] = useState([]);
@@ -162,37 +165,100 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeBook, toggleSidebar]);
 
+  // Load Libraries
+  const loadLibraries = useCallback(() => {
+    fetch('/api/libraries')
+      .then(res => res.json())
+      .then(data => {
+        setLibraries(data.libraries || []);
+        setActiveLibraryId(data.active_library_id || '');
+      })
+      .catch(err => console.error('Failed to load libraries:', err));
+  }, []);
+
   // Load Shelves & Totals
-  const loadShelves = useCallback(() => {
-    fetch('/api/shelves')
+  const loadShelves = useCallback((libId) => {
+    const targetLib = libId !== undefined ? libId : activeLibraryId;
+    const url = targetLib ? `/api/shelves?library_id=${encodeURIComponent(targetLib)}` : '/api/shelves';
+    fetch(url)
       .then(res => res.json())
       .then(data => {
         setShelves(data.shelves || []);
         setTotalBooks(data.total_books || 0);
       })
       .catch(err => console.error('Failed to load shelves:', err));
-  }, []);
+  }, [activeLibraryId]);
 
   // Load Continue Reading
-  const loadContinueReading = useCallback(() => {
-    fetch('/api/continue-reading')
+  const loadContinueReading = useCallback((libId) => {
+    const targetLib = libId !== undefined ? libId : activeLibraryId;
+    const url = targetLib ? `/api/continue-reading?library_id=${encodeURIComponent(targetLib)}` : '/api/continue-reading';
+    fetch(url)
       .then(res => res.json())
       .then(data => {
         setContinueReading(data.books || []);
       })
       .catch(err => console.error('Failed to load continue reading:', err));
-  }, []);
+  }, [activeLibraryId]);
 
   // Load Favorites
-  const loadFavorites = useCallback(() => {
-    fetch('/api/favorites')
+  const loadFavorites = useCallback((libId) => {
+    const targetLib = libId !== undefined ? libId : activeLibraryId;
+    const url = targetLib ? `/api/favorites?library_id=${encodeURIComponent(targetLib)}` : '/api/favorites';
+    fetch(url)
       .then(res => res.json())
       .then(data => {
         setFavorites(data.books || []);
         setFavoriteIds(new Set(data.favorite_ids || []));
       })
       .catch(err => console.error('Failed to load favorites:', err));
-  }, []);
+  }, [activeLibraryId]);
+
+  // Load Books
+  const loadBooks = useCallback((libId) => {
+    setLoading(true);
+    const targetLib = libId !== undefined ? libId : activeLibraryId;
+    const params = new URLSearchParams();
+    if (targetLib) params.append('library_id', targetLib);
+    if (selectedShelf) params.append('shelf', selectedShelf);
+    if (debouncedQuery) params.append('query', debouncedQuery);
+    if (sortBy) params.append('sort', sortBy);
+
+    fetch(`/api/books?${params.toString()}`)
+      .then(res => res.json())
+      .then(data => {
+        setBooks(data.books || []);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to load books:', err);
+        setLoading(false);
+      });
+  }, [activeLibraryId, selectedShelf, debouncedQuery, sortBy]);
+
+  // Switch Active Library
+  const switchLibrary = useCallback((libraryId) => {
+    fetch('/api/libraries/active', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ library_id: libraryId })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === 'ok') {
+        setActiveLibraryId(libraryId);
+        setSelectedShelf(null);
+        setSearchQuery('');
+        window.history.pushState(null, '', '/');
+        loadLibraries();
+        loadShelves(libraryId);
+        loadBooks(libraryId);
+        loadContinueReading(libraryId);
+        loadFavorites(libraryId);
+      }
+    })
+    .catch(err => console.error('Failed to switch library:', err));
+  }, [loadLibraries, loadShelves, loadBooks, loadContinueReading, loadFavorites]);
 
   // Toggle Favorite
   const handleToggleFavorite = useCallback((book) => {
@@ -324,31 +390,15 @@ export default function App() {
     }
   }, []);
 
-  // Load Books
-  const loadBooks = useCallback(() => {
-    setLoading(true);
-    const params = new URLSearchParams();
-    if (selectedShelf) params.append('shelf', selectedShelf);
-    if (debouncedQuery) params.append('query', debouncedQuery);
-    if (sortBy) params.append('sort', sortBy);
-
-    fetch(`/api/books?${params.toString()}`)
-      .then(res => res.json())
-      .then(data => {
-        setBooks(data.books || []);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Failed to load books:', err);
-        setLoading(false);
-      });
-  }, [selectedShelf, debouncedQuery, sortBy]);
+  useEffect(() => {
+    loadLibraries();
+  }, [loadLibraries]);
 
   useEffect(() => {
     loadShelves();
     loadContinueReading();
     loadFavorites();
-  }, [loadShelves, loadContinueReading, loadFavorites]);
+  }, [activeLibraryId, loadShelves, loadContinueReading, loadFavorites]);
 
   useEffect(() => {
     loadBooks();
@@ -361,7 +411,7 @@ export default function App() {
       const isNotReading = !newProgress || 
         newProgress.status === 'not_started' || 
         newProgress.status === 'completed' || 
-        (newProgress.page || 1) <= 1 || 
+        ((newProgress.page || 1) <= 1 && !newProgress.cfi && (newProgress.percent || 0) <= 0.5) || 
         (newProgress.percent || 0) >= 100;
 
       if (isNotReading) {
@@ -508,6 +558,10 @@ export default function App() {
         onShelfContextMenu={handleShelfContextMenu}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        libraries={libraries}
+        activeLibraryId={activeLibraryId}
+        onSwitchLibrary={switchLibrary}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -805,10 +859,19 @@ export default function App() {
       <SettingsModal
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
-        onSaved={() => {
-          loadShelves();
-          loadBooks();
-          loadContinueReading();
+        onLibraryChanged={(newActiveId) => {
+          loadLibraries();
+          const targetId = newActiveId || activeLibraryId;
+          if (newActiveId && newActiveId !== activeLibraryId) {
+            setActiveLibraryId(newActiveId);
+            setSelectedShelf(null);
+            setSearchQuery('');
+            window.history.pushState(null, '', '/');
+          }
+          loadShelves(targetId);
+          loadBooks(targetId);
+          loadContinueReading(targetId);
+          loadFavorites(targetId);
         }}
       />
     </div>

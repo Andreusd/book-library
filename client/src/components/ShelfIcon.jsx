@@ -137,7 +137,11 @@ export const AVAILABLE_SHELF_ICONS = [
   { name: 'Palette', label: 'Design / Cores', labelEn: 'Design / Palette', category: 'General', tags: ['design', 'arte', 'paleta'] }
 ];
 
+export const AVAILABLE_FOLDER_ICONS = AVAILABLE_SHELF_ICONS;
+
 export default function ShelfIcon({ icon, className = 'w-4 h-4' }) {
   const IconComponent = ICON_MAP[icon] || Folder;
   return <IconComponent className={className} />;
 }
+
+export const FolderIcon = ShelfIcon;

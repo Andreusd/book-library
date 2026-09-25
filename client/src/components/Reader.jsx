@@ -1,16 +1,17 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { 
   ArrowLeft, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, 
   Maximize2, Minimize2, Moon, Sun, ListTree,
   MessageSquare, Heart, Settings, SlidersHorizontal, X,
-  PanelTopClose, PanelTopOpen, RotateCcw, StretchHorizontal
+  PanelTopClose, PanelTopOpen, RotateCcw, StretchHorizontal, BookOpen
 } from 'lucide-react';
 import PdfOutline from './PdfOutline';
-import HighlightOverlay from './HighlightOverlay';
+import PdfPageView, { getDualPageSpread, getNextSpreadPage, getPrevSpreadPage } from './PdfPageView';
 import TextSelectionMenu from './TextSelectionMenu';
 import CommentsDrawer from './CommentsDrawer';
+import EpubViewer from './EpubViewer';
 import { useI18n } from '../i18n';
 import 'pdfjs-dist/web/pdf_viewer.css';
 
@@ -96,12 +97,25 @@ export default function Reader({
   onToggleFavorite, 
   isFavorite 
 }) {
+  const isEpub = book?.format === 'epub' || book?.filename?.toLowerCase().endsWith('.epub');
+
+  if (isEpub) {
+    return (
+      <EpubViewer
+        book={book}
+        onClose={onClose}
+        onProgressUpdate={onProgressUpdate}
+        onToggleFavorite={onToggleFavorite}
+        isFavorite={isFavorite}
+      />
+    );
+  }
+
   const { t } = useI18n();
   const [favState, setFavState] = useState(isFavorite !== undefined ? isFavorite : Boolean(book.is_favorite));
   const [pdfDoc, setPdfDoc] = useState(null);
   const [currentPage, setCurrentPage] = useState(book.progress?.page || 1);
   const [totalPages, setTotalPages] = useState(book.progress?.total_pages || 1);
-  const [pageDims, setPageDims] = useState({ width: 0, height: 0 });
 
   const getInitialZoom = () => {
     try {
@@ -139,7 +153,6 @@ export default function Reader({
 
   const [scale, setScale] = useState(getInitialZoom);
   const [loading, setLoading] = useState(true);
-  const [rendering, setRendering] = useState(false);
   const [invertColors, setInvertColors] = useState(getInitialInvertColors);
   const [pageInput, setPageInput] = useState(String(book.progress?.page || 1));
   const [isFullscreen, setIsFullscreen] = useState(() => {
@@ -187,6 +200,20 @@ export default function Reader({
   const [upDownFlipEnabled, setUpDownFlipEnabled] = useState(() => {
     try {
       return localStorage.getItem('reader_up_down_flip') === 'true'; // false by default
+    } catch (e) {
+      return false;
+    }
+  });
+  const [isDualPage, setIsDualPage] = useState(() => {
+    try {
+      return localStorage.getItem('reader_dual_page') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+  const [dualCoverStandalone, setDualCoverStandalone] = useState(() => {
+    try {
+      return localStorage.getItem('reader_dual_cover') === 'true';
     } catch (e) {
       return false;
     }
@@ -352,16 +379,8 @@ export default function Reader({
   const isHeaderShowing = headerEnabled || isHeaderVisible || readerSettingsOpen || commentsDrawerOpen || outlineOpen;
 
 
-  const canvasRef = useRef(null);
-  const textLayerRef = useRef(null);
-  const annotationLayerRef = useRef(null);
   const containerRef = useRef(null);
-  const pageWrapperRef = useRef(null);
-  const renderTaskRef = useRef(null);
-  const textLayerInstanceRef = useRef(null);
-  const annotationLayerInstanceRef = useRef(null);
   const linkServiceRef = useRef(new SimpleLinkService());
-  const lastRenderedPageRef = useRef(null);
   const onProgressUpdateRef = useRef(onProgressUpdate);
   const scaleRef = useRef(scale);
   const invertColorsRef = useRef(invertColors);
@@ -369,6 +388,69 @@ export default function Reader({
   const lastSwipeTimeRef = useRef(0);
   const accumulatedDeltaXRef = useRef(0);
   const clearSwipeTimerRef = useRef(null);
+
+  // Dual page spread calculation
+  const spread = useMemo(() => {
+    return getDualPageSpread(currentPage, totalPages, dualCoverStandalone);
+  }, [currentPage, totalPages, dualCoverStandalone]);
+
+  const hasPrev = isDualPage ? spread.currentBase > 1 : currentPage > 1;
+  const hasNext = isDualPage 
+    ? (dualCoverStandalone && spread.currentBase === 1 ? totalPages > 1 : spread.currentBase + 2 <= totalPages)
+    : currentPage < totalPages;
+
+  // Fit Width
+  const fitWidth = useCallback((forcedDual) => {
+    if (!pdfDoc || !containerRef.current) return;
+    const activeDual = forcedDual !== undefined ? forcedDual : isDualPage;
+    pdfDoc.getPage(currentPage).then(page => {
+      const vp = page.getViewport({ scale: 1 });
+      const containerWidth = containerRef.current.clientWidth - 48;
+      const targetScale = activeDual 
+        ? Math.max(0.4, Math.min((containerWidth - 24) / (2 * vp.width), 2.5))
+        : Math.max(0.5, Math.min(containerWidth / vp.width, 2.5));
+      setScale(Number(targetScale.toFixed(2)));
+    });
+  }, [pdfDoc, currentPage, isDualPage]);
+
+  const toggleDualPage = () => {
+    setIsDualPage(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('reader_dual_page', String(next));
+      } catch (e) {}
+      if (next) {
+        const sp = getDualPageSpread(currentPage, totalPages, dualCoverStandalone);
+        setCurrentPage(sp.currentBase);
+        setTimeout(() => fitWidth(true), 60);
+      } else {
+        setScale(1.2);
+      }
+      return next;
+    });
+  };
+
+  const toggleDualCover = () => {
+    setDualCoverStandalone(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('reader_dual_cover', String(next));
+      } catch (e) {}
+      if (isDualPage) {
+        const sp = getDualPageSpread(currentPage, totalPages, next);
+        setCurrentPage(sp.currentBase);
+      }
+      return next;
+    });
+  };
+
+  const handleResetZoom = () => {
+    if (isDualPage) {
+      fitWidth();
+    } else {
+      setScale(1.2);
+    }
+  };
 
   useEffect(() => {
     scaleRef.current = scale;
@@ -411,12 +493,20 @@ export default function Reader({
 
   // Page Navigation handlers
   const goToNextPage = useCallback(() => {
-    setCurrentPage(prev => (prev < totalPages ? prev + 1 : prev));
-  }, [totalPages]);
+    if (!isDualPage) {
+      setCurrentPage(prev => (prev < totalPages ? prev + 1 : prev));
+    } else {
+      setCurrentPage(prev => getNextSpreadPage(prev, totalPages, dualCoverStandalone));
+    }
+  }, [isDualPage, totalPages, dualCoverStandalone]);
 
   const goToPrevPage = useCallback(() => {
-    setCurrentPage(prev => (prev > 1 ? prev - 1 : prev));
-  }, []);
+    if (!isDualPage) {
+      setCurrentPage(prev => (prev > 1 ? prev - 1 : prev));
+    } else {
+      setCurrentPage(prev => getPrevSpreadPage(prev, totalPages, dualCoverStandalone));
+    }
+  }, [isDualPage, totalPages, dualCoverStandalone]);
 
   // Configure link service
   const handleLinkNavigate = useCallback((target) => {
@@ -425,9 +515,15 @@ export default function Reader({
     } else if (target === 'prev') {
       goToPrevPage();
     } else if (typeof target === 'number') {
-      setCurrentPage(Math.min(Math.max(1, target), totalPages));
+      const targetPage = Math.min(Math.max(1, target), totalPages);
+      if (isDualPage) {
+        const sp = getDualPageSpread(targetPage, totalPages, dualCoverStandalone);
+        setCurrentPage(sp.currentBase);
+      } else {
+        setCurrentPage(targetPage);
+      }
     }
-  }, [goToNextPage, goToPrevPage, totalPages]);
+  }, [goToNextPage, goToPrevPage, totalPages, isDualPage, dualCoverStandalone]);
 
   // Handle PDF index/outline item click
   const handleOutlineClick = useCallback((item) => {
@@ -522,11 +618,14 @@ export default function Reader({
     const text = selection ? selection.toString().trim() : '';
     if (!text || selection.rangeCount === 0) return;
 
-    const range = selection.getRangeAt(0);
-    const wrapper = pageWrapperRef.current;
-    if (!wrapper) return;
+    const pageEl = e.target.closest('[data-pdf-page]');
+    if (!pageEl) return;
 
-    const wrapperRect = wrapper.getBoundingClientRect();
+    const pageNumber = parseInt(pageEl.getAttribute('data-pdf-page'), 10);
+    if (!pageNumber) return;
+
+    const range = selection.getRangeAt(0);
+    const wrapperRect = pageEl.getBoundingClientRect();
     const clientRects = Array.from(range.getClientRects());
     if (clientRects.length === 0) return;
 
@@ -548,7 +647,7 @@ export default function Reader({
       y: e.clientY,
       text: text,
       rects: rects,
-      page: currentPage,
+      page: pageNumber,
     });
   };
 
@@ -614,8 +713,13 @@ export default function Reader({
 
   // Jump directly to an annotation's page
   const handleJumpToAnnotation = (ann) => {
-    if (ann.page && ann.page !== currentPage) {
-      setCurrentPage(ann.page);
+    if (ann.page) {
+      if (isDualPage) {
+        const sp = getDualPageSpread(ann.page, totalPages, dualCoverStandalone);
+        setCurrentPage(sp.currentBase);
+      } else {
+        setCurrentPage(ann.page);
+      }
     }
     if (window.innerWidth < 768) {
       setCommentsDrawerOpen(false);
@@ -645,134 +749,27 @@ export default function Reader({
     .catch(err => console.error('Failed to save progress:', err));
   }, [book.id]);
 
-  // Render Page on Canvas, TextLayer and AnnotationLayer
-  const renderPage = useCallback((pageNum) => {
-    if (!pdfDoc || !canvasRef.current) return;
-
-    // Cancel any in-flight rendering
-    if (renderTaskRef.current) {
-      try {
-        renderTaskRef.current.cancel();
-      } catch (e) {}
-      renderTaskRef.current = null;
-    }
-
-    if (textLayerInstanceRef.current) {
-      try {
-        textLayerInstanceRef.current.cancel();
-      } catch (e) {}
-      textLayerInstanceRef.current = null;
-    }
-
-    if (textLayerRef.current) {
-      textLayerRef.current.replaceChildren();
-    }
-    if (annotationLayerRef.current) {
-      annotationLayerRef.current.replaceChildren();
-    }
-
-    setRendering(true);
-
-    pdfDoc.getPage(pageNum).then(async (page) => {
-      const viewport = page.getViewport({ scale });
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const vpWidth = Math.floor(viewport.width);
-      const vpHeight = Math.floor(viewport.height);
-      setPageDims({ width: vpWidth, height: vpHeight });
-
-      const context = canvas.getContext('2d');
-      const dpr = window.devicePixelRatio || 1;
-
-      canvas.width = Math.floor(viewport.width * dpr);
-      canvas.height = Math.floor(viewport.height * dpr);
-      canvas.style.width = `${vpWidth}px`;
-      canvas.style.height = `${vpHeight}px`;
-
-      context.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-      const renderContext = {
-        canvasContext: context,
-        viewport: viewport,
-      };
-
-      const task = page.render(renderContext);
-      renderTaskRef.current = task;
-
-      try {
-        await task.promise;
-      } catch (err) {
-        if (err?.name !== 'RenderingCancelledException') {
-          console.error('Render error:', err);
-        }
-        setRendering(false);
-        return;
-      }
-
-      renderTaskRef.current = null;
-      setRendering(false);
-
-      // Only scroll back to top if the page actually changed (not on zoom)
-      if (lastRenderedPageRef.current !== pageNum) {
-        lastRenderedPageRef.current = pageNum;
-        if (containerRef.current) {
-          containerRef.current.scrollTop = 0;
-        }
-      }
-
-      // Render Text Layer for text selection & copying
-      if (textLayerRef.current) {
-        try {
-          const textContent = await page.getTextContent();
-          const textLayer = new pdfjsLib.TextLayer({
-            textContentSource: textContent,
-            container: textLayerRef.current,
-            viewport: viewport,
-          });
-          textLayerInstanceRef.current = textLayer;
-          await textLayer.render();
-        } catch (err) {
-          if (err?.name !== 'RenderingCancelledException') {
-            console.error('TextLayer render error:', err);
-          }
-        }
-      }
-
-      // Render Annotation Layer for clickable links (internal TOC & external URLs)
-      if (annotationLayerRef.current) {
-        try {
-          const annotations = await page.getAnnotations({ intent: 'display' });
-          if (annotations && annotations.length > 0) {
-            const annotationLayer = new pdfjsLib.AnnotationLayer({
-              div: annotationLayerRef.current,
-              page: page,
-              viewport: viewport,
-              linkService: linkServiceRef.current,
-            });
-            annotationLayerInstanceRef.current = annotationLayer;
-            await annotationLayer.render({
-              annotations: annotations,
-              viewport: viewport,
-            });
-          }
-        } catch (err) {
-          console.error('AnnotationLayer render error:', err);
-        }
-      }
-    }).catch(err => {
-      console.error('Failed to get page:', err);
-      setRendering(false);
-    });
-  }, [pdfDoc, scale]);
-
-  // Render page when document, page number, or scale changes
+  // Scroll back to top on page change
   useEffect(() => {
-    if (pdfDoc) {
-      renderPage(currentPage);
-      setPageInput(String(currentPage));
+    if (containerRef.current) {
+      containerRef.current.scrollTop = 0;
     }
-  }, [pdfDoc, currentPage, scale, renderPage]);
+  }, [currentPage]);
+
+  // Compute text for page input display (e.g. "1-2" in dual mode)
+  const getPageDisplayText = useCallback((page) => {
+    if (!isDualPage) return String(page);
+    const sp = getDualPageSpread(page, totalPages, dualCoverStandalone);
+    if (sp.left && sp.right) {
+      return `${sp.left}-${sp.right}`;
+    }
+    return String(sp.left || sp.right || page);
+  }, [isDualPage, totalPages, dualCoverStandalone]);
+
+  // Keep pageInput synced with current page or spread
+  useEffect(() => {
+    setPageInput(getPageDisplayText(currentPage));
+  }, [currentPage, getPageDisplayText]);
 
   // Persist progress to backend with debounce (only when progressed past page 1)
   useEffect(() => {
@@ -828,11 +825,17 @@ export default function Reader({
 
   const handlePageSubmit = (e) => {
     e.preventDefault();
-    const num = parseInt(pageInput, 10);
+    const match = pageInput.trim().match(/^\d+/);
+    const num = match ? parseInt(match[0], 10) : NaN;
     if (!isNaN(num) && num >= 1 && num <= totalPages) {
-      setCurrentPage(num);
+      if (isDualPage) {
+        const sp = getDualPageSpread(num, totalPages, dualCoverStandalone);
+        setCurrentPage(sp.currentBase);
+      } else {
+        setCurrentPage(num);
+      }
     } else {
-      setPageInput(String(currentPage));
+      setPageInput(getPageDisplayText(currentPage));
     }
   };
 
@@ -1029,17 +1032,6 @@ export default function Reader({
     };
   }, [goToNextPage, goToPrevPage, trackpadSwipeEnabled]);
 
-  // Fit Width
-  const fitWidth = () => {
-    if (!pdfDoc || !containerRef.current) return;
-    pdfDoc.getPage(currentPage).then(page => {
-      const vp = page.getViewport({ scale: 1 });
-      const containerWidth = containerRef.current.clientWidth - 48;
-      const targetScale = containerWidth / vp.width;
-      setScale(Math.max(0.5, Math.min(targetScale, 2.5)));
-    });
-  };
-
   // Toggle fullscreen
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -1049,7 +1041,8 @@ export default function Reader({
     }
   };
 
-  const progressPercent = totalPages > 0 ? Math.round((currentPage / totalPages) * 100) : 0;
+  const currentProgressPage = isDualPage && spread.right ? spread.right : currentPage;
+  const progressPercent = totalPages > 0 ? Math.round((currentProgressPage / totalPages) * 100) : 0;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-neutral-950 text-neutral-100 overflow-hidden overscroll-none touch-pan-y">
@@ -1118,7 +1111,7 @@ export default function Reader({
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-2 z-10">
           <button 
             onClick={goToPrevPage}
-            disabled={currentPage <= 1}
+            disabled={!hasPrev}
             className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:hover:bg-neutral-800 transition cursor-pointer"
             title={t('prevPageTitle')}
           >
@@ -1131,7 +1124,7 @@ export default function Reader({
               value={pageInput}
               onChange={(e) => setPageInput(e.target.value)}
               onBlur={handlePageSubmit}
-              className="w-12 text-center py-1 bg-neutral-950 border border-neutral-700 rounded text-neutral-200 focus:border-amber-500 focus:outline-none"
+              className="w-16 text-center py-1 bg-neutral-950 border border-neutral-700 rounded text-neutral-200 focus:border-amber-500 focus:outline-none"
             />
             <span className="text-neutral-400 mx-1.5">/</span>
             <span className="text-neutral-400">{totalPages}</span>
@@ -1139,7 +1132,7 @@ export default function Reader({
 
           <button 
             onClick={goToNextPage}
-            disabled={currentPage >= totalPages}
+            disabled={!hasNext}
             className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:hover:bg-neutral-800 transition cursor-pointer"
             title={t('nextPageTitle')}
           >
@@ -1155,15 +1148,15 @@ export default function Reader({
         <div className="flex items-center gap-1.5 ml-auto z-10">
           {/* Zoom controls */}
           <button 
-            onClick={() => setScale(s => Math.max(0.5, Number((s - 0.15).toFixed(2))))}
-            className="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition"
+            onClick={() => setScale(s => Math.max(0.4, Number((s - 0.15).toFixed(2))))}
+            className="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition cursor-pointer"
             title={t('zoomOutTitle')}
           >
             <ZoomOut className="w-4 h-4" />
           </button>
           
           <button 
-            onClick={() => setScale(1.2)}
+            onClick={handleResetZoom}
             className="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition cursor-pointer hidden sm:inline-block"
             title={t('resetWidthTitle')}
           >
@@ -1171,11 +1164,24 @@ export default function Reader({
           </button>
 
           <button 
-            onClick={fitWidth}
+            onClick={() => fitWidth()}
             className="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition cursor-pointer hidden sm:inline-block"
             title={t('fitWidth')}
           >
             <StretchHorizontal className="w-4 h-4" />
+          </button>
+
+          {/* Toggle Dual Page View */}
+          <button 
+            onClick={toggleDualPage}
+            className={`p-1.5 rounded-lg transition cursor-pointer hidden md:inline-block ${
+              isDualPage 
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
+                : 'hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200'
+            }`}
+            title={isDualPage ? t('singlePageMode') : t('dualPageMode')}
+          >
+            <BookOpen className="w-4 h-4" />
           </button>
 
           <button 
@@ -1351,6 +1357,50 @@ export default function Reader({
                       </div>
                     </label>
 
+                    {/* Toggle Dual Page View */}
+                    <label className="flex items-start justify-between gap-3 p-2.5 rounded-xl hover:bg-neutral-800/60 transition-colors cursor-pointer group">
+                      <div className="min-w-0 flex-1">
+                        <span className="text-xs font-semibold text-neutral-100 block group-hover:text-amber-300 transition-colors">
+                          {t('dualPageSetting')}
+                        </span>
+                        <span className="text-[11px] text-neutral-300 leading-snug block mt-0.5">
+                          {t('dualPageSettingDesc')}
+                        </span>
+                      </div>
+                      <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                        <input 
+                          type="checkbox"
+                          checked={isDualPage}
+                          onChange={toggleDualPage}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
+                      </div>
+                    </label>
+
+                    {/* Toggle Cover Page Alone (when in dual page view) */}
+                    {isDualPage && (
+                      <label className="flex items-start justify-between gap-3 p-2.5 rounded-xl hover:bg-neutral-800/60 transition-colors cursor-pointer group pl-5 border-l-2 border-amber-500/40 ml-1">
+                        <div className="min-w-0 flex-1">
+                          <span className="text-xs font-semibold text-neutral-100 block group-hover:text-amber-300 transition-colors">
+                            {t('dualCoverStandalone')}
+                          </span>
+                          <span className="text-[11px] text-neutral-300 leading-snug block mt-0.5">
+                            {t('dualCoverStandaloneDesc')}
+                          </span>
+                        </div>
+                        <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                          <input 
+                            type="checkbox"
+                            checked={dualCoverStandalone}
+                            onChange={toggleDualCover}
+                            className="sr-only peer"
+                          />
+                          <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
+                        </div>
+                      </label>
+                    )}
+
                     {/* Toggle Auto-Hide Header */}
                     <label className="flex items-start justify-between gap-3 p-2.5 rounded-xl hover:bg-neutral-800/60 transition-colors cursor-pointer group">
                       <div className="min-w-0 flex-1">
@@ -1407,65 +1457,54 @@ export default function Reader({
               </div>
             ) : (
               <div className="min-h-full flex justify-center items-start">
-                {/* Document Page Wrapper with exact CSS dimensions and PDF.js scale variables */}
-                <div 
-                  ref={pageWrapperRef}
-                  className="relative shadow-2xl rounded"
-                  style={{
-                    width: pageDims.width ? `${pageDims.width}px` : 'auto',
-                    height: pageDims.height ? `${pageDims.height}px` : 'auto',
-                    '--scale-factor': scale,
-                    '--total-scale-factor': scale,
-                    '--user-unit': 1,
-                    '--scale-round-x': '1px',
-                    '--scale-round-y': '1px',
-                  }}
-                >
-                  {/* Canvas raster background */}
-                  <canvas 
-                    ref={canvasRef}
-                    className="max-w-none transition-filter duration-200 rounded block"
-                    style={{
-                      filter: invertColors ? 'invert(0.9) hue-rotate(180deg) brightness(0.95) contrast(1.1)' : 'none',
-                    }}
-                  />
-
-                  {/* Text Layer for text selection & copy */}
-                  <div 
-                    ref={textLayerRef}
-                    className="textLayer"
-                    style={{
-                      filter: invertColors ? 'invert(0.9) hue-rotate(180deg) brightness(0.95) contrast(1.1)' : 'none',
-                    }}
-                  />
-
-                  {/* Annotation Layer for clickable links */}
-                  <div 
-                    ref={annotationLayerRef}
-                    className="annotationLayer"
-                  />
-
-                  {/* Visual Highlights & Comment Badges Overlay */}
-                  <HighlightOverlay
+                {isDualPage ? (
+                  <div className="flex items-start justify-center shadow-2xl">
+                    {spread.left && (
+                      <PdfPageView
+                        pdfDoc={pdfDoc}
+                        pageNum={spread.left}
+                        scale={scale}
+                        invertColors={invertColors}
+                        linkService={linkServiceRef.current}
+                        annotations={annotations.filter(a => a.page === spread.left)}
+                        onUpdateComment={handleUpdateComment}
+                        onDeleteAnnotation={handleDeleteAnnotation}
+                        pageSide={spread.right ? 'left' : 'single'}
+                      />
+                    )}
+                    {spread.right && (
+                      <PdfPageView
+                        pdfDoc={pdfDoc}
+                        pageNum={spread.right}
+                        scale={scale}
+                        invertColors={invertColors}
+                        linkService={linkServiceRef.current}
+                        annotations={annotations.filter(a => a.page === spread.right)}
+                        onUpdateComment={handleUpdateComment}
+                        onDeleteAnnotation={handleDeleteAnnotation}
+                        pageSide={spread.left ? 'right' : 'single'}
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <PdfPageView
+                    pdfDoc={pdfDoc}
+                    pageNum={currentPage}
+                    scale={scale}
+                    invertColors={invertColors}
+                    linkService={linkServiceRef.current}
                     annotations={annotations.filter(a => a.page === currentPage)}
                     onUpdateComment={handleUpdateComment}
                     onDeleteAnnotation={handleDeleteAnnotation}
-                    invertColors={invertColors}
+                    pageSide="single"
                   />
-
-                  {/* Rendering indicator badge */}
-                  {rendering && (
-                    <div className="absolute top-3 right-3 bg-black/70 backdrop-blur-sm text-neutral-300 text-xs px-2.5 py-1 rounded shadow pointer-events-none z-10 select-none">
-                      {t('rendering')}
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
             )}
           </div>
 
           {/* Floating Left Navigation Button */}
-          {floatingButtonsEnabled && currentPage > 1 && (
+          {floatingButtonsEnabled && hasPrev && (
             <button
               type="button"
               onClick={(e) => {
@@ -1481,7 +1520,7 @@ export default function Reader({
           )}
 
           {/* Floating Right Navigation Button */}
-          {floatingButtonsEnabled && currentPage < totalPages && (
+          {floatingButtonsEnabled && hasNext && (
             <button
               type="button"
               onClick={(e) => {

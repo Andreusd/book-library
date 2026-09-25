@@ -4,11 +4,11 @@ export const translations = {
   en: {
     // Sidebar
     appTitle: 'Digital Library',
-    shelfCount: '{books} books • {shelves} shelves',
-    filterShelvesPlaceholder: 'Filter shelves...',
+    shelfCount: '{books} books • {folders} folders',
+    filterShelvesPlaceholder: 'Filter folders...',
     allShelves: 'Home',
     allBooks: 'Home',
-    categories: 'Bookshelves ({count})',
+    categories: 'Folders ({count})',
     librarySafe: 'Source Folder Protected (Read-Only)',
     customNameNotice: 'Custom display name in app',
     originalFolderLabel: 'Original Folder: {folder}',
@@ -24,7 +24,7 @@ export const translations = {
     sortRecent: 'Recently Read',
     fullLibrary: 'Home',
     viewAll: 'View all',
-    booksInShelf: '{count} books in this shelf',
+    booksInShelf: '{count} books in this folder',
     searchResults: 'Results for "{query}" ({count} books found)',
 
     // Continue Reading
@@ -46,7 +46,7 @@ export const translations = {
 
     // Empty state & Onboarding
     noBooksFound: 'No books found',
-    noBooksDesc: "We couldn't find any books matching your search or in this bookshelf.",
+    noBooksDesc: "We couldn't find any books matching your search or in this folder.",
     clearSearch: 'Clear search',
     setupPromptTitle: 'Welcome to Digital Library',
     setupPromptDesc: 'To get started, configure the folder where your PDF books are located.',
@@ -60,6 +60,13 @@ export const translations = {
     resetWidth: 'Reset Width',
     resetWidthTitle: 'Reset zoom to default (100%)',
     fitWidth: 'Fit Width',
+    dualPageMode: 'Dual Page View',
+    singlePageMode: 'Single Page View',
+    dualPageToggle: 'Toggle Dual Page View',
+    dualPageSetting: 'Dual Page Mode',
+    dualPageSettingDesc: 'Display two pages side-by-side like an open book',
+    dualCoverStandalone: 'Cover Page Alone',
+    dualCoverStandaloneDesc: 'Display the first page alone as the book cover',
     readerSettings: 'Reader Settings',
     trackpadSwipe: 'Two-Finger Trackpad Swipe',
     trackpadSwipeDesc: 'Swipe 2 fingers horizontally to flip pages',
@@ -107,35 +114,55 @@ export const translations = {
     copyFilePath: 'Copy File Path',
     pathCopied: 'Path Copied!',
 
-    // Shelf Context Menu & Modal
+    // Folder Context Menu & Modal
     folderLabel: 'Folder: {folder}',
-    renameShelfVirtual: 'Rename Shelf (Virtual)',
+    renameShelfVirtual: 'Rename Folder (Virtual)',
     chooseShelfIcon: 'Change Icon',
-    iconModalTitle: 'Choose Bookshelf Icon',
+    iconModalTitle: 'Choose Folder Icon',
     searchIconsPlaceholder: 'Search icons (e.g. code, database, cloud)...',
     restoreDefaultIcon: 'Reset to default folder',
     previewLabel: 'Sidebar Preview',
     saveIcon: 'Save Icon',
     restoreOriginalName: 'Restore Original Name',
-    renameModalTitle: 'Rename Shelf (Virtual)',
+    renameModalTitle: 'Rename Folder (Virtual)',
     realFolderPrefix: 'Real folder: ',
     renameDisclaimer: 'This name is only displayed inside the app. Real filesystem folders remain 100% untouched.',
-    shelfNameLabel: 'Shelf Display Name:',
+    shelfNameLabel: 'Folder Display Name:',
     renamePlaceholder: 'e.g. Advanced Algorithms',
     restoreOriginal: 'Restore Original',
     cancel: 'Cancel',
     saveName: 'Save Name',
 
-    // Settings
+    // Settings & Libraries
     settings: 'Settings',
     settingsTitle: 'Library Settings',
-    settingsSubtitle: 'Configure your library folder and interface preferences',
+    settingsSubtitle: 'Configure your library folders and interface preferences',
+    libraries: 'Libraries',
+    activeLibrary: 'Active Library',
+    switchLibrary: 'Switch Library',
+    addLibrary: 'Add Library',
+    addNewLibrary: 'Add New Library',
+    manageLibraries: 'Manage Libraries',
+    libraryName: 'Library Name',
+    libraryPath: 'Folder Path',
+    libraryNamePlaceholder: 'e.g. Work, Fiction, Reference',
+    activeBadge: 'Active',
+    setActive: 'Set Active',
+    editLibrary: 'Edit Library',
+    deleteLibrary: 'Remove Library',
+    deleteLibraryConfirm: 'Remove "{name}" from your libraries? (Files on disk will NOT be deleted)',
+    cannotDeleteOnlyLibrary: 'You cannot remove the only configured library.',
+    libraryAdded: 'Library added successfully!',
+    libraryUpdated: 'Library updated successfully!',
+    libraryRemoved: 'Library removed!',
+    booksIsolatedNotice: 'Books in different directories are kept strictly isolated.',
+    switchingLibrary: 'Switching library...',
     languageLabel: 'Interface Language',
     libraryPathLabel: 'Books Directory Path',
     libraryPathPlaceholder: 'e.g. C:\\Books or /home/user/books',
-    libraryPathHelp: 'Enter the folder where your PDF books or bookshelf folders are stored.',
-    validFolder: 'Valid folder: {books} books across {shelves} shelves found',
-    noPdfsFound: 'Directory exists, but no PDF files were found inside',
+    libraryPathHelp: 'Enter the folder where your books (.pdf, .epub) or subfolders are stored.',
+    validFolder: 'Valid folder: {books} books across {folders} folders found',
+    noPdfsFound: 'Directory exists, but no book files (.pdf, .epub) were found inside',
     pathNotFound: 'Directory does not exist on disk',
     notADirectory: 'Path is a file, not a directory',
     saveSettings: 'Save & Rescan',
@@ -144,11 +171,11 @@ export const translations = {
   pt: {
     // Sidebar
     appTitle: 'Biblioteca Digital',
-    shelfCount: '{books} livros • {shelves} estantes',
-    filterShelvesPlaceholder: 'Filtrar estantes...',
+    shelfCount: '{books} livros • {folders} pastas',
+    filterShelvesPlaceholder: 'Filtrar pastas...',
     allShelves: 'Início',
     allBooks: 'Início',
-    categories: 'Estantes ({count})',
+    categories: 'Pastas ({count})',
     librarySafe: 'Pasta de Origem Protegida (Modo Leitura)',
     customNameNotice: 'Nome personalizado no app',
     originalFolderLabel: 'Pasta Original: {folder}',
@@ -164,7 +191,7 @@ export const translations = {
     sortRecent: 'Lido Recentemente',
     fullLibrary: 'Início',
     viewAll: 'Ver todos',
-    booksInShelf: '{count} livros nesta estante',
+    booksInShelf: '{count} livros nesta pasta',
     searchResults: 'Resultados para "{query}" ({count} livros encontrados)',
 
     // Continue Reading
@@ -186,7 +213,7 @@ export const translations = {
 
     // Empty state & Onboarding
     noBooksFound: 'Nenhum livro encontrado',
-    noBooksDesc: 'Não encontramos nenhum livro correspondente à sua busca ou nesta estante.',
+    noBooksDesc: 'Não encontramos nenhum livro correspondente à sua busca ou nesta pasta.',
     clearSearch: 'Limpar pesquisa',
     setupPromptTitle: 'Bem-vindo à Biblioteca Digital',
     setupPromptDesc: 'Para começar, configure a pasta onde seus livros em PDF estão localizados.',
@@ -194,12 +221,19 @@ export const translations = {
 
     // Reader
     backToLibrary: 'Biblioteca',
-    backToLibraryTitle: 'Voltar à estante (Esc)',
+    backToLibraryTitle: 'Voltar à pasta (Esc)',
     prevPageTitle: 'Página anterior (Seta esquerda)',
     nextPageTitle: 'Próxima página (Seta direita)',
     resetWidth: 'Redefinir Largura',
     resetWidthTitle: 'Redefinir zoom para o padrão (100%)',
     fitWidth: 'Ajustar Largura',
+    dualPageMode: 'Visualização em Duas Páginas',
+    singlePageMode: 'Visualização em Página Única',
+    dualPageToggle: 'Alternar Modo Duas Páginas',
+    dualPageSetting: 'Modo Duas Páginas',
+    dualPageSettingDesc: 'Exibir duas páginas lado a lado como um livro aberto',
+    dualCoverStandalone: 'Capa Isolada',
+    dualCoverStandaloneDesc: 'Exibir a primeira página isolada como capa do livro',
     readerSettings: 'Configurações do Leitor',
     trackpadSwipe: 'Gesto de 2 Dedos no Trackpad',
     trackpadSwipeDesc: 'Deslizar 2 dedos para os lados para virar páginas',
@@ -216,7 +250,7 @@ export const translations = {
     autoHideHeader: 'Ocultar Cabeçalho Automaticamente',
     autoHideHeaderDesc: 'O cabeçalho desaparece após alguns segundos e reaparece ao passar o mouse',
     loadingBook: 'Carregando livro...',
-    rendering: 'Renderizando...',
+    rendering: 'Rendering...',
     tableOfContents: 'Sumário',
     index: 'Sumário',
     showIndex: 'Mostrar Sumário',
@@ -247,35 +281,55 @@ export const translations = {
     copyFilePath: 'Copiar Caminho do Arquivo',
     pathCopied: 'Caminho Copiado!',
 
-    // Shelf Context Menu & Modal
+    // Folder Context Menu & Modal
     folderLabel: 'Pasta: {folder}',
-    renameShelfVirtual: 'Renomear Estante (Virtual)',
+    renameShelfVirtual: 'Renomear Pasta (Virtual)',
     chooseShelfIcon: 'Alterar Ícone',
-    iconModalTitle: 'Escolher Ícone da Estante',
+    iconModalTitle: 'Escolher Ícone da Pasta',
     searchIconsPlaceholder: 'Buscar ícones (ex: código, banco de dados, nuvem)...',
     restoreDefaultIcon: 'Restaurar pasta padrão',
     previewLabel: 'Prévia no Menu',
     saveIcon: 'Salvar Ícone',
     restoreOriginalName: 'Restaurar Nome Original',
-    renameModalTitle: 'Renomear Estante (Virtual)',
+    renameModalTitle: 'Renomear Pasta (Virtual)',
     realFolderPrefix: 'Pasta real: ',
     renameDisclaimer: 'Este nome é exibido apenas dentro do app. Os arquivos e pastas reais no disco permanecem 100% inalterados.',
-    shelfNameLabel: 'Nome de Exibição da Estante:',
+    shelfNameLabel: 'Nome de Exibição da Pasta:',
     renamePlaceholder: 'Ex: Algoritmos Avançados',
     restoreOriginal: 'Restaurar Original',
     cancel: 'Cancelar',
     saveName: 'Salvar Nome',
 
-    // Settings
+    // Settings & Libraries
     settings: 'Configurações',
     settingsTitle: 'Configurações da Biblioteca',
-    settingsSubtitle: 'Configure a pasta de livros e preferências da interface',
+    settingsSubtitle: 'Configure suas pastas de livros e preferências da interface',
+    libraries: 'Bibliotecas',
+    activeLibrary: 'Biblioteca Ativa',
+    switchLibrary: 'Alternar Biblioteca',
+    addLibrary: 'Adicionar Biblioteca',
+    addNewLibrary: 'Adicionar Nova Biblioteca',
+    manageLibraries: 'Gerenciar Bibliotecas',
+    libraryName: 'Nome da Biblioteca',
+    libraryPath: 'Caminho da Pasta',
+    libraryNamePlaceholder: 'Ex: Trabalho, Ficção, Referência',
+    activeBadge: 'Ativa',
+    setActive: 'Tornar Ativa',
+    editLibrary: 'Editar Biblioteca',
+    deleteLibrary: 'Remover Biblioteca',
+    deleteLibraryConfirm: 'Remover "{name}" das suas bibliotecas? (Os arquivos no disco NÃO serão excluídos)',
+    cannotDeleteOnlyLibrary: 'Você não pode remover a única biblioteca configurada.',
+    libraryAdded: 'Biblioteca adicionada com sucesso!',
+    libraryUpdated: 'Biblioteca atualizada com sucesso!',
+    libraryRemoved: 'Biblioteca removida!',
+    booksIsolatedNotice: 'Livros em diretórios diferentes são mantidos estritamente isolados.',
+    switchingLibrary: 'Alternando biblioteca...',
     languageLabel: 'Idioma da Interface',
     libraryPathLabel: 'Caminho da Pasta de Livros',
     libraryPathPlaceholder: 'Ex: C:\\Livros ou /home/usuario/livros',
-    libraryPathHelp: 'Insira a pasta onde seus livros em PDF ou pastas de estantes estão armazenados.',
-    validFolder: 'Pasta válida: {books} livros encontrados em {shelves} estantes',
-    noPdfsFound: 'A pasta existe, mas nenhum arquivo PDF foi encontrado dentro',
+    libraryPathHelp: 'Insira a pasta onde seus livros (.pdf, .epub) ou subpastas estão armazenados.',
+    validFolder: 'Pasta válida: {books} livros encontrados em {folders} pastas',
+    noPdfsFound: 'A pasta existe, mas nenhum livro (.pdf, .epub) foi encontrado dentro',
     pathNotFound: 'O diretório não existe no disco',
     notADirectory: 'O caminho informado é um arquivo, não uma pasta',
     saveSettings: 'Salvar e Reexaminar',
@@ -300,7 +354,14 @@ export function I18nProvider({ children }) {
   const t = (key, params = {}) => {
     const dict = translations[lang] || translations.en;
     let str = dict[key] || translations.en[key] || key;
-    for (const [k, v] of Object.entries(params)) {
+    const resolvedParams = { ...params };
+    if (resolvedParams.shelves !== undefined && resolvedParams.folders === undefined) {
+      resolvedParams.folders = resolvedParams.shelves;
+    }
+    if (resolvedParams.folders !== undefined && resolvedParams.shelves === undefined) {
+      resolvedParams.shelves = resolvedParams.folders;
+    }
+    for (const [k, v] of Object.entries(resolvedParams)) {
       str = str.replace(`{${k}}`, v);
     }
     return str;
