@@ -143,7 +143,7 @@ class LibraryScanner:
     def _get_epub_metadata(self, epub_path: str, mtime: float) -> Dict[str, str]:
         cache_key = f"{epub_path}:::{mtime}"
         with self._lock:
-            if cache_key in self._metadata_cache:
+            if cache_key in self._metadata_cache and "spine_count" in self._metadata_cache[cache_key]:
                 return self._metadata_cache[cache_key]
 
         meta = {"title": "", "author": ""}
@@ -171,6 +171,8 @@ class LibraryScanner:
                     m_author = re.search(r'<dc:creator[^>]*>([^<]+)</dc:creator>', opf_text, re.IGNORECASE)
                     if m_author:
                         meta['author'] = html.unescape(m_author.group(1).strip())
+                    spine_items = re.findall(r'<itemref\b', opf_text, re.IGNORECASE)
+                    meta['spine_count'] = len(spine_items)
         except Exception as e:
             print(f"Error reading EPUB metadata from {epub_path}: {e}")
 
@@ -179,6 +181,25 @@ class LibraryScanner:
             self._save_metadata_cache()
 
         return meta
+
+    def estimate_epub_percent(self, epub_path: str, cfi: str) -> Optional[float]:
+        """Estimates reading percentage from EPUB spine index in CFI."""
+        if not epub_path or not os.path.isfile(epub_path) or not cfi:
+            return None
+        match = re.search(r'/6/(\d+)!', cfi)
+        if not match:
+            return None
+        try:
+            child_num = int(match.group(1))
+            spine_index = max(0, (child_num // 2) - 1)
+            mtime = os.path.getmtime(epub_path)
+            meta = self._get_epub_metadata(epub_path, mtime)
+            sc = meta.get("spine_count", 0)
+            if sc > 0:
+                return round(min(100.0, max(0.0, (spine_index / sc) * 100.0)), 1)
+        except Exception as e:
+            print(f"Error estimating epub percent: {e}")
+        return None
 
     def set_shelf_icon(self, shelf_id: str, icon_name: str, library_id: Optional[str] = None) -> str:
         """Sets or resets an icon name for a folder scoped to library."""

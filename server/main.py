@@ -340,6 +340,15 @@ def list_books(
     # Enrich each book with reading progress, favorite status, and cover URL
     for b in books:
         prog = all_progress.get(b["id"])
+        if prog:
+            p_pct = prog.get("percent", 0)
+            p_cfi = prog.get("cfi")
+            if (p_pct is None or p_pct <= 0) and p_cfi and b.get("path") and b["path"].lower().endswith(".epub"):
+                est = scanner.estimate_epub_percent(b["path"], p_cfi)
+                if est is not None and est > 0:
+                    prog["percent"] = est
+                    tracker._data[b["id"]]["percent"] = est
+                    tracker._save()
         b["progress"] = prog if prog else {"page": 1, "total_pages": 0, "percent": 0}
         b["cover_url"] = f"/api/cover/{b['id']}"
         b["is_favorite"] = favorites_mgr.is_favorite(b["id"])
@@ -383,17 +392,26 @@ def continue_reading(library_id: Optional[str] = Query(None)):
         b = lib_books.get(r["book_id"])
         if b:
             b_copy = dict(b)
+            r_pct = r.get("percent", 0)
+            r_cfi = r.get("cfi")
+            if (r_pct is None or r_pct <= 0) and r_cfi and b.get("path") and b["path"].lower().endswith(".epub"):
+                est = scanner.estimate_epub_percent(b["path"], r_cfi)
+                if est is not None and est > 0:
+                    r_pct = est
+                    tracker._data[r["book_id"]]["percent"] = est
+                    tracker._save()
+
             prog = {
                 "page": r.get("page", 1),
                 "total_pages": r.get("total_pages", 100),
-                "percent": r.get("percent", 0),
+                "percent": r_pct,
                 "status": r.get("status", "in_progress"),
                 "zoom": r.get("zoom", 1.2),
                 "invert_colors": r.get("invert_colors", False),
                 "updated_at": r.get("updated_at", "")
             }
-            if "cfi" in r and r["cfi"]:
-                prog["cfi"] = r["cfi"]
+            if r_cfi:
+                prog["cfi"] = r_cfi
             b_copy["progress"] = prog
             b_copy["cover_url"] = f"/api/cover/{b['id']}"
             b_copy["is_favorite"] = favorites_mgr.is_favorite(b["id"])
@@ -405,6 +423,14 @@ def continue_reading(library_id: Optional[str] = Query(None)):
 @app.post("/api/progress")
 def save_progress(payload: ProgressPayload):
     """Saves the current reading page/cfi, zoom, and night reading mode for a book."""
+    pct = payload.percent
+    if (pct is None or pct <= 0) and payload.cfi:
+        b = scanner.find_book(payload.book_id)
+        if b and b.get("path") and b["path"].lower().endswith(".epub"):
+            est = scanner.estimate_epub_percent(b["path"], payload.cfi)
+            if est is not None and est > 0:
+                pct = est
+
     record = tracker.set_progress(
         payload.book_id, 
         payload.page, 
@@ -412,7 +438,7 @@ def save_progress(payload: ProgressPayload):
         payload.zoom,
         payload.invert_colors,
         payload.cfi,
-        payload.percent
+        pct
     )
     return {"status": "ok", "progress": record}
 
@@ -465,6 +491,15 @@ def get_book(book_id: str):
         raise HTTPException(status_code=404, detail="Book not found")
     b_copy = dict(b)
     prog = tracker.get_progress(book_id)
+    if prog:
+        p_pct = prog.get("percent", 0)
+        p_cfi = prog.get("cfi")
+        if (p_pct is None or p_pct <= 0) and p_cfi and b.get("path") and b["path"].lower().endswith(".epub"):
+            est = scanner.estimate_epub_percent(b["path"], p_cfi)
+            if est is not None and est > 0:
+                prog["percent"] = est
+                tracker._data[book_id]["percent"] = est
+                tracker._save()
     b_copy["progress"] = prog if prog else {"page": 1, "total_pages": 0, "percent": 0}
     b_copy["cover_url"] = f"/api/cover/{book_id}"
     b_copy["is_favorite"] = favorites_mgr.is_favorite(book_id)

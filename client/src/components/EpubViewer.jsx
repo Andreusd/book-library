@@ -486,11 +486,27 @@ export default function EpubViewer({
           setLoading(false);
         }
 
-        // Generate location numbers in background for accurate percent tracking
+        // Generate location numbers in background for accurate percent tracking (with localStorage caching)
         epubBook.ready.then(() => {
-          return epubBook.locations.generate(1000);
+          try {
+            const cached = localStorage.getItem(`book_locations_${book.id}`);
+            if (cached) {
+              epubBook.locations.load(cached);
+              return;
+            }
+          } catch (e) {}
+
+          const spineCount = epubBook.spine?.items?.length || 0;
+          const charsPerChunk = spineCount > 250 ? 2500 : 1000;
+          return epubBook.locations.generate(charsPerChunk);
         }).then(() => {
           if (isCancelled) return;
+          try {
+            if (epubBook.locations && epubBook.locations.length() > 0) {
+              localStorage.setItem(`book_locations_${book.id}`, epubBook.locations.save());
+            }
+          } catch (e) {}
+
           // If no initial CFI but saved percentage > 0, jump to that percentage
           if (!startCfi && initialPercentRef.current > 0 && isInitialRelocationRef.current) {
             try {
@@ -506,7 +522,10 @@ export default function EpubViewer({
           if (rendition.currentLocation()?.start?.cfi) {
             const cfi = rendition.currentLocation().start.cfi;
             const pct = Math.round(epubBook.locations.percentageFromCfi(cfi) * 100);
-            setLocationInfo(prev => ({ ...prev, percentage: pct }));
+            if (pct > 0) {
+              setLocationInfo(prev => ({ ...prev, percentage: pct }));
+              saveProgressDebounced(cfi, pct);
+            }
           }
         }).catch(e => {
           console.warn('Locations generation notice:', e);
@@ -541,25 +560,68 @@ export default function EpubViewer({
           }
         });
 
+        // Helper to calculate reading percentage reliably
+        const getAccuratePercentage = (location, cfi) => {
+          // 1. If epubBook has generated locations and can resolve the CFI, use it
+          if (epubBook.locations && typeof epubBook.locations.length === 'function' && epubBook.locations.length() > 0) {
+            try {
+              const locPct = epubBook.locations.percentageFromCfi(cfi);
+              if (typeof locPct === 'number' && !isNaN(locPct) && locPct >= 0) {
+                return Math.min(100, Math.max(0, Math.round(locPct * 100)));
+              }
+            } catch (e) {}
+          }
+
+          // 2. If location has native percentage
+          if (location?.start?.percentage !== undefined && typeof location.start.percentage === 'number' && !isNaN(location.start.percentage) && location.start.percentage > 0) {
+            return Math.min(100, Math.max(0, Math.round(location.start.percentage * 100)));
+          }
+
+          // 3. Spine-based calculation (immediate, accurate, zero delay)
+          const spineItems = epubBook.spine?.items || [];
+          const totalSpine = spineItems.length;
+
+          if (totalSpine > 0) {
+            let spineIndex = location?.start?.index;
+
+            // If spine index is missing, extract it from CFI /6/(\d+)!
+            if (spineIndex === undefined && cfi) {
+              const match = cfi.match(/\/6\/(\d+)!/);
+              if (match) {
+                const childNum = parseInt(match[1], 10);
+                spineIndex = Math.max(0, Math.floor(childNum / 2) - 1);
+              }
+            }
+
+            if (spineIndex !== undefined && spineIndex >= 0) {
+              const displayed = location?.start?.displayed;
+              let intraFraction = 0;
+              if (displayed && displayed.total > 1 && displayed.page > 0) {
+                intraFraction = (displayed.page - 1) / displayed.total;
+              }
+              const fraction = (spineIndex + intraFraction) / totalSpine;
+              return Math.min(100, Math.max(0, Math.round(fraction * 100)));
+            }
+          }
+
+          if (initialPercentRef.current > 0) {
+            return Math.round(initialPercentRef.current);
+          }
+
+          return 0;
+        };
+
         // Handle Location changes
         rendition.on('relocated', (location) => {
           if (isCancelled || !location || !location.start) return;
           const cfi = location.start.cfi;
-          let pct = 0;
-
-          if (epubBook.locations && epubBook.locations.length()) {
-            pct = Math.round(epubBook.locations.percentageFromCfi(cfi) * 100);
-          } else if (location.start.percentage !== undefined) {
-            pct = Math.round(location.start.percentage * 100);
-          } else {
-            pct = initialPercentRef.current || 0;
-          }
+          const pct = getAccuratePercentage(location, cfi);
 
           const chapterName = findChapterLabel(tocRef.current, location.start.href);
 
           setLocationInfo({
             cfi: cfi,
-            percentage: Math.min(100, Math.max(0, pct)),
+            percentage: pct,
             chapter: chapterName
           });
 
@@ -572,6 +634,10 @@ export default function EpubViewer({
           // Prevent initial relocation on mount from overwriting saved progress before locations are generated
           if (isInitialRelocationRef.current) {
             isInitialRelocationRef.current = false;
+            // If the book had 0% or no percent saved, save the real computed percent now
+            if (pct > 0 && (!book.progress?.percent || book.progress.percent === 0)) {
+              saveProgressDebounced(cfi, pct);
+            }
             return;
           }
 
