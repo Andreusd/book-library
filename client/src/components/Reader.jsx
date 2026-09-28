@@ -301,11 +301,12 @@ export default function Reader({
   };
 
   // Header auto-hide / pin state
-  const [headerEnabled, setHeaderEnabled] = useState(() => {
+  const [headerPinned, setHeaderPinned] = useState(() => {
     try {
-      return localStorage.getItem('reader_header_enabled') !== 'false';
+      const saved = localStorage.getItem('reader_header_pinned');
+      return saved !== null ? saved === 'true' : false;
     } catch (e) {
-      return true;
+      return false;
     }
   });
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
@@ -389,11 +390,11 @@ export default function Reader({
     }, delay);
   }, [clearHideTimer]);
 
-  const toggleHeaderEnabled = useCallback(() => {
-    setHeaderEnabled(prev => {
+  const toggleHeaderPinned = useCallback(() => {
+    setHeaderPinned(prev => {
       const next = !prev;
       try {
-        localStorage.setItem('reader_header_enabled', String(next));
+        localStorage.setItem('reader_header_pinned', String(next));
       } catch (e) {}
       if (next) {
         clearHideTimer();
@@ -410,7 +411,7 @@ export default function Reader({
   }, [clearHideTimer, showHeader, startHideTimer]);
 
   useEffect(() => {
-    if (headerEnabled) {
+    if (headerPinned) {
       clearHideTimer();
       return;
     }
@@ -451,9 +452,9 @@ export default function Reader({
       window.removeEventListener('touchstart', handleTouchStart);
       clearHideTimer();
     };
-  }, [headerEnabled, showHeader, startHideTimer, clearHideTimer]);
+  }, [headerPinned, showHeader, startHideTimer, clearHideTimer]);
 
-  const isHeaderShowing = headerEnabled || isHeaderVisible || readerSettingsOpen || commentsDrawerOpen || outlineOpen || searchOpen;
+  const isHeaderShowing = headerPinned || isHeaderVisible || readerSettingsOpen || commentsDrawerOpen || outlineOpen || searchOpen;
 
 
   const containerRef = useRef(null);
@@ -1337,7 +1338,7 @@ export default function Reader({
         }}
         onMouseLeave={() => {
           isMouseOverHeaderRef.current = false;
-          if (!headerEnabled && !readerSettingsOpen && !commentsDrawerOpen && !outlineOpen) {
+          if (!headerPinned && !readerSettingsOpen && !commentsDrawerOpen && !outlineOpen) {
             startHideTimer(3000, true);
           }
         }}
@@ -1346,7 +1347,7 @@ export default function Reader({
             ? 'bg-black border-neutral-900 text-neutral-200' 
             : 'bg-white border-neutral-200 text-neutral-700'
         } ${
-          headerEnabled 
+          headerPinned 
             ? 'relative shrink-0 translate-y-0 opacity-100 pointer-events-auto' 
             : `fixed top-0 left-0 right-0 ${invertColors ? 'shadow-2xl shadow-black/80' : 'shadow-md shadow-neutral-900/5'} ${
                 isHeaderShowing 
@@ -1481,21 +1482,6 @@ export default function Reader({
 
           <div className={`h-4 w-px mx-1 hidden sm:block ${dividerClass}`} />
 
-          {/* Toggle Header Auto-Hide / Keep Header Visible */}
-          <button 
-            onClick={toggleHeaderEnabled}
-            className={`h-7 w-7 flex items-center justify-center rounded-lg transition shrink-0 cursor-pointer ${
-              !headerEnabled ? btnActiveClass : btnClass
-            }`}
-            title={headerEnabled ? t('unpinHeaderTitle') : t('pinHeaderTitle')}
-          >
-            {headerEnabled ? (
-              <PanelTopClose className="w-4 h-4" />
-            ) : (
-              <PanelTopOpen className="w-4 h-4" />
-            )}
-          </button>
-
           {/* In-Book Full-Text Search Toggle */}
           <button 
             onClick={() => {
@@ -1558,6 +1544,21 @@ export default function Reader({
             title={commentsDrawerOpen ? t('hideComments') : (annotations.length > 0 ? `${t('showComments')} (${annotations.length})` : t('showComments'))}
           >
             <MessageSquare className="w-4 h-4" />
+          </button>
+
+          {/* Toggle Header Auto-Hide / Keep Header Visible */}
+          <button 
+            onClick={toggleHeaderPinned}
+            className={`h-7 w-7 flex items-center justify-center rounded-lg transition shrink-0 cursor-pointer ${
+              headerPinned ? btnActiveClass : btnClass
+            }`}
+            title={headerPinned ? t('unpinHeaderTitle') : t('pinHeaderTitle')}
+          >
+            {headerPinned ? (
+              <PanelTopClose className="w-4 h-4" />
+            ) : (
+              <PanelTopOpen className="w-4 h-4" />
+            )}
           </button>
 
           {/* Fullscreen */}
@@ -1747,8 +1748,8 @@ export default function Reader({
                       <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
                         <input 
                           type="checkbox"
-                          checked={!headerEnabled}
-                          onChange={toggleHeaderEnabled}
+                          checked={!headerPinned}
+                          onChange={toggleHeaderPinned}
                           className="sr-only peer"
                         />
                         <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
@@ -1763,7 +1764,7 @@ export default function Reader({
       </header>
 
       {/* Main Reader Stage */}
-      <div className={`relative flex-1 flex overflow-hidden ${invertColors ? 'bg-black' : 'bg-white'} ${!headerEnabled ? 'pt-14' : ''}`}>
+      <div className={`relative flex-1 flex overflow-hidden ${invertColors ? 'bg-black' : 'bg-white'} ${!headerPinned ? 'pt-14' : ''}`}>
         {/* Toggleable Left Index / Table of Contents Drawer */}
         {hasOutline && (
           <PdfOutline

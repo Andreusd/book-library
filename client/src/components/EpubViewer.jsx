@@ -5,7 +5,8 @@ import {
   Maximize2, Minimize2, Moon, Sun, ListTree,
   Heart, X, BookOpen,
   PanelTopClose, PanelTopOpen, Palette,
-  MessageSquare, Search, Headphones
+  MessageSquare, Search, Headphones,
+  Settings, SlidersHorizontal
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 import CommentsDrawer from './CommentsDrawer';
@@ -365,9 +366,9 @@ export default function EpubViewer({
   const [headerPinned, setHeaderPinned] = useState(() => {
     try {
       const saved = localStorage.getItem('reader_header_pinned');
-      return saved !== null ? saved === 'true' : true;
+      return saved !== null ? saved === 'true' : false;
     } catch (e) {
-      return true;
+      return false;
     }
   });
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
@@ -400,6 +401,75 @@ export default function EpubViewer({
   useEffect(() => {
     ttsOpenRef.current = ttsOpen;
   }, [ttsOpen]);
+
+  // Reader Settings state
+  const [readerSettingsOpen, setReaderSettingsOpen] = useState(false);
+  const readerSettingsOpenRef = useRef(false);
+  useEffect(() => {
+    readerSettingsOpenRef.current = readerSettingsOpen;
+  }, [readerSettingsOpen]);
+
+  const [trackpadSwipeEnabled, setTrackpadSwipeEnabled] = useState(() => {
+    try {
+      return localStorage.getItem('reader_trackpad_swipe') !== 'false';
+    } catch (e) {
+      return true;
+    }
+  });
+  const trackpadSwipeEnabledRef = useRef(trackpadSwipeEnabled);
+  useEffect(() => {
+    trackpadSwipeEnabledRef.current = trackpadSwipeEnabled;
+  }, [trackpadSwipeEnabled]);
+
+  const toggleTrackpadSwipe = useCallback(() => {
+    setTrackpadSwipeEnabled(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('reader_trackpad_swipe', String(next));
+      } catch (e) {}
+      return next;
+    });
+  }, []);
+
+  const [floatingButtonsEnabled, setFloatingButtonsEnabled] = useState(() => {
+    try {
+      return localStorage.getItem('reader_floating_buttons') !== 'false';
+    } catch (e) {
+      return true;
+    }
+  });
+
+  const toggleFloatingButtons = useCallback(() => {
+    setFloatingButtonsEnabled(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('reader_floating_buttons', String(next));
+      } catch (e) {}
+      return next;
+    });
+  }, []);
+
+  const [upDownFlipEnabled, setUpDownFlipEnabled] = useState(() => {
+    try {
+      return localStorage.getItem('reader_up_down_flip') === 'true'; // false by default
+    } catch (e) {
+      return false;
+    }
+  });
+  const upDownFlipEnabledRef = useRef(upDownFlipEnabled);
+  useEffect(() => {
+    upDownFlipEnabledRef.current = upDownFlipEnabled;
+  }, [upDownFlipEnabled]);
+
+  const toggleUpDownFlip = useCallback(() => {
+    setUpDownFlipEnabled(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('reader_up_down_flip', String(next));
+      } catch (e) {}
+      return next;
+    });
+  }, []);
 
   const isHeaderVisibleRef = useRef(true);
   const hideTimerRef = useRef(null);
@@ -441,7 +511,8 @@ export default function EpubViewer({
         tocOpenRef.current ||
         commentsDrawerOpenRef.current ||
         searchOpenRef.current ||
-        ttsOpenRef.current
+        ttsOpenRef.current ||
+        readerSettingsOpenRef.current
       ) {
         return;
       }
@@ -492,7 +563,8 @@ export default function EpubViewer({
           !tocOpenRef.current &&
           !commentsDrawerOpenRef.current &&
           !searchOpenRef.current &&
-          !ttsOpenRef.current
+          !ttsOpenRef.current &&
+          !readerSettingsOpenRef.current
         ) {
           startHideTimer(3000, false);
         }
@@ -799,7 +871,10 @@ export default function EpubViewer({
         isHeaderVisibleRef.current &&
         !isMouseOverHeaderRef.current &&
         !tocOpenRef.current &&
-        !commentsDrawerOpenRef.current
+        !commentsDrawerOpenRef.current &&
+        !searchOpenRef.current &&
+        !ttsOpenRef.current &&
+        !readerSettingsOpenRef.current
       ) {
         startHideTimer(3000, false);
       }
@@ -983,6 +1058,10 @@ export default function EpubViewer({
 
     // 1. Two-finger horizontal trackpad swipe to flip pages
     if (absX > absY && absX > 2) {
+      if (!trackpadSwipeEnabledRef.current) {
+        if (e.cancelable) e.preventDefault();
+        return;
+      }
       if (e.cancelable) e.preventDefault();
       if (typeof e.stopPropagation === 'function') e.stopPropagation();
 
@@ -1860,14 +1939,16 @@ export default function EpubViewer({
           } else if (e.altKey && (e.key === 'r' || e.key === 'R')) {
             e.preventDefault();
             toggleTts();
-          } else if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+          } else if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ' || (upDownFlipEnabledRef.current && e.key === 'ArrowDown')) {
             e.preventDefault();
             rendition.next();
-          } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+          } else if (e.key === 'ArrowLeft' || e.key === 'PageUp' || (upDownFlipEnabledRef.current && e.key === 'ArrowUp')) {
             e.preventDefault();
             rendition.prev();
           } else if (e.key === 'Escape') {
-            if (ttsOpenRef.current) {
+            if (readerSettingsOpenRef.current) {
+              setReaderSettingsOpen(false);
+            } else if (ttsOpenRef.current) {
               setTtsOpen(false);
             } else if (searchOpenRef.current) {
               handleCloseSearch();
@@ -1923,14 +2004,16 @@ export default function EpubViewer({
         return;
       }
 
-      if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+      if (e.key === 'ArrowRight' || e.key === 'PageDown' || (upDownFlipEnabledRef.current && e.key === 'ArrowDown')) {
         e.preventDefault();
         flipNext();
-      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp' || (upDownFlipEnabledRef.current && e.key === 'ArrowUp')) {
         e.preventDefault();
         flipPrev();
       } else if (e.key === 'Escape') {
-        if (ttsOpenRef.current) {
+        if (readerSettingsOpenRef.current) {
+          setReaderSettingsOpen(false);
+        } else if (ttsOpenRef.current) {
           setTtsOpen(false);
         } else if (searchOpenRef.current) {
           handleCloseSearch();
@@ -2071,8 +2154,6 @@ export default function EpubViewer({
       toolBtn: 'text-neutral-400 hover:text-white hover:bg-neutral-800',
       iconBtn: 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800',
       iconBtnActive: 'bg-amber-500/20 border-amber-500/50 text-amber-400',
-      pinActive: 'bg-neutral-800 border-neutral-700 text-neutral-200',
-      pinInactive: 'bg-neutral-900 border-neutral-800 text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800',
     },
     sepia: {
       bar: 'bg-[#fbf0d9] border-[#e5d5b5] text-[#433422]',
@@ -2091,8 +2172,6 @@ export default function EpubViewer({
       toolBtn: 'text-[#5a4833] hover:text-[#292014] hover:bg-[#e4d2b0]',
       iconBtn: 'bg-[#efe0c2] border-[#e5d5b5] text-[#5a4833] hover:text-[#292014] hover:bg-[#e4d2b0]',
       iconBtnActive: 'bg-amber-500/20 border-amber-600/50 text-amber-800',
-      pinActive: 'bg-[#e4d2b0] border-[#cfbc97] text-[#292014]',
-      pinInactive: 'bg-[#efe0c2] border-[#e5d5b5] text-[#7c6a53] hover:text-[#292014] hover:bg-[#e4d2b0]',
     },
     light: {
       bar: 'bg-white border-neutral-200 text-neutral-700',
@@ -2111,12 +2190,10 @@ export default function EpubViewer({
       toolBtn: 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200',
       iconBtn: 'bg-neutral-100 border-neutral-200 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200',
       iconBtnActive: 'bg-amber-500/20 border-amber-500/50 text-amber-700',
-      pinActive: 'bg-neutral-200 border-neutral-300 text-neutral-900',
-      pinInactive: 'bg-neutral-100 border-neutral-200 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-200',
     }
   };
   const ht = headerTheme[theme] || headerTheme.dark;
-  const isHeaderShowing = headerPinned || isHeaderVisible || tocOpen || commentsDrawerOpen || searchOpen;
+  const isHeaderShowing = headerPinned || isHeaderVisible || tocOpen || commentsDrawerOpen || searchOpen || ttsOpen || readerSettingsOpen;
 
   return (
     <div 
@@ -2130,7 +2207,7 @@ export default function EpubViewer({
         }}
         onMouseLeave={() => {
           isMouseOverHeaderRef.current = false;
-          if (!headerPinned && !tocOpen && !commentsDrawerOpen && !searchOpen) {
+          if (!headerPinned && !tocOpen && !commentsDrawerOpen && !searchOpen && !ttsOpen && !readerSettingsOpen) {
             startHideTimer(3000, true);
           }
         }}
@@ -2383,8 +2460,8 @@ export default function EpubViewer({
             onClick={toggleHeaderPinned}
             className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
               headerPinned 
-                ? ht.pinActive 
-                : ht.pinInactive
+                ? ht.iconBtnActive 
+                : ht.iconBtn
             }`}
             title={headerPinned ? t('unpinHeaderTitle') : t('pinHeaderTitle')}
           >
@@ -2399,6 +2476,168 @@ export default function EpubViewer({
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
+
+          {/* Reader Settings Popover */}
+          <div className="relative">
+            <button 
+              onClick={() => setReaderSettingsOpen(prev => !prev)}
+              className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                readerSettingsOpen ? ht.iconBtnActive : ht.iconBtn
+              }`}
+              title={t('readerSettings')}
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+
+            {readerSettingsOpen && (
+              <>
+                <div 
+                  className="fixed inset-0 z-40 bg-transparent" 
+                  onClick={() => setReaderSettingsOpen(false)}
+                />
+                <div className={`absolute right-0 top-full mt-2 w-72 sm:w-80 rounded-2xl p-3.5 z-50 text-left select-none animate-in fade-in zoom-in-95 duration-150 border ${
+                  theme === 'dark' 
+                    ? 'bg-neutral-900 border-neutral-700 shadow-2xl shadow-black/80 text-neutral-100' 
+                    : theme === 'sepia'
+                    ? 'bg-[#fbf0d9] border-[#d8c5a0] shadow-2xl shadow-neutral-900/15 text-[#292014]'
+                    : 'bg-white border-neutral-200 shadow-2xl shadow-neutral-900/15 text-neutral-800'
+                }`}>
+                  <div className={`flex items-center justify-between pb-2.5 mb-2.5 border-b ${
+                    theme === 'dark' ? 'border-neutral-800' : theme === 'sepia' ? 'border-[#d8c5a0]' : 'border-neutral-200'
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      <SlidersHorizontal className="w-4 h-4 text-amber-500" />
+                      <h3 className={`text-xs font-bold uppercase tracking-wider ${
+                        theme === 'dark' ? 'text-neutral-100' : theme === 'sepia' ? 'text-[#292014]' : 'text-neutral-900'
+                      }`}>{t('readerSettings')}</h3>
+                    </div>
+                    <button 
+                      onClick={() => setReaderSettingsOpen(false)}
+                      className={`p-1 rounded-md transition cursor-pointer ${
+                        theme === 'dark' 
+                          ? 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800' 
+                          : theme === 'sepia'
+                          ? 'text-[#7c6a53] hover:text-[#292014] hover:bg-[#efe0c2]'
+                          : 'text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100'
+                      }`}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    {/* Toggle Trackpad Swipe */}
+                    <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${
+                      theme === 'dark' ? 'hover:bg-neutral-800/60' : theme === 'sepia' ? 'hover:bg-[#efe0c2]/60' : 'hover:bg-neutral-100'
+                    }`}>
+                      <div className="min-w-0 flex-1">
+                        <span className={`text-xs font-semibold block transition-colors ${
+                          theme === 'dark' ? 'text-neutral-100 group-hover:text-amber-300' : theme === 'sepia' ? 'text-[#292014] group-hover:text-amber-700' : 'text-neutral-900 group-hover:text-amber-600'
+                        }`}>
+                          {t('trackpadSwipe')}
+                        </span>
+                        <span className={`text-[11px] leading-snug block mt-0.5 ${
+                          theme === 'dark' ? 'text-neutral-300' : theme === 'sepia' ? 'text-[#7c6a53]' : 'text-neutral-500'
+                        }`}>
+                          {t('trackpadSwipeDesc')}
+                        </span>
+                      </div>
+                      <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                        <input 
+                          type="checkbox"
+                          checked={trackpadSwipeEnabled}
+                          onChange={toggleTrackpadSwipe}
+                          className="sr-only peer"
+                        />
+                        <div className={`w-9 h-5 ${theme === 'dark' ? 'bg-neutral-800 border-neutral-700' : 'bg-neutral-300 border-neutral-300'} border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500`}></div>
+                      </div>
+                    </label>
+
+                    {/* Toggle Floating Side Buttons */}
+                    <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${
+                      theme === 'dark' ? 'hover:bg-neutral-800/60' : theme === 'sepia' ? 'hover:bg-[#efe0c2]/60' : 'hover:bg-neutral-100'
+                    }`}>
+                      <div className="min-w-0 flex-1">
+                        <span className={`text-xs font-semibold block transition-colors ${
+                          theme === 'dark' ? 'text-neutral-100 group-hover:text-amber-300' : theme === 'sepia' ? 'text-[#292014] group-hover:text-amber-700' : 'text-neutral-900 group-hover:text-amber-600'
+                        }`}>
+                          {t('floatingSideButtons')}
+                        </span>
+                        <span className={`text-[11px] leading-snug block mt-0.5 ${
+                          theme === 'dark' ? 'text-neutral-300' : theme === 'sepia' ? 'text-[#7c6a53]' : 'text-neutral-500'
+                        }`}>
+                          {t('floatingSideButtonsDesc')}
+                        </span>
+                      </div>
+                      <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                        <input 
+                          type="checkbox"
+                          checked={floatingButtonsEnabled}
+                          onChange={toggleFloatingButtons}
+                          className="sr-only peer"
+                        />
+                        <div className={`w-9 h-5 ${theme === 'dark' ? 'bg-neutral-800 border-neutral-700' : 'bg-neutral-300 border-neutral-300'} border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500`}></div>
+                      </div>
+                    </label>
+
+                    {/* Toggle Up/Down Arrow Page Flip */}
+                    <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${
+                      theme === 'dark' ? 'hover:bg-neutral-800/60' : theme === 'sepia' ? 'hover:bg-[#efe0c2]/60' : 'hover:bg-neutral-100'
+                    }`}>
+                      <div className="min-w-0 flex-1">
+                        <span className={`text-xs font-semibold block transition-colors ${
+                          theme === 'dark' ? 'text-neutral-100 group-hover:text-amber-300' : theme === 'sepia' ? 'text-[#292014] group-hover:text-amber-700' : 'text-neutral-900 group-hover:text-amber-600'
+                        }`}>
+                          {t('upDownPageFlip')}
+                        </span>
+                        <span className={`text-[11px] leading-snug block mt-0.5 ${
+                          theme === 'dark' ? 'text-neutral-300' : theme === 'sepia' ? 'text-[#7c6a53]' : 'text-neutral-500'
+                        }`}>
+                          {t('upDownPageFlipDesc')}
+                        </span>
+                      </div>
+                      <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                        <input 
+                          type="checkbox"
+                          checked={upDownFlipEnabled}
+                          onChange={toggleUpDownFlip}
+                          className="sr-only peer"
+                        />
+                        <div className={`w-9 h-5 ${theme === 'dark' ? 'bg-neutral-800 border-neutral-700' : 'bg-neutral-300 border-neutral-300'} border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500`}></div>
+                      </div>
+                    </label>
+
+                    {/* Toggle Auto-Hide Header */}
+                    <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${
+                      theme === 'dark' ? 'hover:bg-neutral-800/60' : theme === 'sepia' ? 'hover:bg-[#efe0c2]/60' : 'hover:bg-neutral-100'
+                    }`}>
+                      <div className="min-w-0 flex-1">
+                        <span className={`text-xs font-semibold block transition-colors ${
+                          theme === 'dark' ? 'text-neutral-100 group-hover:text-amber-300' : theme === 'sepia' ? 'text-[#292014] group-hover:text-amber-700' : 'text-neutral-900 group-hover:text-amber-600'
+                        }`}>
+                          {t('autoHideHeader')}
+                        </span>
+                        <span className={`text-[11px] leading-snug block mt-0.5 ${
+                          theme === 'dark' ? 'text-neutral-300' : theme === 'sepia' ? 'text-[#7c6a53]' : 'text-neutral-500'
+                        }`}>
+                          {t('autoHideHeaderDesc')}
+                        </span>
+                      </div>
+                      <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                        <input 
+                          type="checkbox"
+                          checked={!headerPinned}
+                          onChange={toggleHeaderPinned}
+                          className="sr-only peer"
+                        />
+                        <div className={`w-9 h-5 ${theme === 'dark' ? 'bg-neutral-800 border-neutral-700' : 'bg-neutral-300 border-neutral-300'} border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500`}></div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </header>
 
@@ -2442,33 +2681,38 @@ export default function EpubViewer({
             </div>
           )}
 
-          {/* Floating Left Navigation Button */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              flipPrev();
-            }}
-            className="absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 z-20 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-neutral-900/80 hover:bg-neutral-800 backdrop-blur-md border border-neutral-700 hover:border-amber-500/60 text-neutral-300 hover:text-white shadow-2xl flex items-center justify-center transition-all duration-200 opacity-60 hover:opacity-100 sm:opacity-0 sm:group-hover/stage:opacity-80 sm:hover:!opacity-100 hover:scale-110 active:scale-95 cursor-pointer select-none"
-            title={t('prevPageTitle')}
-            aria-label={t('prevPageTitle')}
-          >
-            <ChevronLeft className="w-6 h-6 sm:w-7 sm:h-7 text-neutral-300 hover:text-amber-400 transition-colors" />
-          </button>
+          {/* Floating Navigation Buttons */}
+          {floatingButtonsEnabled && (
+            <>
+              {/* Floating Left Navigation Button */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  flipPrev();
+                }}
+                className="absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 z-20 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-neutral-900/80 hover:bg-neutral-800 backdrop-blur-md border border-neutral-700 hover:border-amber-500/60 text-neutral-300 hover:text-white shadow-2xl flex items-center justify-center transition-all duration-200 opacity-60 hover:opacity-100 sm:opacity-0 sm:group-hover/stage:opacity-80 sm:hover:!opacity-100 hover:scale-110 active:scale-95 cursor-pointer select-none"
+                title={t('prevPageTitle')}
+                aria-label={t('prevPageTitle')}
+              >
+                <ChevronLeft className="w-6 h-6 sm:w-7 sm:h-7 text-neutral-300 hover:text-amber-400 transition-colors" />
+              </button>
 
-          {/* Floating Right Navigation Button */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              flipNext();
-            }}
-            className="absolute right-3 sm:right-5 top-1/2 -translate-y-1/2 z-20 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-neutral-900/80 hover:bg-neutral-800 backdrop-blur-md border border-neutral-700 hover:border-amber-500/60 text-neutral-300 hover:text-white shadow-2xl flex items-center justify-center transition-all duration-200 opacity-60 hover:opacity-100 sm:opacity-0 sm:group-hover/stage:opacity-80 sm:hover:!opacity-100 hover:scale-110 active:scale-95 cursor-pointer select-none"
-            title={t('nextPageTitle')}
-            aria-label={t('nextPageTitle')}
-          >
-            <ChevronRight className="w-6 h-6 sm:w-7 sm:h-7 text-neutral-300 hover:text-amber-400 transition-colors" />
-          </button>
+              {/* Floating Right Navigation Button */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  flipNext();
+                }}
+                className="absolute right-3 sm:right-5 top-1/2 -translate-y-1/2 z-20 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-neutral-900/80 hover:bg-neutral-800 backdrop-blur-md border border-neutral-700 hover:border-amber-500/60 text-neutral-300 hover:text-white shadow-2xl flex items-center justify-center transition-all duration-200 opacity-60 hover:opacity-100 sm:opacity-0 sm:group-hover/stage:opacity-80 sm:hover:!opacity-100 hover:scale-110 active:scale-95 cursor-pointer select-none"
+                title={t('nextPageTitle')}
+                aria-label={t('nextPageTitle')}
+              >
+                <ChevronRight className="w-6 h-6 sm:w-7 sm:h-7 text-neutral-300 hover:text-amber-400 transition-colors" />
+              </button>
+            </>
+          )}
 
           {/* Expanded Document Viewport */}
           <div className="w-full h-full px-14 sm:px-20 py-2 flex flex-col overflow-hidden">
