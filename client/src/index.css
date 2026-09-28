@@ -103,3 +103,13 @@
   background: rgba(245, 158, 11, 0.22) !important;
   outline: 1.5px dashed rgba(245, 158, 11, 0.75) !important;
 }
+
+/* Hide scrollbars for clean carousel presentation */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+

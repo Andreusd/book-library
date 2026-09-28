@@ -13,9 +13,21 @@ export default function EpubViewer({
   onClose,
   onProgressUpdate,
   onToggleFavorite,
-  isFavorite
+  isFavorite,
+  showFileExtension
 }) {
   const { t } = useI18n();
+
+  const shouldShowExtension = showFileExtension !== undefined 
+    ? Boolean(showFileExtension) 
+    : (() => {
+        try {
+          return localStorage.getItem('show_file_extension') !== 'false';
+        } catch (e) {
+          return true;
+        }
+      })();
+
   const viewerRef = useRef(null);
   const bookRef = useRef(null);
   const renditionRef = useRef(null);
@@ -771,9 +783,11 @@ export default function EpubViewer({
               {book.author && <span className="text-amber-400 font-medium truncate">{book.author}</span>}
               {book.author && <span>•</span>}
               <span className="truncate">{book.shelf_display || book.folder_display}</span>
-              <span className="px-1 py-0.2 text-[8px] font-bold rounded bg-indigo-950 text-indigo-300 border border-indigo-500/40 uppercase">
-                EPUB
-              </span>
+              {shouldShowExtension && (
+                <span className="px-1 py-0.2 text-[8px] font-bold rounded bg-indigo-950 text-indigo-300 border border-indigo-500/40 uppercase">
+                  EPUB
+                </span>
+              )}
             </div>
           </div>
         </div>

@@ -89,6 +89,10 @@ class ConfigManager:
         active_lib = next((l for l in libraries if l["id"] == config["active_library_id"]), None)
         config["library_path"] = active_lib["path"] if active_lib else ""
 
+        # Display preference: show file extension badges (EPUB, PDF)
+        if "show_file_extension" not in config:
+            config["show_file_extension"] = True
+
         return config
 
     def _save(self):
@@ -229,6 +233,19 @@ class ConfigManager:
                 self.add_library("Default Library", clean_path, set_active=True)
 
             return clean_path
+
+    def get_show_file_extension(self) -> bool:
+        """Returns whether file extension badges (EPUB, PDF) should be shown."""
+        with self._lock:
+            self._reload_if_changed()
+            return bool(self._config.get("show_file_extension", True))
+
+    def set_show_file_extension(self, show: bool) -> bool:
+        """Saves whether file extension badges should be shown."""
+        with self._lock:
+            self._config["show_file_extension"] = bool(show)
+            self._save()
+            return self._config["show_file_extension"]
 
     @staticmethod
     def validate_path(path: str) -> Dict[str, Any]:

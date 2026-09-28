@@ -66,8 +66,24 @@ export default function ContextMenu({
   };
 
   const isFav = isFavorite !== undefined ? isFavorite : Boolean(book?.is_favorite);
-  const isCompleted = book.progress?.status === 'completed' || (book.progress?.percent && book.progress.percent >= 100);
-  const isNotStarted = !book.progress || book.progress?.status === 'not_started' || (book.progress?.page <= 1 && !isCompleted);
+  const isCompleted = Boolean(
+    book?.progress?.status === 'completed' || 
+    (book?.progress?.percent && book.progress.percent >= 100)
+  );
+  const isEpub = Boolean(
+    book?.format === 'epub' || 
+    book?.filename?.toLowerCase().endsWith('.epub') || 
+    book?.progress?.cfi
+  );
+  const hasReadingProgress = Boolean(
+    book?.progress && (
+      book.progress.status === 'in_progress' ||
+      Boolean(book.progress.cfi) ||
+      (book.progress.percent && book.progress.percent > 0) ||
+      (!isEpub && book.progress.page && book.progress.page > 1)
+    )
+  );
+  const isNotStarted = !isCompleted && !hasReadingProgress;
 
   return (
     <div

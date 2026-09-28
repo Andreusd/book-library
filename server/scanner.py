@@ -262,6 +262,10 @@ class LibraryScanner:
             custom_name = self.get_shelf_display_name("_general", lib_id)
             orig_name = "General"
             icon = self.get_shelf_icon("_general", lib_id) or "BookOpen"
+            sample_covers = [
+                f"/api/cover/{compute_book_id('_general', f, lib_id)}"
+                for f in root_books[:4]
+            ]
             shelves.append({
                 "id": "_general",
                 "name": custom_name,
@@ -272,20 +276,27 @@ class LibraryScanner:
                 "book_count": len(root_books),
                 "icon": icon,
                 "library_id": lib_id,
+                "sample_covers": sample_covers,
             })
 
         for entry in entries:
             full_path = os.path.join(lib_path, entry)
             if os.path.isdir(full_path):
                 try:
-                    book_count = sum(1 for f in os.listdir(full_path) if f.lower().endswith(BOOK_EXTENSIONS))
+                    book_files = sorted([f for f in os.listdir(full_path) if f.lower().endswith(BOOK_EXTENSIONS)])
+                    book_count = len(book_files)
                 except Exception:
+                    book_files = []
                     book_count = 0
 
                 if book_count > 0:
                     orig_name = format_shelf_name(entry)
                     custom_name = self.get_shelf_display_name(entry, lib_id)
                     icon = self.get_shelf_icon(entry, lib_id)
+                    sample_covers = [
+                        f"/api/cover/{compute_book_id(entry, f, lib_id)}"
+                        for f in book_files[:4]
+                    ]
                     shelves.append({
                         "id": entry,
                         "name": custom_name,
@@ -296,6 +307,7 @@ class LibraryScanner:
                         "book_count": book_count,
                         "icon": icon,
                         "library_id": lib_id,
+                        "sample_covers": sample_covers,
                     })
         return shelves
 

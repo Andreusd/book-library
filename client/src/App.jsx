@@ -9,6 +9,7 @@ import Sidebar from './components/Sidebar';
 import BookCard from './components/BookCard';
 import ContinueReading from './components/ContinueReading';
 import FavoriteBooks from './components/FavoriteBooks';
+import LibraryFolders from './components/LibraryFolders';
 import Reader from './components/Reader';
 import ContextMenu from './components/ContextMenu';
 import ShelfContextMenu from './components/ShelfContextMenu';
@@ -86,6 +87,22 @@ export default function App() {
   const [favoriteIds, setFavoriteIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [showFileExtension, setShowFileExtension] = useState(() => {
+    try {
+      const saved = localStorage.getItem('show_file_extension');
+      return saved !== null ? saved === 'true' : true;
+    } catch (e) {
+      return true;
+    }
+  });
+
+  const handleToggleFileExtension = useCallback((enabled) => {
+    setShowFileExtension(enabled);
+    try {
+      localStorage.setItem('show_file_extension', String(enabled));
+    } catch (e) {}
+  }, []);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [sortBy, setSortBy] = useState('title_asc');
@@ -174,6 +191,19 @@ export default function App() {
         setActiveLibraryId(data.active_library_id || '');
       })
       .catch(err => console.error('Failed to load libraries:', err));
+
+    fetch('/api/settings')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.show_file_extension !== undefined) {
+          const localSaved = localStorage.getItem('show_file_extension');
+          if (localSaved === null) {
+            setShowFileExtension(data.show_file_extension);
+            localStorage.setItem('show_file_extension', String(data.show_file_extension));
+          }
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // Load Shelves & Totals
@@ -439,7 +469,8 @@ export default function App() {
         page: 1,
         total_pages: book.progress?.total_pages || 1,
         percent: 0,
-        status: 'not_started'
+        status: 'not_started',
+        cfi: null
       };
       handleProgressUpdate(book.id, resetProgress);
     } else if (status === 'completed') {
@@ -696,6 +727,7 @@ export default function App() {
               onSelectBook={(book) => openReader(book)} 
               onContextMenu={handleContextMenu}
               onViewAll={() => navigateToShelf('continue-reading')}
+              showFileExtension={showFileExtension}
             />
           )}
 
@@ -707,6 +739,17 @@ export default function App() {
               onContextMenu={handleContextMenu}
               onToggleFavorite={handleToggleFavorite}
               onViewAll={() => navigateToShelf('favorites')}
+              showFileExtension={showFileExtension}
+            />
+          )}
+
+          {/* Folders in Library (displayed when browsing all books without active search) */}
+          {!selectedShelf && !debouncedQuery && shelves.length > 0 && (
+            <LibraryFolders
+              folders={shelves}
+              books={books}
+              onSelectFolder={(folderId) => navigateToShelf(folderId)}
+              onContextMenu={handleShelfContextMenu}
             />
           )}
 
@@ -720,12 +763,14 @@ export default function App() {
                     ? t('favorites') 
                     : currentShelfObj 
                       ? currentShelfObj.name 
-                      : t('allBooks')}
+                      : t('allBooksLibrary')}
               </h2>
               <p className="text-xs text-neutral-400 mt-0.5">
                 {debouncedQuery 
                   ? t('searchResults', { query: debouncedQuery, count: books.length })
-                  : t('booksInShelf', { count: books.length })}
+                  : !selectedShelf
+                    ? t('booksInLibrary', { count: books.length })
+                    : t('booksInShelf', { count: books.length })}
               </p>
             </div>
           </div>
@@ -751,6 +796,7 @@ export default function App() {
                   onSelectBook={(selected) => openReader(selected)}
                   onContextMenu={handleContextMenu}
                   onToggleFavorite={handleToggleFavorite}
+                  showFileExtension={showFileExtension}
                 />
               ))}
             </div>
@@ -809,6 +855,7 @@ export default function App() {
           onClose={closeReader}
           onProgressUpdate={handleProgressUpdate}
           onToggleFavorite={handleToggleFavorite}
+          showFileExtension={showFileExtension}
         />
       )}
 
@@ -859,6 +906,8 @@ export default function App() {
       <SettingsModal
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
+        showFileExtension={showFileExtension}
+        onToggleFileExtension={handleToggleFileExtension}
         onLibraryChanged={(newActiveId) => {
           loadLibraries();
           const targetId = newActiveId || activeLibraryId;

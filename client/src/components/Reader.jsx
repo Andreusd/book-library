@@ -95,9 +95,20 @@ export default function Reader({
   onClose, 
   onProgressUpdate, 
   onToggleFavorite, 
-  isFavorite 
+  isFavorite,
+  showFileExtension
 }) {
   const isEpub = book?.format === 'epub' || book?.filename?.toLowerCase().endsWith('.epub');
+
+  const shouldShowExtension = showFileExtension !== undefined 
+    ? Boolean(showFileExtension) 
+    : (() => {
+        try {
+          return localStorage.getItem('show_file_extension') !== 'false';
+        } catch (e) {
+          return true;
+        }
+      })();
 
   if (isEpub) {
     return (
@@ -107,6 +118,7 @@ export default function Reader({
         onProgressUpdate={onProgressUpdate}
         onToggleFavorite={onToggleFavorite}
         isFavorite={isFavorite}
+        showFileExtension={shouldShowExtension}
       />
     );
   }
@@ -1101,9 +1113,14 @@ export default function Reader({
             <h1 className="text-sm font-semibold truncate text-neutral-100" title={book.title}>
               {book.title}
             </h1>
-            <p className="text-xs text-neutral-400 truncate">
-              {book.shelf_display} • {book.size_formatted}
-            </p>
+            <div className="flex items-center gap-1.5 text-xs text-neutral-400 truncate">
+              <span className="truncate">{book.shelf_display} • {book.size_formatted}</span>
+              {shouldShowExtension && (
+                <span className="px-1 py-0.2 text-[8px] font-bold rounded bg-rose-950 text-rose-300 border border-rose-500/40 uppercase shrink-0">
+                  PDF
+                </span>
+              )}
+            </div>
           </div>
         </div>
 

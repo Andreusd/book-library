@@ -8,7 +8,8 @@ export default function FavoriteBooks({
   onSelectBook, 
   onContextMenu, 
   onToggleFavorite,
-  onViewAll
+  onViewAll,
+  showFileExtension
 }) {
   const { t } = useI18n();
 
@@ -52,6 +53,7 @@ export default function FavoriteBooks({
                 onSelectBook={onSelectBook}
                 onContextMenu={onContextMenu}
                 onToggleFavorite={onToggleFavorite}
+                showFileExtension={showFileExtension}
               />
             </div>
           );

@@ -31,6 +31,19 @@ export const translations = {
     continueReading: 'Continue Reading',
     booksInProgress: '({count} books in progress)',
     pageOf: 'Page {page} of {total}',
+    progress: 'Progress',
+
+    // Folders in library
+    foldersInLibrary: 'Folders in library',
+    foldersCount: '({count} folders)',
+    folderBooksCount: '{count} books',
+    folderBooksCount_one: '1 book',
+    viewAllFolders: 'View all',
+    collapseFolders: 'Show carousel',
+
+    // All books in library
+    allBooksLibrary: 'All books in library',
+    booksInLibrary: '{count} books in library',
 
     // Favorites
     favorites: 'Favorites',
@@ -167,6 +180,9 @@ export const translations = {
     notADirectory: 'Path is a file, not a directory',
     saveSettings: 'Save & Rescan',
     settingsSaved: 'Settings saved successfully!',
+    displayPreferences: 'Display Preferences',
+    showFileExtension: 'Show file extension',
+    showFileExtensionDesc: 'Display format badges (EPUB, PDF) on book cards',
   },
   pt: {
     // Sidebar
@@ -198,6 +214,19 @@ export const translations = {
     continueReading: 'Continuar Lendo',
     booksInProgress: '({count} livros em progresso)',
     pageOf: 'Pág. {page} de {total}',
+    progress: 'Progresso',
+
+    // Folders in library
+    foldersInLibrary: 'Pastas na biblioteca',
+    foldersCount: '({count} pastas)',
+    folderBooksCount: '{count} livros',
+    folderBooksCount_one: '1 livro',
+    viewAllFolders: 'Ver todos',
+    collapseFolders: 'Mostrar carrossel',
+
+    // All books in library
+    allBooksLibrary: 'Todos os livros na biblioteca',
+    booksInLibrary: '{count} livros na biblioteca',
 
     // Favorites
     favorites: 'Favoritos',
@@ -334,6 +363,9 @@ export const translations = {
     notADirectory: 'O caminho informado é um arquivo, não uma pasta',
     saveSettings: 'Salvar e Reexaminar',
     settingsSaved: 'Configurações salvas com sucesso!',
+    displayPreferences: 'Preferências de Exibição',
+    showFileExtension: 'Mostrar extensão do arquivo',
+    showFileExtensionDesc: 'Exibir tags de formato (EPUB, PDF) nos cards dos livros',
   }
 };
 

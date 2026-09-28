@@ -7,7 +7,8 @@ export default function BookCard({
   isFavorite, 
   onSelectBook, 
   onContextMenu, 
-  onToggleFavorite 
+  onToggleFavorite,
+  showFileExtension
 }) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -15,9 +16,27 @@ export default function BookCard({
 
   const isFav = isFavorite !== undefined ? isFavorite : Boolean(book.is_favorite);
   const isEpub = book.format === 'epub' || book.filename?.toLowerCase().endsWith('.epub');
+  const isPdf = book.format === 'pdf' || book.filename?.toLowerCase().endsWith('.pdf') || !isEpub;
+  const shouldShowExtension = showFileExtension !== undefined 
+    ? Boolean(showFileExtension) 
+    : (() => {
+        try {
+          return localStorage.getItem('show_file_extension') !== 'false';
+        } catch (e) {
+          return true;
+        }
+      })();
   const isFinished = Boolean(book.progress && (book.progress.percent >= 100 || book.progress.status === 'completed'));
-  const isNotStarted = Boolean(!book.progress || book.progress.status === 'not_started' || (!isEpub && book.progress.page <= 1 && !isFinished));
-  const hasProgress = !isNotStarted && Boolean(book.progress && (book.progress.percent > 0 || book.progress.page > 1 || isFinished));
+  const hasReadingProgress = Boolean(
+    book.progress && (
+      book.progress.status === 'in_progress' ||
+      Boolean(book.progress.cfi) ||
+      (book.progress.percent && book.progress.percent > 0) ||
+      (!isEpub && book.progress.page && book.progress.page > 1)
+    )
+  );
+  const isNotStarted = !isFinished && !hasReadingProgress;
+  const hasProgress = !isNotStarted && (hasReadingProgress || isFinished);
   const percent = book.progress ? Math.round(book.progress.percent) : 0;
 
   const handleContextMenu = (e) => {
@@ -140,9 +159,14 @@ export default function BookCard({
         <div className="flex items-center justify-between mt-1 text-[11px] text-neutral-500">
           <span className="truncate max-w-[65%]">{book.shelf_display || book.folder_display}</span>
           <div className="flex items-center gap-1.5 shrink-0">
-            {isEpub && (
+            {shouldShowExtension && isEpub && (
               <span className="px-1.5 py-0.2 text-[9px] font-bold tracking-wider rounded bg-indigo-950/80 border border-indigo-500/40 text-indigo-300 uppercase">
                 EPUB
+              </span>
+            )}
+            {shouldShowExtension && isPdf && (
+              <span className="px-1.5 py-0.2 text-[9px] font-bold tracking-wider rounded bg-rose-950/80 border border-rose-500/40 text-rose-300 uppercase">
+                PDF
               </span>
             )}
             <span>{book.size_formatted}</span>

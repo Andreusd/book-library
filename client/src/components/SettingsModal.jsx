@@ -1,15 +1,49 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Settings, Folder, CheckCircle, AlertCircle, AlertTriangle, 
-  X, Plus, Trash2, Edit3, Check, Globe, ShieldCheck, ArrowRight
+  X, Plus, Trash2, Edit3, Check, Globe, ShieldCheck, ArrowRight, Sliders
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 
-export default function SettingsModal({ isOpen, onClose, onLibraryChanged }) {
+export default function SettingsModal({ 
+  isOpen, 
+  onClose, 
+  onLibraryChanged,
+  showFileExtension,
+  onToggleFileExtension
+}) {
   const { t, lang, setLang } = useI18n();
   const [libraries, setLibraries] = useState([]);
   const [activeLibraryId, setActiveLibraryId] = useState('');
   const [loading, setLoading] = useState(true);
+
+  // Local fallback for showFileExtension
+  const [localShowFileExtension, setLocalShowFileExtension] = useState(() => {
+    try {
+      const saved = localStorage.getItem('show_file_extension');
+      return saved !== null ? saved === 'true' : true;
+    } catch (e) {
+      return true;
+    }
+  });
+
+  const isShowExt = showFileExtension !== undefined ? showFileExtension : localShowFileExtension;
+
+  const handleToggleShowFileExtension = (e) => {
+    const val = e.target.checked;
+    setLocalShowFileExtension(val);
+    try {
+      localStorage.setItem('show_file_extension', String(val));
+    } catch (err) {}
+    if (onToggleFileExtension) {
+      onToggleFileExtension(val);
+    }
+    fetch('/api/settings/display', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ show_file_extension: val })
+    }).catch(() => {});
+  };
 
   // Add Library form state
   const [showAddForm, setShowAddForm] = useState(false);
@@ -322,6 +356,43 @@ export default function SettingsModal({ isOpen, onClose, onLibraryChanged }) {
                 </div>
                 {lang === 'en' && <Check className="w-3.5 h-3.5 text-amber-400" />}
               </button>
+            </div>
+          </div>
+
+          {/* Display Preferences */}
+          <div className="space-y-2.5">
+            <label className="block text-xs font-semibold text-neutral-300 flex items-center gap-1.5">
+              <Sliders className="w-3.5 h-3.5 text-amber-400" />
+              <span>{t('displayPreferences')}</span>
+            </label>
+            <div className="p-3.5 rounded-xl bg-neutral-950/60 border border-neutral-800 flex items-center justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-neutral-200 block">
+                    {t('showFileExtension')}
+                  </span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="px-1.5 py-0.2 text-[8px] font-bold rounded bg-indigo-950/80 border border-indigo-500/40 text-indigo-300 uppercase">
+                      EPUB
+                    </span>
+                    <span className="px-1.5 py-0.2 text-[8px] font-bold rounded bg-rose-950/80 border border-rose-500/40 text-rose-300 uppercase">
+                      PDF
+                    </span>
+                  </div>
+                </div>
+                <span className="text-[11px] text-neutral-400 block mt-0.5">
+                  {t('showFileExtensionDesc')}
+                </span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  checked={isShowExt}
+                  onChange={handleToggleShowFileExtension}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500" />
+              </label>
             </div>
           </div>
 

@@ -84,6 +84,9 @@ class ToggleFavoritePayload(BaseModel):
 class SettingsPayload(BaseModel):
     library_path: str
 
+class DisplaySettingsPayload(BaseModel):
+    show_file_extension: bool
+
 class ValidatePathPayload(BaseModel):
     path: str
 
@@ -217,7 +220,14 @@ def get_settings():
         "active_library_id": scanner.config_mgr.get_active_library_id(),
         "libraries": scanner.config_mgr.get_libraries(),
         "validation": validation,
+        "show_file_extension": scanner.config_mgr.get_show_file_extension(),
     }
+
+@app.post("/api/settings/display")
+def update_display_settings(payload: DisplaySettingsPayload):
+    """Updates display preferences such as showing/hiding file extension tags."""
+    val = scanner.config_mgr.set_show_file_extension(payload.show_file_extension)
+    return {"status": "ok", "show_file_extension": val}
 
 @app.post("/api/settings/validate")
 def validate_settings_path(payload: ValidatePathPayload):

@@ -2,14 +2,24 @@ import React from 'react';
 import { Bookmark, ChevronRight } from 'lucide-react';
 import { useI18n } from '../i18n';
 
-export default function ContinueReading({ books, onSelectBook, onContextMenu, onViewAll }) {
+export default function ContinueReading({ books, onSelectBook, onContextMenu, onViewAll, showFileExtension }) {
   const { t } = useI18n();
+
+  const shouldShowExtension = showFileExtension !== undefined 
+    ? Boolean(showFileExtension) 
+    : (() => {
+        try {
+          return localStorage.getItem('show_file_extension') !== 'false';
+        } catch (e) {
+          return true;
+        }
+      })();
 
   const inProgressBooks = (books || []).filter(
     b => b.progress && 
          b.progress.status !== 'not_started' && 
          b.progress.status !== 'completed' && 
-         b.progress.page > 1 && 
+         (b.progress.page > 1 || Boolean(b.progress.cfi) || b.progress.percent > 0) && 
          b.progress.percent < 100
   );
 
@@ -70,9 +80,20 @@ export default function ContinueReading({ books, onSelectBook, onContextMenu, on
               {/* Info & Progress */}
               <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
                 <div>
-                  <span className="text-[10px] font-medium text-emerald-500/90 uppercase tracking-wider">
-                    {book.shelf_display}
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] font-medium text-emerald-500/90 uppercase tracking-wider">
+                      {book.shelf_display}
+                    </span>
+                    {shouldShowExtension && (
+                      <span className={`px-1.5 py-0.2 text-[8px] font-bold rounded uppercase ${
+                        (book.format === 'epub' || book.filename?.toLowerCase().endsWith('.epub'))
+                          ? 'bg-indigo-950/80 border border-indigo-500/40 text-indigo-300'
+                          : 'bg-rose-950/80 border border-rose-500/40 text-rose-300'
+                      }`}>
+                        {(book.format === 'epub' || book.filename?.toLowerCase().endsWith('.epub')) ? 'EPUB' : 'PDF'}
+                      </span>
+                    )}
+                  </div>
                   <h3 className="text-xs font-semibold text-neutral-200 group-hover:text-emerald-400 transition-colors line-clamp-2 leading-tight mt-0.5">
                     {book.title}
                   </h3>
@@ -81,7 +102,9 @@ export default function ContinueReading({ books, onSelectBook, onContextMenu, on
                 <div className="mt-2">
                   <div className="flex items-center justify-between text-[11px] text-neutral-400 mb-1.5">
                     <span>
-                      {t('pageOf', { page: book.progress?.page || 1, total: book.progress?.total_pages || '?' })}
+                      {(book.format === 'epub' || book.filename?.toLowerCase().endsWith('.epub')) && (!book.progress?.page || book.progress.page <= 1)
+                        ? t('progress')
+                        : t('pageOf', { page: book.progress?.page || 1, total: book.progress?.total_pages || '?' })}
                     </span>
                     <span className="font-semibold text-emerald-400">{percent}%</span>
                   </div>
