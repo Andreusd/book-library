@@ -230,6 +230,23 @@ export default function Reader({
       return false;
     }
   });
+  const [bookTextureEnabled, setBookTextureEnabled] = useState(() => {
+    try {
+      return localStorage.getItem('reader_book_texture') !== 'false';
+    } catch (e) {
+      return true;
+    }
+  });
+
+  const toggleBookTexture = () => {
+    setBookTextureEnabled(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('reader_book_texture', String(next));
+      } catch (e) {}
+      return next;
+    });
+  };
 
   const toggleTrackpadSwipe = () => {
     setTrackpadSwipeEnabled(prev => {
@@ -1056,8 +1073,31 @@ export default function Reader({
   const currentProgressPage = isDualPage && spread.right ? spread.right : currentPage;
   const progressPercent = totalPages > 0 ? Math.round((currentProgressPage / totalPages) * 100) : 0;
 
+  const btnClass = invertColors 
+    ? 'bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 hover:text-white' 
+    : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700 hover:text-neutral-900 border border-neutral-200';
+
+  const btnActiveClass = invertColors 
+    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
+    : 'bg-amber-500/20 text-amber-700 border border-amber-500/40';
+
+  const dividerClass = invertColors ? 'bg-neutral-700' : 'bg-neutral-300';
+  const textTitleClass = invertColors ? 'text-neutral-100' : 'text-neutral-900';
+  const textSubClass = invertColors ? 'text-neutral-400' : 'text-neutral-500';
+  const inputClass = invertColors 
+    ? 'bg-neutral-950 border-neutral-700 text-neutral-200 focus:border-amber-500' 
+    : 'bg-white border-neutral-300 text-neutral-900 focus:border-amber-500';
+  const pageSlashClass = invertColors ? 'text-neutral-400' : 'text-neutral-500';
+  const percentClass = invertColors ? 'text-amber-400' : 'text-amber-600 font-semibold';
+  const badgeClass = invertColors 
+    ? 'bg-rose-950 text-rose-300 border-rose-500/40' 
+    : 'bg-rose-50 text-rose-700 border-rose-200';
+  const floatingBtnClass = invertColors
+    ? 'bg-neutral-900/80 hover:bg-neutral-800 border-neutral-700 hover:border-amber-500/60 text-neutral-300 hover:text-white'
+    : 'bg-white/90 hover:bg-white border-neutral-300 hover:border-amber-500/60 text-neutral-700 hover:text-neutral-900 shadow-xl';
+
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-neutral-950 text-neutral-100 overflow-hidden overscroll-none touch-pan-y">
+    <div className={`fixed inset-0 z-50 flex flex-col ${invertColors ? 'bg-black text-neutral-100' : 'bg-white text-neutral-800'} overflow-hidden overscroll-none touch-pan-y transition-colors duration-300`}>
       {/* Top Header / Toolbar */}
       <header 
         onMouseEnter={() => {
@@ -1070,10 +1110,14 @@ export default function Reader({
             startHideTimer(3000, true);
           }
         }}
-        className={`h-14 px-4 bg-neutral-900 border-b border-neutral-800 flex items-center justify-between z-30 select-none transition-all duration-300 ease-in-out ${
+        className={`h-14 px-4 border-b flex items-center justify-between z-30 select-none transition-all duration-300 ease-in-out ${
+          invertColors 
+            ? 'bg-black border-neutral-900 text-neutral-200' 
+            : 'bg-white border-neutral-200 text-neutral-700'
+        } ${
           headerEnabled 
             ? 'relative shrink-0 translate-y-0 opacity-100 pointer-events-auto' 
-            : `fixed top-0 left-0 right-0 shadow-2xl shadow-black/80 ${
+            : `fixed top-0 left-0 right-0 ${invertColors ? 'shadow-2xl shadow-black/80' : 'shadow-md shadow-neutral-900/5'} ${
                 isHeaderShowing 
                   ? 'translate-y-0 opacity-100 pointer-events-auto' 
                   : '-translate-y-full opacity-0 pointer-events-none'
@@ -1084,7 +1128,7 @@ export default function Reader({
         <div className="flex items-center gap-2 sm:gap-3 min-w-0 max-w-[calc(50%-90px)] sm:max-w-[calc(50%-110px)] md:max-w-[calc(50%-130px)] z-10">
           <button 
             onClick={onClose}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 hover:text-white transition text-sm font-medium shrink-0"
+            className={`h-7 flex items-center gap-1.5 px-2.5 rounded-lg transition text-xs font-medium shrink-0 cursor-pointer ${btnClass}`}
             title={t('backToLibraryTitle')}
           >
             <ArrowLeft className="w-4 h-4" />
@@ -1095,28 +1139,25 @@ export default function Reader({
           {hasOutline && (
             <button
               onClick={() => setOutlineOpen(prev => !prev)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition shrink-0 ${
-                outlineOpen
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                  : 'bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 hover:text-white'
+              className={`h-7 w-7 flex items-center justify-center rounded-lg transition shrink-0 cursor-pointer ${
+                outlineOpen ? btnActiveClass : btnClass
               }`}
               title={outlineOpen ? t('hideIndex') : t('showIndex')}
             >
-              <ListTree className="w-4 h-4 text-amber-400" />
-              <span className="hidden md:inline">{t('index')}</span>
+              <ListTree className="w-4 h-4" />
             </button>
           )}
           
-          <div className="h-4 w-px bg-neutral-700 mx-0.5 hidden sm:block shrink-0" />
+          <div className={`h-4 w-px mx-0.5 hidden sm:block shrink-0 ${dividerClass}`} />
 
           <div className="min-w-0 flex-1">
-            <h1 className="text-sm font-semibold truncate text-neutral-100" title={book.title}>
+            <h1 className={`text-sm font-semibold truncate ${textTitleClass}`} title={book.title}>
               {book.title}
             </h1>
-            <div className="flex items-center gap-1.5 text-xs text-neutral-400 truncate">
+            <div className={`flex items-center gap-1.5 text-xs truncate ${textSubClass}`}>
               <span className="truncate">{book.shelf_display} • {book.size_formatted}</span>
               {shouldShowExtension && (
-                <span className="px-1 py-0.2 text-[8px] font-bold rounded bg-rose-950 text-rose-300 border border-rose-500/40 uppercase shrink-0">
+                <span className={`px-1 py-0.2 text-[8px] font-bold rounded uppercase shrink-0 border ${badgeClass}`}>
                   PDF
                 </span>
               )}
@@ -1129,7 +1170,7 @@ export default function Reader({
           <button 
             onClick={goToPrevPage}
             disabled={!hasPrev}
-            className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:hover:bg-neutral-800 transition cursor-pointer"
+            className={`h-7 w-7 flex items-center justify-center rounded-lg disabled:opacity-30 transition cursor-pointer ${btnClass}`}
             title={t('prevPageTitle')}
           >
             <ChevronLeft className="w-4 h-4" />
@@ -1141,22 +1182,22 @@ export default function Reader({
               value={pageInput}
               onChange={(e) => setPageInput(e.target.value)}
               onBlur={handlePageSubmit}
-              className="w-16 text-center py-1 bg-neutral-950 border border-neutral-700 rounded text-neutral-200 focus:border-amber-500 focus:outline-none"
+              className={`w-14 sm:w-16 h-7 text-center py-0 rounded focus:outline-none ${inputClass}`}
             />
-            <span className="text-neutral-400 mx-1.5">/</span>
-            <span className="text-neutral-400">{totalPages}</span>
+            <span className={`mx-1.5 ${pageSlashClass}`}>/</span>
+            <span className={pageSlashClass}>{totalPages}</span>
           </form>
 
           <button 
             onClick={goToNextPage}
             disabled={!hasNext}
-            className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 disabled:opacity-30 disabled:hover:bg-neutral-800 transition cursor-pointer"
+            className={`h-7 w-7 flex items-center justify-center rounded-lg disabled:opacity-30 transition cursor-pointer ${btnClass}`}
             title={t('nextPageTitle')}
           >
             <ChevronRight className="w-4 h-4" />
           </button>
 
-          <span className="text-xs font-medium text-amber-400 ml-1 hidden md:inline-block">
+          <span className={`text-xs ml-1 hidden md:inline-block ${percentClass}`}>
             {progressPercent}%
           </span>
         </div>
@@ -1166,7 +1207,7 @@ export default function Reader({
           {/* Zoom controls */}
           <button 
             onClick={() => setScale(s => Math.max(0.4, Number((s - 0.15).toFixed(2))))}
-            className="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition cursor-pointer"
+            className={`h-7 w-7 flex items-center justify-center rounded-lg transition cursor-pointer ${btnClass}`}
             title={t('zoomOutTitle')}
           >
             <ZoomOut className="w-4 h-4" />
@@ -1174,7 +1215,7 @@ export default function Reader({
           
           <button 
             onClick={handleResetZoom}
-            className="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition cursor-pointer hidden sm:inline-block"
+            className={`h-7 w-7 flex items-center justify-center rounded-lg transition cursor-pointer hidden sm:inline-flex ${btnClass}`}
             title={t('resetWidthTitle')}
           >
             <RotateCcw className="w-4 h-4" />
@@ -1182,7 +1223,7 @@ export default function Reader({
 
           <button 
             onClick={() => fitWidth()}
-            className="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition cursor-pointer hidden sm:inline-block"
+            className={`h-7 w-7 flex items-center justify-center rounded-lg transition cursor-pointer hidden sm:inline-flex ${btnClass}`}
             title={t('fitWidth')}
           >
             <StretchHorizontal className="w-4 h-4" />
@@ -1191,10 +1232,8 @@ export default function Reader({
           {/* Toggle Dual Page View */}
           <button 
             onClick={toggleDualPage}
-            className={`p-1.5 rounded-lg transition cursor-pointer hidden md:inline-block ${
-              isDualPage 
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
-                : 'hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200'
+            className={`h-7 w-7 flex items-center justify-center rounded-lg transition shrink-0 cursor-pointer hidden md:inline-flex ${
+              isDualPage ? btnActiveClass : btnClass
             }`}
             title={isDualPage ? t('singlePageMode') : t('dualPageMode')}
           >
@@ -1203,21 +1242,19 @@ export default function Reader({
 
           <button 
             onClick={() => setScale(s => Math.min(3.5, Number((s + 0.15).toFixed(2))))}
-            className="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition cursor-pointer"
+            className={`h-7 w-7 flex items-center justify-center rounded-lg transition cursor-pointer ${btnClass}`}
             title={t('zoomInTitle')}
           >
             <ZoomIn className="w-4 h-4" />
           </button>
 
-          <div className="h-4 w-px bg-neutral-700 mx-1 hidden sm:block" />
+          <div className={`h-4 w-px mx-1 hidden sm:block ${dividerClass}`} />
 
           {/* Toggle Header Auto-Hide / Keep Header Visible */}
           <button 
             onClick={toggleHeaderEnabled}
-            className={`p-1.5 rounded-lg transition cursor-pointer ${
-              !headerEnabled 
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
-                : 'hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200'
+            className={`h-7 w-7 flex items-center justify-center rounded-lg transition shrink-0 cursor-pointer ${
+              !headerEnabled ? btnActiveClass : btnClass
             }`}
             title={headerEnabled ? t('unpinHeaderTitle') : t('pinHeaderTitle')}
           >
@@ -1231,23 +1268,21 @@ export default function Reader({
           {/* Invert Dark / Light */}
           <button 
             onClick={() => setInvertColors(!invertColors)}
-            className={`p-1.5 rounded-lg transition cursor-pointer ${
-              invertColors 
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
-                : 'hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200'
+            className={`h-7 w-7 flex items-center justify-center rounded-lg transition shrink-0 cursor-pointer ${
+              invertColors ? btnActiveClass : btnClass
             }`}
             title={t('nightModeTitle')}
           >
-            <Moon className="w-4 h-4" />
+            {invertColors ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
           </button>
 
           {/* Favorite Toggle */}
           <button 
             onClick={handleToggleFav}
-            className={`p-1.5 rounded-lg transition cursor-pointer ${
+            className={`h-7 w-7 flex items-center justify-center rounded-lg transition shrink-0 cursor-pointer ${
               favState 
-                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' 
-                : 'hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200'
+                ? 'bg-rose-500/20 text-rose-500 border border-rose-500/30' 
+                : btnClass
             }`}
             title={favState ? t('removeFromFavorites') : t('addToFavorites')}
           >
@@ -1257,20 +1292,18 @@ export default function Reader({
           {/* Comments & Highlights Drawer Toggle */}
           <button 
             onClick={() => setCommentsDrawerOpen(prev => !prev)}
-            className={`p-1.5 rounded-lg transition cursor-pointer ${
-              commentsDrawerOpen 
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
-                : 'hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200'
+            className={`h-7 w-7 flex items-center justify-center rounded-lg transition shrink-0 cursor-pointer ${
+              commentsDrawerOpen ? btnActiveClass : btnClass
             }`}
             title={commentsDrawerOpen ? t('hideComments') : (annotations.length > 0 ? `${t('showComments')} (${annotations.length})` : t('showComments'))}
           >
-            <MessageSquare className="w-4 h-4 text-amber-400" />
+            <MessageSquare className="w-4 h-4" />
           </button>
 
           {/* Fullscreen */}
           <button 
             onClick={toggleFullscreen}
-            className="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition cursor-pointer"
+            className={`h-7 w-7 flex items-center justify-center rounded-lg transition cursor-pointer ${btnClass}`}
             title={t('fullscreenTitle')}
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -1280,10 +1313,8 @@ export default function Reader({
           <div className="relative">
             <button 
               onClick={() => setReaderSettingsOpen(prev => !prev)}
-              className={`p-1.5 rounded-lg transition cursor-pointer ${
-                readerSettingsOpen 
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
-                  : 'hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200'
+              className={`h-7 w-7 flex items-center justify-center rounded-lg transition shrink-0 cursor-pointer ${
+                readerSettingsOpen ? btnActiveClass : btnClass
               }`}
               title={t('readerSettings')}
             >
@@ -1296,15 +1327,19 @@ export default function Reader({
                   className="fixed inset-0 z-40 bg-transparent" 
                   onClick={() => setReaderSettingsOpen(false)}
                 />
-                <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-neutral-900 border border-neutral-700 rounded-2xl shadow-2xl shadow-black/80 p-3.5 z-50 text-left select-none animate-in fade-in zoom-in-95 duration-150">
-                  <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-neutral-800">
+                <div className={`absolute right-0 top-full mt-2 w-72 sm:w-80 rounded-2xl p-3.5 z-50 text-left select-none animate-in fade-in zoom-in-95 duration-150 border ${
+                  invertColors 
+                    ? 'bg-neutral-900 border-neutral-700 shadow-2xl shadow-black/80 text-neutral-100' 
+                    : 'bg-white border-neutral-200 shadow-2xl shadow-neutral-900/15 text-neutral-800'
+                }`}>
+                  <div className={`flex items-center justify-between pb-2.5 mb-2.5 border-b ${invertColors ? 'border-neutral-800' : 'border-neutral-200'}`}>
                     <div className="flex items-center gap-2">
-                      <SlidersHorizontal className="w-4 h-4 text-amber-400" />
-                      <h3 className="text-xs font-bold text-neutral-100 uppercase tracking-wider">{t('readerSettings')}</h3>
+                      <SlidersHorizontal className="w-4 h-4 text-amber-500" />
+                      <h3 className={`text-xs font-bold uppercase tracking-wider ${invertColors ? 'text-neutral-100' : 'text-neutral-900'}`}>{t('readerSettings')}</h3>
                     </div>
                     <button 
                       onClick={() => setReaderSettingsOpen(false)}
-                      className="p-1 rounded-md text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 transition cursor-pointer"
+                      className={`p-1 rounded-md transition cursor-pointer ${invertColors ? 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800' : 'text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100'}`}
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -1312,12 +1347,12 @@ export default function Reader({
 
                   <div className="space-y-1.5">
                     {/* Toggle Trackpad Swipe */}
-                    <label className="flex items-start justify-between gap-3 p-2.5 rounded-xl hover:bg-neutral-800/60 transition-colors cursor-pointer group">
+                    <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
                       <div className="min-w-0 flex-1">
-                        <span className="text-xs font-semibold text-neutral-100 block group-hover:text-amber-300 transition-colors">
+                        <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
                           {t('trackpadSwipe')}
                         </span>
-                        <span className="text-[11px] text-neutral-300 leading-snug block mt-0.5">
+                        <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
                           {t('trackpadSwipeDesc')}
                         </span>
                       </div>
@@ -1333,12 +1368,12 @@ export default function Reader({
                     </label>
 
                     {/* Toggle Floating Side Buttons */}
-                    <label className="flex items-start justify-between gap-3 p-2.5 rounded-xl hover:bg-neutral-800/60 transition-colors cursor-pointer group">
+                    <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
                       <div className="min-w-0 flex-1">
-                        <span className="text-xs font-semibold text-neutral-100 block group-hover:text-amber-300 transition-colors">
+                        <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
                           {t('floatingSideButtons')}
                         </span>
-                        <span className="text-[11px] text-neutral-300 leading-snug block mt-0.5">
+                        <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
                           {t('floatingSideButtonsDesc')}
                         </span>
                       </div>
@@ -1354,12 +1389,12 @@ export default function Reader({
                     </label>
 
                     {/* Toggle Up/Down Arrow Page Flip */}
-                    <label className="flex items-start justify-between gap-3 p-2.5 rounded-xl hover:bg-neutral-800/60 transition-colors cursor-pointer group">
+                    <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
                       <div className="min-w-0 flex-1">
-                        <span className="text-xs font-semibold text-neutral-100 block group-hover:text-amber-300 transition-colors">
+                        <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
                           {t('upDownPageFlip')}
                         </span>
-                        <span className="text-[11px] text-neutral-300 leading-snug block mt-0.5">
+                        <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
                           {t('upDownPageFlipDesc')}
                         </span>
                       </div>
@@ -1375,12 +1410,12 @@ export default function Reader({
                     </label>
 
                     {/* Toggle Dual Page View */}
-                    <label className="flex items-start justify-between gap-3 p-2.5 rounded-xl hover:bg-neutral-800/60 transition-colors cursor-pointer group">
+                    <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
                       <div className="min-w-0 flex-1">
-                        <span className="text-xs font-semibold text-neutral-100 block group-hover:text-amber-300 transition-colors">
+                        <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
                           {t('dualPageSetting')}
                         </span>
-                        <span className="text-[11px] text-neutral-300 leading-snug block mt-0.5">
+                        <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
                           {t('dualPageSettingDesc')}
                         </span>
                       </div>
@@ -1397,12 +1432,12 @@ export default function Reader({
 
                     {/* Toggle Cover Page Alone (when in dual page view) */}
                     {isDualPage && (
-                      <label className="flex items-start justify-between gap-3 p-2.5 rounded-xl hover:bg-neutral-800/60 transition-colors cursor-pointer group pl-5 border-l-2 border-amber-500/40 ml-1">
+                      <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group pl-5 border-l-2 border-amber-500/40 ml-1 ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
                         <div className="min-w-0 flex-1">
-                          <span className="text-xs font-semibold text-neutral-100 block group-hover:text-amber-300 transition-colors">
+                          <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
                             {t('dualCoverStandalone')}
                           </span>
-                          <span className="text-[11px] text-neutral-300 leading-snug block mt-0.5">
+                          <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
                             {t('dualCoverStandaloneDesc')}
                           </span>
                         </div>
@@ -1418,13 +1453,34 @@ export default function Reader({
                       </label>
                     )}
 
-                    {/* Toggle Auto-Hide Header */}
-                    <label className="flex items-start justify-between gap-3 p-2.5 rounded-xl hover:bg-neutral-800/60 transition-colors cursor-pointer group">
+                    {/* Toggle Book Spine Texture */}
+                    <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
                       <div className="min-w-0 flex-1">
-                        <span className="text-xs font-semibold text-neutral-100 block group-hover:text-amber-300 transition-colors">
+                        <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
+                          {t('bookTexture')}
+                        </span>
+                        <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                          {t('bookTextureDesc')}
+                        </span>
+                      </div>
+                      <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                        <input 
+                          type="checkbox"
+                          checked={bookTextureEnabled}
+                          onChange={toggleBookTexture}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
+                      </div>
+                    </label>
+
+                    {/* Toggle Auto-Hide Header */}
+                    <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
+                      <div className="min-w-0 flex-1">
+                        <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
                           {t('autoHideHeader')}
                         </span>
-                        <span className="text-[11px] text-neutral-300 leading-snug block mt-0.5">
+                        <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
                           {t('autoHideHeaderDesc')}
                         </span>
                       </div>
@@ -1447,7 +1503,7 @@ export default function Reader({
       </header>
 
       {/* Main Reader Stage */}
-      <div className="relative flex-1 flex overflow-hidden bg-neutral-900">
+      <div className={`relative flex-1 flex overflow-hidden ${invertColors ? 'bg-black' : 'bg-white'}`}>
         {/* Toggleable Left Index / Table of Contents Drawer */}
         {hasOutline && (
           <PdfOutline
@@ -1475,7 +1531,7 @@ export default function Reader({
             ) : (
               <div className="min-h-full flex justify-center items-start">
                 {isDualPage ? (
-                  <div className="flex items-start justify-center shadow-2xl">
+                  <div className={`flex items-start justify-center ${bookTextureEnabled ? 'shadow-2xl' : 'shadow-md'}`}>
                     {spread.left && (
                       <PdfPageView
                         pdfDoc={pdfDoc}
@@ -1487,6 +1543,7 @@ export default function Reader({
                         onUpdateComment={handleUpdateComment}
                         onDeleteAnnotation={handleDeleteAnnotation}
                         pageSide={spread.right ? 'left' : 'single'}
+                        showBookTexture={bookTextureEnabled}
                       />
                     )}
                     {spread.right && (
@@ -1500,6 +1557,7 @@ export default function Reader({
                         onUpdateComment={handleUpdateComment}
                         onDeleteAnnotation={handleDeleteAnnotation}
                         pageSide={spread.left ? 'right' : 'single'}
+                        showBookTexture={bookTextureEnabled}
                       />
                     )}
                   </div>
@@ -1514,6 +1572,7 @@ export default function Reader({
                     onUpdateComment={handleUpdateComment}
                     onDeleteAnnotation={handleDeleteAnnotation}
                     pageSide="single"
+                    showBookTexture={bookTextureEnabled}
                   />
                 )}
               </div>
@@ -1528,11 +1587,11 @@ export default function Reader({
                 e.stopPropagation();
                 goToPrevPage();
               }}
-              className="absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 z-20 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-neutral-900/80 hover:bg-neutral-800 backdrop-blur-md border border-neutral-700 hover:border-amber-500/60 text-neutral-300 hover:text-white shadow-2xl flex items-center justify-center transition-all duration-200 opacity-60 hover:opacity-100 sm:opacity-0 sm:group-hover/stage:opacity-80 sm:hover:!opacity-100 hover:scale-110 active:scale-95 cursor-pointer select-none"
+              className={`absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 z-20 w-11 h-11 sm:w-12 sm:h-12 rounded-full backdrop-blur-md border shadow-2xl flex items-center justify-center transition-all duration-200 opacity-60 hover:opacity-100 sm:opacity-0 sm:group-hover/stage:opacity-80 sm:hover:!opacity-100 hover:scale-110 active:scale-95 cursor-pointer select-none ${floatingBtnClass}`}
               title={t('prevPageTitle')}
               aria-label={t('prevPageTitle')}
             >
-              <ChevronLeft className="w-6 h-6 sm:w-7 sm:h-7 text-neutral-300 hover:text-amber-400 transition-colors" />
+              <ChevronLeft className={`w-6 h-6 sm:w-7 sm:h-7 transition-colors ${invertColors ? 'text-neutral-300 hover:text-amber-400' : 'text-neutral-600 hover:text-amber-600'}`} />
             </button>
           )}
 
@@ -1544,11 +1603,11 @@ export default function Reader({
                 e.stopPropagation();
                 goToNextPage();
               }}
-              className="absolute right-3 sm:right-5 top-1/2 -translate-y-1/2 z-20 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-neutral-900/80 hover:bg-neutral-800 backdrop-blur-md border border-neutral-700 hover:border-amber-500/60 text-neutral-300 hover:text-white shadow-2xl flex items-center justify-center transition-all duration-200 opacity-60 hover:opacity-100 sm:opacity-0 sm:group-hover/stage:opacity-80 sm:hover:!opacity-100 hover:scale-110 active:scale-95 cursor-pointer select-none"
+              className={`absolute right-3 sm:right-5 top-1/2 -translate-y-1/2 z-20 w-11 h-11 sm:w-12 sm:h-12 rounded-full backdrop-blur-md border shadow-2xl flex items-center justify-center transition-all duration-200 opacity-60 hover:opacity-100 sm:opacity-0 sm:group-hover/stage:opacity-80 sm:hover:!opacity-100 hover:scale-110 active:scale-95 cursor-pointer select-none ${floatingBtnClass}`}
               title={t('nextPageTitle')}
               aria-label={t('nextPageTitle')}
             >
-              <ChevronRight className="w-6 h-6 sm:w-7 sm:h-7 text-neutral-300 hover:text-amber-400 transition-colors" />
+              <ChevronRight className={`w-6 h-6 sm:w-7 sm:h-7 transition-colors ${invertColors ? 'text-neutral-300 hover:text-amber-400' : 'text-neutral-600 hover:text-amber-600'}`} />
             </button>
           )}
         </div>
@@ -1576,7 +1635,7 @@ export default function Reader({
       )}
 
       {/* Bottom Progress Bar */}
-      <div className="h-1 bg-neutral-950 w-full overflow-hidden select-none">
+      <div className={`h-1 w-full overflow-hidden select-none ${invertColors ? 'bg-black' : 'bg-neutral-200'}`}>
         <div 
           className="h-full bg-gradient-to-r from-amber-600 to-amber-400 transition-all duration-300"
           style={{ width: `${progressPercent}%` }}

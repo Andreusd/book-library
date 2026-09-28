@@ -117,12 +117,12 @@ export default function LibraryFolders({
                   onContextMenu(e, folder);
                 }
               }}
-              className={`group relative cursor-pointer bg-neutral-900/60 hover:bg-neutral-800/90 border border-neutral-800 hover:border-amber-500/40 rounded-2xl p-3.5 sm:p-4 flex flex-col items-center justify-between transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1 select-none ${
+              className={`group relative cursor-pointer bg-neutral-900/60 hover:bg-neutral-800/90 border border-neutral-800 hover:border-amber-500/40 rounded-2xl p-3.5 sm:p-4 flex flex-col items-center justify-between transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1 select-none isolate ${
                 !isGridView && folders.length > 4 ? 'w-44 sm:w-48 shrink-0' : 'w-full'
               }`}
             >
               {/* Thumbnail Stack Container */}
-              <div className="relative w-full h-36 sm:h-40 flex items-center justify-center my-1">
+              <div className="relative w-full h-36 sm:h-40 flex items-center justify-center my-1 isolate">
                 {covers.length === 0 ? (
                   /* Empty state placeholder */
                   <div className="w-20 aspect-[1/1.45] rounded-lg bg-neutral-800/40 border border-neutral-700/40 flex flex-col items-center justify-center text-neutral-500 gap-1.5 shadow-inner">

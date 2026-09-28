@@ -80,6 +80,8 @@ export const translations = {
     dualPageSettingDesc: 'Display two pages side-by-side like an open book',
     dualCoverStandalone: 'Cover Page Alone',
     dualCoverStandaloneDesc: 'Display the first page alone as the book cover',
+    bookTexture: 'Book Spine Texture',
+    bookTextureDesc: 'Show realistic book spine shadow and curvature in dual-page view',
     readerSettings: 'Reader Settings',
     trackpadSwipe: 'Two-Finger Trackpad Swipe',
     trackpadSwipeDesc: 'Swipe 2 fingers horizontally to flip pages',
@@ -183,6 +185,22 @@ export const translations = {
     displayPreferences: 'Display Preferences',
     showFileExtension: 'Show file extension',
     showFileExtensionDesc: 'Display format badges (EPUB, PDF) on book cards',
+
+    // Library Selection Screen
+    selectLibraryTitle: 'Select a Library',
+    selectLibrarySubtitle: 'Choose a library to browse your collection or add a new one',
+    openLibrary: 'Open Library',
+    allLibraries: 'All Libraries',
+    switchLibraryAction: 'Switch Library',
+    backToLibraries: 'Libraries',
+    addNewLibraryCard: 'Add New Library',
+    addNewLibraryCardDesc: 'Connect a folder on your computer containing PDF or EPUB books',
+    noLibrariesTitle: 'No libraries configured',
+    noLibrariesDesc: 'You haven’t configured any book libraries yet. Add your first folder to get started.',
+    folderCountBadge: '{count} folders',
+    folderCountBadge_one: '1 folder',
+    bookCountBadge: '{count} books',
+    bookCountBadge_one: '1 book',
   },
   pt: {
     // Sidebar
@@ -263,6 +281,8 @@ export const translations = {
     dualPageSettingDesc: 'Exibir duas páginas lado a lado como um livro aberto',
     dualCoverStandalone: 'Capa Isolada',
     dualCoverStandaloneDesc: 'Exibir a primeira página isolada como capa do livro',
+    bookTexture: 'Textura de Livro',
+    bookTextureDesc: 'Exibir sombra e curvatura realista na lombada no modo de duas páginas',
     readerSettings: 'Configurações do Leitor',
     trackpadSwipe: 'Gesto de 2 Dedos no Trackpad',
     trackpadSwipeDesc: 'Deslizar 2 dedos para os lados para virar páginas',
@@ -366,6 +386,22 @@ export const translations = {
     displayPreferences: 'Preferências de Exibição',
     showFileExtension: 'Mostrar extensão do arquivo',
     showFileExtensionDesc: 'Exibir tags de formato (EPUB, PDF) nos cards dos livros',
+
+    // Library Selection Screen
+    selectLibraryTitle: 'Selecione uma Biblioteca',
+    selectLibrarySubtitle: 'Escolha uma biblioteca para explorar sua coleção ou adicione uma nova',
+    openLibrary: 'Abrir Biblioteca',
+    allLibraries: 'Todas as Bibliotecas',
+    switchLibraryAction: 'Trocar Biblioteca',
+    backToLibraries: 'Bibliotecas',
+    addNewLibraryCard: 'Adicionar Nova Biblioteca',
+    addNewLibraryCardDesc: 'Conecte uma pasta no seu computador contendo livros em PDF ou EPUB',
+    noLibrariesTitle: 'Nenhuma biblioteca configurada',
+    noLibrariesDesc: 'Você ainda não configurou nenhuma biblioteca de livros. Adicione sua primeira pasta para começar a leitura.',
+    folderCountBadge: '{count} pastas',
+    folderCountBadge_one: '1 pasta',
+    bookCountBadge: '{count} livros',
+    bookCountBadge_one: '1 livro',
   }
 };
 

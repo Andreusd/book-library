@@ -51,6 +51,8 @@ class AnnotationsManager:
                 "id": annotation_id,
                 "book_id": book_id,
                 "page": int(data.get("page", 1)),
+                "cfi": data.get("cfi"),
+                "chapter": data.get("chapter"),
                 "text": str(data.get("text", "")).strip(),
                 "color": str(data.get("color", "yellow")),
                 "comment": str(data.get("comment", "")).strip(),

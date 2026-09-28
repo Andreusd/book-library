@@ -51,6 +51,7 @@ export default function PdfPageView({
   onUpdateComment,
   onDeleteAnnotation,
   pageSide = 'single', // 'single' | 'left' | 'right'
+  showBookTexture = true,
 }) {
   const { t } = useI18n();
   const canvasRef = useRef(null);
@@ -197,12 +198,18 @@ export default function PdfPageView({
 
   const getSideClasses = () => {
     if (pageSide === 'left') {
+      if (!showBookTexture) {
+        return 'rounded-l-sm shadow-md';
+      }
       return 'rounded-l-sm shadow-2xl border-r border-neutral-800/90 before:absolute before:right-0 before:top-0 before:bottom-0 before:w-6 before:bg-gradient-to-l before:from-black/15 before:to-transparent before:pointer-events-none before:z-10';
     }
     if (pageSide === 'right') {
+      if (!showBookTexture) {
+        return 'rounded-r-sm shadow-md';
+      }
       return 'rounded-r-sm shadow-2xl border-l border-neutral-900/60 after:absolute after:left-0 after:top-0 after:bottom-0 after:w-6 after:bg-gradient-to-r after:from-black/15 after:to-transparent after:pointer-events-none after:z-10';
     }
-    return 'rounded-sm shadow-2xl';
+    return showBookTexture ? 'rounded-sm shadow-2xl' : 'rounded-sm shadow-md';
   };
 
   return (

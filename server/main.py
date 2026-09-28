@@ -30,10 +30,13 @@ favorites_mgr = FavoritesManager()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Pre-cache covers in the background on startup
-    books = scanner.get_books()
-    print(f"Discovered {len(books)} books across {len(scanner.get_shelves())} shelves.")
-    cover_mgr.pre_cache_all(books)
+    # Pre-cache covers for all configured libraries on startup
+    all_books = []
+    for lib in scanner.config_mgr.get_libraries():
+        lib_books = scanner.get_books(library_id=lib["id"])
+        all_books.extend(lib_books)
+    print(f"Discovered {len(all_books)} books across {len(scanner.config_mgr.get_libraries())} libraries.")
+    cover_mgr.pre_cache_all(all_books)
     yield
 
 app = FastAPI(title="Book Library API", lifespan=lifespan)
@@ -72,11 +75,13 @@ class RenameShelfPayload(BaseModel):
     shelf_id: Optional[str] = None
     folder_id: Optional[str] = None
     custom_name: str
+    library_id: Optional[str] = None
 
 class SetShelfIconPayload(BaseModel):
     shelf_id: Optional[str] = None
     folder_id: Optional[str] = None
     icon: str
+    library_id: Optional[str] = None
 
 class ToggleFavoritePayload(BaseModel):
     book_id: str
@@ -104,37 +109,56 @@ class SetActiveLibraryPayload(BaseModel):
 
 class AnnotationPayload(BaseModel):
     book_id: str
-    page: int
+    page: Optional[int] = 1
+    cfi: Optional[str] = None
+    chapter: Optional[str] = None
     text: str
     color: str = "yellow"
     comment: Optional[str] = ""
-    rects: List[Dict[str, Any]] = []
+    rects: Optional[List[Dict[str, Any]]] = []
 
 class UpdateAnnotationPayload(BaseModel):
     comment: Optional[str] = None
     color: Optional[str] = None
 
 @app.get("/api/libraries")
-def list_libraries():
-    """Returns list of all configured libraries with validation and folder/book counts."""
-    active_id = scanner.config_mgr.get_active_library_id()
+def list_libraries(library_id: Optional[str] = Query(None)):
+    """Returns list of all configured libraries with validation, folder/book counts, and sample covers."""
     libs = scanner.config_mgr.get_libraries()
     results = []
     for lib in libs:
         val = scanner.config_mgr.validate_path(lib["path"])
+        sample_covers = []
+        folder_count = 0
+        book_count = 0
+        if val.get("valid"):
+            try:
+                books = scanner.get_books(library_id=lib["id"])
+                book_count = len(books)
+                sample_covers = [f"/api/cover/{b['id']}" for b in books[:4]]
+                folders = scanner.get_folders(library_id=lib["id"])
+                folder_count = len(folders)
+            except Exception:
+                folder_count = val.get("folder_count", 0)
+                book_count = val.get("book_count", 0)
+        else:
+            folder_count = val.get("folder_count", 0)
+            book_count = val.get("book_count", 0)
+
         results.append({
             "id": lib["id"],
             "name": lib["name"],
             "path": lib["path"],
-            "is_active": lib["id"] == active_id,
-            "folder_count": val.get("folder_count", 0),
-            "book_count": val.get("book_count", 0),
+            "is_active": bool(library_id and lib["id"] == library_id),
+            "folder_count": folder_count,
+            "book_count": book_count,
             "valid": val.get("valid", False),
-            "error": val.get("error")
+            "error": val.get("error"),
+            "sample_covers": sample_covers,
         })
     return {
         "libraries": results,
-        "active_library_id": active_id
+        "active_library_id": library_id or ""
     }
 
 @app.post("/api/libraries")
@@ -209,15 +233,16 @@ def set_active_library(payload: SetActiveLibraryPayload):
     }
 
 @app.get("/api/settings")
-def get_settings():
-    """Returns the current book library folder path and validation status."""
-    path = scanner.library_path
+def get_settings(library_id: Optional[str] = Query(None)):
+    """Returns application settings, display preferences, and library status."""
+    lib = scanner.config_mgr.get_library_by_id(library_id) if library_id else None
+    path = lib["path"] if lib else scanner.library_path
     validation = scanner.config_mgr.validate_path(path) if path else {
         "valid": False, "exists": False, "is_dir": False, "shelf_count": 0, "folder_count": 0, "book_count": 0, "error": "path_empty", "normalized_path": ""
     }
     return {
         "library_path": path,
-        "active_library_id": scanner.config_mgr.get_active_library_id(),
+        "active_library_id": library_id or "",
         "libraries": scanner.config_mgr.get_libraries(),
         "validation": validation,
         "show_file_extension": scanner.config_mgr.get_show_file_extension(),
@@ -277,15 +302,15 @@ def rename_folder(payload: RenameShelfPayload):
     target_id = payload.folder_id or payload.shelf_id
     if not target_id:
         raise HTTPException(status_code=400, detail="Missing folder_id or shelf_id")
-    scanner.set_shelf_alias(target_id, payload.custom_name)
-    folders = scanner.get_folders()
+    scanner.set_shelf_alias(target_id, payload.custom_name, library_id=payload.library_id)
+    folders = scanner.get_folders(library_id=payload.library_id)
     return {
         "status": "ok",
         "folders": folders,
         "shelves": folders,
         "folder_id": target_id,
         "shelf_id": target_id,
-        "name": scanner.get_shelf_display_name(target_id)
+        "name": scanner.get_shelf_display_name(target_id, library_id=payload.library_id)
     }
 
 @app.post("/api/folders/icon")
@@ -295,8 +320,8 @@ def set_folder_icon(payload: SetShelfIconPayload):
     target_id = payload.folder_id or payload.shelf_id
     if not target_id:
         raise HTTPException(status_code=400, detail="Missing folder_id or shelf_id")
-    icon = scanner.set_shelf_icon(target_id, payload.icon)
-    folders = scanner.get_folders()
+    icon = scanner.set_shelf_icon(target_id, payload.icon, library_id=payload.library_id)
+    folders = scanner.get_folders(library_id=payload.library_id)
     return {
         "status": "ok",
         "folders": folders,

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Search, SlidersHorizontal, Menu, X, BookOpen, 
   ArrowUpDown, FolderOpen, RefreshCw, PanelLeftClose, PanelLeftOpen,
-  Settings, Heart, Bookmark, Home, Maximize2, Minimize2 
+  Settings, Heart, Bookmark, Home, Maximize2, Minimize2, Library
 } from 'lucide-react';
 
 import Sidebar from './components/Sidebar';
@@ -10,6 +10,7 @@ import BookCard from './components/BookCard';
 import ContinueReading from './components/ContinueReading';
 import FavoriteBooks from './components/FavoriteBooks';
 import LibraryFolders from './components/LibraryFolders';
+import LibrarySelector from './components/LibrarySelector';
 import Reader from './components/Reader';
 import ContextMenu from './components/ContextMenu';
 import ShelfContextMenu from './components/ShelfContextMenu';
@@ -19,73 +20,106 @@ import ShelfIcon from './components/ShelfIcon';
 import SettingsModal from './components/SettingsModal';
 import { useI18n } from './i18n';
 
-// Helper to extract view & route information from URL (/folder/:id, /shelf/:id, /continue-reading, /favorites, /book/:id)
+// Helper to extract view & route information from URL
+// Scoped routes: /:libraryId, /:libraryId/folder/:id, /:libraryId/continue-reading, /:libraryId/favorites, /:libraryId/book/:id
+// Root / -> view: 'select-library'
 function parseRoute() {
-  if (typeof window === 'undefined') return { view: 'home', bookId: null, shelfId: null };
-
-  const pathname = window.location.pathname;
-  const hash = window.location.hash;
-
-  // 1. Book detail / reader
-  const bookMatch = pathname.match(/\/book\/([^/?#]+)/) || hash.match(/#\/?book\/([^/?#]+)/);
-  if (bookMatch && bookMatch[1]) {
-    return { view: 'book', bookId: decodeURIComponent(bookMatch[1]), shelfId: null };
+  if (typeof window === 'undefined') {
+    return { view: 'select-library', libraryId: null, shelfId: null, bookId: null };
   }
 
-  // 2. Continue Reading
-  if (pathname === '/continue-reading' || hash === '#/continue-reading') {
-    return { view: 'continue-reading', bookId: null, shelfId: 'continue-reading' };
+  let rawPath = window.location.pathname;
+  if (window.location.hash && window.location.hash.startsWith('#/')) {
+    rawPath = window.location.hash.slice(1);
   }
 
-  // 3. Favorites
-  if (pathname === '/favorites' || hash === '#/favorites') {
-    return { view: 'favorites', bookId: null, shelfId: 'favorites' };
+  // Split path into clean segments
+  const segments = rawPath.split('/').filter(Boolean).map(s => decodeURIComponent(s));
+
+  // 1. Root / -> Select Library view
+  if (segments.length === 0) {
+    return { view: 'select-library', libraryId: null, shelfId: null, bookId: null };
   }
 
-  // 4. Specific Folder (/folder/:id or legacy /shelf/:id)
-  const folderMatch = pathname.match(/\/(?:folder|shelf)\/([^/?#]+)/) || hash.match(/#\/?(?:folder|shelf)\/([^/?#]+)/);
-  if (folderMatch && folderMatch[1]) {
-    return { view: 'folder', bookId: null, shelfId: decodeURIComponent(folderMatch[1]) };
+  // 2. Legacy direct paths without library prefix (for backward compatibility)
+  if (segments[0] === 'book' && segments[1]) {
+    return { view: 'book', libraryId: null, shelfId: null, bookId: segments[1] };
+  }
+  if (segments[0] === 'continue-reading') {
+    return { view: 'continue-reading', libraryId: null, shelfId: 'continue-reading', bookId: null };
+  }
+  if (segments[0] === 'favorites') {
+    return { view: 'favorites', libraryId: null, shelfId: 'favorites', bookId: null };
+  }
+  if ((segments[0] === 'folder' || segments[0] === 'shelf') && segments[1]) {
+    return { view: 'folder', libraryId: null, shelfId: segments[1], bookId: null };
   }
 
-  // Legacy query params support (?book=... or ?folder=... or ?shelf=...)
-  const searchParams = new URLSearchParams(window.location.search);
-  const qBook = searchParams.get('book');
-  if (qBook) {
-    return { view: 'book', bookId: qBook, shelfId: null };
-  }
-  const qFolder = searchParams.get('folder') || searchParams.get('shelf');
-  if (qFolder) {
-    if (qFolder === 'continue-reading' || qFolder === 'favorites') {
-      return { view: qFolder, bookId: null, shelfId: qFolder };
-    }
-    return { view: 'folder', bookId: null, shelfId: qFolder };
+  // 3. Library-scoped routes:
+  // Support both /:libraryId and /library/:libraryId
+  let libId = segments[0];
+  let rest = segments.slice(1);
+  if (libId === 'library' && rest.length > 0) {
+    libId = rest[0];
+    rest = rest.slice(1);
   }
 
-  // 5. Default Home
-  return { view: 'home', bookId: null, shelfId: null };
+  // /:libraryId
+  if (rest.length === 0) {
+    return { view: 'home', libraryId: libId, shelfId: null, bookId: null };
+  }
+
+  // /:libraryId/book/:bookId
+  if (rest[0] === 'book' && rest[1]) {
+    return { view: 'book', libraryId: libId, shelfId: null, bookId: rest[1] };
+  }
+
+  // /:libraryId/continue-reading
+  if (rest[0] === 'continue-reading') {
+    return { view: 'continue-reading', libraryId: libId, shelfId: 'continue-reading', bookId: null };
+  }
+
+  // /:libraryId/favorites
+  if (rest[0] === 'favorites') {
+    return { view: 'favorites', libraryId: libId, shelfId: 'favorites', bookId: null };
+  }
+
+  // /:libraryId/folder/:folderId or /:libraryId/shelf/:folderId
+  if ((rest[0] === 'folder' || rest[0] === 'shelf') && rest[1]) {
+    return { view: 'folder', libraryId: libId, shelfId: rest[1], bookId: null };
+  }
+
+  return { view: 'home', libraryId: libId, shelfId: null, bookId: null };
 }
 
-function getPathForShelf(shelfId) {
-  if (!shelfId) return '/';
-  if (shelfId === 'continue-reading') return '/continue-reading';
-  if (shelfId === 'favorites') return '/favorites';
-  return `/folder/${encodeURIComponent(shelfId)}`;
+function getPathForShelf(shelfId, libraryId) {
+  if (!libraryId) return '/';
+  const base = `/${encodeURIComponent(libraryId)}`;
+  if (!shelfId) return base;
+  if (shelfId === 'continue-reading') return `${base}/continue-reading`;
+  if (shelfId === 'favorites') return `${base}/favorites`;
+  return `${base}/folder/${encodeURIComponent(shelfId)}`;
 }
 const getPathForFolder = getPathForShelf;
 
+function getPathForBook(bookId, libraryId) {
+  if (!libraryId) return `/book/${encodeURIComponent(bookId)}`;
+  return `/${encodeURIComponent(libraryId)}/book/${encodeURIComponent(bookId)}`;
+}
+
 export default function App() {
+  const initialRoute = parseRoute();
   const { t } = useI18n();
   const [shelves, setShelves] = useState([]);
   const [totalBooks, setTotalBooks] = useState(0);
   const [libraries, setLibraries] = useState([]);
-  const [activeLibraryId, setActiveLibraryId] = useState('');
-  const [selectedShelf, setSelectedShelf] = useState(() => parseRoute().shelfId);
+  const [activeLibraryId, setActiveLibraryId] = useState(() => initialRoute.libraryId || '');
+  const [selectedShelf, setSelectedShelf] = useState(() => initialRoute.shelfId);
   const [books, setBooks] = useState([]);
   const [continueReading, setContinueReading] = useState([]);
   const [favorites, setFavorites] = useState([]);
   const [favoriteIds, setFavoriteIds] = useState(new Set());
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showFileExtension, setShowFileExtension] = useState(() => {
     try {
@@ -107,7 +141,7 @@ export default function App() {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [sortBy, setSortBy] = useState('title_asc');
   const [activeBook, setActiveBook] = useState(null);
-  const [routeLoading, setRouteLoading] = useState(() => Boolean(parseRoute().bookId));
+  const [routeLoading, setRouteLoading] = useState(() => Boolean(initialRoute.bookId));
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     try {
       const saved = localStorage.getItem('sidebar_open');
@@ -188,7 +222,6 @@ export default function App() {
       .then(res => res.json())
       .then(data => {
         setLibraries(data.libraries || []);
-        setActiveLibraryId(data.active_library_id || '');
       })
       .catch(err => console.error('Failed to load libraries:', err));
 
@@ -209,7 +242,12 @@ export default function App() {
   // Load Shelves & Totals
   const loadShelves = useCallback((libId) => {
     const targetLib = libId !== undefined ? libId : activeLibraryId;
-    const url = targetLib ? `/api/shelves?library_id=${encodeURIComponent(targetLib)}` : '/api/shelves';
+    if (!targetLib) {
+      setShelves([]);
+      setTotalBooks(0);
+      return;
+    }
+    const url = `/api/shelves?library_id=${encodeURIComponent(targetLib)}`;
     fetch(url)
       .then(res => res.json())
       .then(data => {
@@ -222,7 +260,11 @@ export default function App() {
   // Load Continue Reading
   const loadContinueReading = useCallback((libId) => {
     const targetLib = libId !== undefined ? libId : activeLibraryId;
-    const url = targetLib ? `/api/continue-reading?library_id=${encodeURIComponent(targetLib)}` : '/api/continue-reading';
+    if (!targetLib) {
+      setContinueReading([]);
+      return;
+    }
+    const url = `/api/continue-reading?library_id=${encodeURIComponent(targetLib)}`;
     fetch(url)
       .then(res => res.json())
       .then(data => {
@@ -234,7 +276,12 @@ export default function App() {
   // Load Favorites
   const loadFavorites = useCallback((libId) => {
     const targetLib = libId !== undefined ? libId : activeLibraryId;
-    const url = targetLib ? `/api/favorites?library_id=${encodeURIComponent(targetLib)}` : '/api/favorites';
+    if (!targetLib) {
+      setFavorites([]);
+      setFavoriteIds(new Set());
+      return;
+    }
+    const url = `/api/favorites?library_id=${encodeURIComponent(targetLib)}`;
     fetch(url)
       .then(res => res.json())
       .then(data => {
@@ -245,12 +292,18 @@ export default function App() {
   }, [activeLibraryId]);
 
   // Load Books
-  const loadBooks = useCallback((libId) => {
-    setLoading(true);
+  const loadBooks = useCallback((libId, targetShelf) => {
     const targetLib = libId !== undefined ? libId : activeLibraryId;
+    if (!targetLib) {
+      setBooks([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const shelfToUse = targetShelf !== undefined ? targetShelf : selectedShelf;
     const params = new URLSearchParams();
-    if (targetLib) params.append('library_id', targetLib);
-    if (selectedShelf) params.append('shelf', selectedShelf);
+    params.append('library_id', targetLib);
+    if (shelfToUse) params.append('shelf', shelfToUse);
     if (debouncedQuery) params.append('query', debouncedQuery);
     if (sortBy) params.append('sort', sortBy);
 
@@ -266,29 +319,37 @@ export default function App() {
       });
   }, [activeLibraryId, selectedShelf, debouncedQuery, sortBy]);
 
+  // Select Library from selector screen
+  const selectLibrary = useCallback((libraryId) => {
+    setActiveLibraryId(libraryId);
+    setSelectedShelf(null);
+    setSearchQuery('');
+    const targetPath = `/${encodeURIComponent(libraryId)}`;
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({ libraryId, shelfId: null }, '', targetPath);
+    }
+    loadShelves(libraryId);
+    loadBooks(libraryId, null);
+    loadContinueReading(libraryId);
+    loadFavorites(libraryId);
+  }, [loadShelves, loadBooks, loadContinueReading, loadFavorites]);
+
+  // Return to All Libraries selection screen
+  const selectAllLibraries = useCallback(() => {
+    setActiveLibraryId('');
+    setSelectedShelf(null);
+    setActiveBook(null);
+    setSearchQuery('');
+    if (window.location.pathname !== '/') {
+      window.history.pushState(null, '', '/');
+    }
+    loadLibraries();
+  }, [loadLibraries]);
+
   // Switch Active Library
   const switchLibrary = useCallback((libraryId) => {
-    fetch('/api/libraries/active', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ library_id: libraryId })
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.status === 'ok') {
-        setActiveLibraryId(libraryId);
-        setSelectedShelf(null);
-        setSearchQuery('');
-        window.history.pushState(null, '', '/');
-        loadLibraries();
-        loadShelves(libraryId);
-        loadBooks(libraryId);
-        loadContinueReading(libraryId);
-        loadFavorites(libraryId);
-      }
-    })
-    .catch(err => console.error('Failed to switch library:', err));
-  }, [loadLibraries, loadShelves, loadBooks, loadContinueReading, loadFavorites]);
+    selectLibrary(libraryId);
+  }, [selectLibrary]);
 
   // Toggle Favorite
   const handleToggleFavorite = useCallback((book) => {
@@ -318,51 +379,67 @@ export default function App() {
           return updated;
         });
         setContinueReading(prev => prev.map(b => b.id === book.id ? { ...b, is_favorite: data.is_favorite } : b));
-        loadFavorites();
+        loadFavorites(activeLibraryId);
       }
     })
     .catch(err => console.error('Failed to toggle favorite:', err));
-  }, [loadFavorites, selectedShelf]);
+  }, [loadFavorites, selectedShelf, activeLibraryId]);
 
   // Navigate to shelf and update browser URL
   const navigateToShelf = useCallback((shelfId, replace = false) => {
     setSelectedShelf(shelfId);
     setSearchQuery('');
-    const targetPath = getPathForShelf(shelfId);
+    const targetPath = getPathForShelf(shelfId, activeLibraryId);
     if (window.location.pathname !== targetPath) {
       if (replace) {
-        window.history.replaceState({ shelfId }, '', targetPath);
+        window.history.replaceState({ libraryId: activeLibraryId, shelfId }, '', targetPath);
       } else {
-        window.history.pushState({ shelfId }, '', targetPath);
+        window.history.pushState({ libraryId: activeLibraryId, shelfId }, '', targetPath);
       }
     }
-  }, []);
+  }, [activeLibraryId]);
 
-  // Open reader and update browser route to /book/:id
+  // Open reader and update browser route to /:libraryId/book/:id
   const openReader = useCallback((book) => {
     if (!book) return;
     setActiveBook(book);
-    const targetPath = `/book/${encodeURIComponent(book.id)}`;
-    if (window.location.pathname !== targetPath) {
-      window.history.pushState({ bookId: book.id, shelfId: selectedShelf }, '', targetPath);
+    const targetLib = activeLibraryId || book.library_id || 'default';
+    if (!activeLibraryId && book.library_id) {
+      setActiveLibraryId(book.library_id);
     }
-  }, [selectedShelf]);
+    const targetPath = getPathForBook(book.id, targetLib);
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({ bookId: book.id, libraryId: targetLib, shelfId: selectedShelf }, '', targetPath);
+    }
+  }, [activeLibraryId, selectedShelf]);
 
   // Close reader and return to current shelf route
   const closeReader = useCallback(() => {
     setActiveBook(null);
-    const targetPath = getPathForShelf(selectedShelf);
+    const targetPath = getPathForShelf(selectedShelf, activeLibraryId);
     if (window.location.pathname !== targetPath) {
-      window.history.pushState({ shelfId: selectedShelf }, '', targetPath);
+      window.history.pushState({ libraryId: activeLibraryId, shelfId: selectedShelf }, '', targetPath);
     }
-    loadContinueReading();
-    loadFavorites();
-  }, [selectedShelf, loadContinueReading, loadFavorites]);
+    loadContinueReading(activeLibraryId);
+    loadFavorites(activeLibraryId);
+  }, [selectedShelf, activeLibraryId, loadContinueReading, loadFavorites]);
 
   // Handle browser Back and Forward navigation (popstate)
   useEffect(() => {
     const handlePopState = () => {
       const route = parseRoute();
+      if (!route.libraryId && !route.bookId) {
+        setActiveLibraryId('');
+        setSelectedShelf(null);
+        setActiveBook(null);
+        loadLibraries();
+        return;
+      }
+
+      if (route.libraryId && route.libraryId !== activeLibraryId) {
+        setActiveLibraryId(route.libraryId);
+      }
+
       if (route.bookId) {
         if (!activeBook || activeBook.id !== route.bookId) {
           fetch(`/api/book/${encodeURIComponent(route.bookId)}`)
@@ -371,18 +448,23 @@ export default function App() {
               return res.json();
             })
             .then(book => {
-              if (book && book.id) setActiveBook(book);
+              if (book && book.id) {
+                setActiveBook(book);
+                if (book.library_id && !route.libraryId) {
+                  setActiveLibraryId(book.library_id);
+                }
+              }
             })
             .catch(() => {
               setActiveBook(null);
-              window.history.replaceState(null, '', getPathForShelf(selectedShelf));
+              window.history.replaceState(null, '', getPathForShelf(selectedShelf, route.libraryId || activeLibraryId));
             });
         }
       } else {
         if (activeBook) {
           setActiveBook(null);
-          loadContinueReading();
-          loadFavorites();
+          loadContinueReading(route.libraryId || activeLibraryId);
+          loadFavorites(route.libraryId || activeLibraryId);
         }
         setSelectedShelf(route.shelfId);
         setSearchQuery('');
@@ -391,7 +473,7 @@ export default function App() {
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [activeBook, selectedShelf, loadContinueReading, loadFavorites]);
+  }, [activeBook, selectedShelf, activeLibraryId, loadLibraries, loadContinueReading, loadFavorites]);
 
   // Load book directly from route on initial page load / reload
   useEffect(() => {
@@ -404,13 +486,16 @@ export default function App() {
         })
         .then(book => {
           if (book && book.id) {
+            const targetLib = route.libraryId || book.library_id || 'default';
+            setActiveLibraryId(targetLib);
             setActiveBook(book);
             setSelectedShelf(prev => prev || book.shelf || null);
+            window.history.replaceState({ bookId: book.id, libraryId: targetLib }, '', getPathForBook(book.id, targetLib));
           }
         })
         .catch(err => {
           console.error('Failed to load book from route:', err);
-          window.history.replaceState(null, '', getPathForShelf(route.shelfId));
+          window.history.replaceState(null, '', route.libraryId ? getPathForShelf(route.shelfId, route.libraryId) : '/');
         })
         .finally(() => {
           setRouteLoading(false);
@@ -555,21 +640,51 @@ export default function App() {
 
   // Find active shelf metadata
   const currentShelfObj = shelves.find(s => s.id === selectedShelf);
+  const activeLibraryObj = libraries.find(l => l.id === activeLibraryId);
 
   // Dynamic Browser Tab Title
   useEffect(() => {
     if (activeBook) {
       document.title = `${activeBook.title} - ${t('appTitle')}`;
     } else if (selectedShelf === 'continue-reading') {
-      document.title = `${t('continueReading')} - ${t('appTitle')}`;
+      document.title = `${t('continueReading')} - ${activeLibraryObj?.name || t('appTitle')}`;
     } else if (selectedShelf === 'favorites') {
-      document.title = `${t('favorites')} - ${t('appTitle')}`;
+      document.title = `${t('favorites')} - ${activeLibraryObj?.name || t('appTitle')}`;
     } else if (currentShelfObj) {
-      document.title = `${currentShelfObj.name} - ${t('appTitle')}`;
+      document.title = `${currentShelfObj.name} - ${activeLibraryObj?.name || t('appTitle')}`;
+    } else if (activeLibraryObj) {
+      document.title = `${activeLibraryObj.name} - ${t('appTitle')}`;
     } else {
-      document.title = t('appTitle');
+      document.title = `${t('selectLibraryTitle')} - ${t('appTitle')}`;
     }
-  }, [activeBook, selectedShelf, currentShelfObj, t]);
+  }, [activeBook, selectedShelf, currentShelfObj, activeLibraryObj, t]);
+
+  // When no active library is selected (e.g. root /), display Library Selection screen
+  if (!activeLibraryId) {
+    return (
+      <>
+        <LibrarySelector
+          libraries={libraries}
+          onSelectLibrary={selectLibrary}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onAddNewLibrary={() => setSettingsOpen(true)}
+        />
+
+        <SettingsModal
+          isOpen={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          showFileExtension={showFileExtension}
+          onToggleFileExtension={handleToggleFileExtension}
+          onLibraryChanged={(newActiveId) => {
+            loadLibraries();
+            if (newActiveId) {
+              selectLibrary(newActiveId);
+            }
+          }}
+        />
+      </>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col lg:flex-row">
@@ -592,13 +707,14 @@ export default function App() {
         libraries={libraries}
         activeLibraryId={activeLibraryId}
         onSwitchLibrary={switchLibrary}
+        onSelectAllLibraries={selectAllLibraries}
         onOpenSettings={() => setSettingsOpen(true)}
       />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 transition-all duration-300">
         {/* Top Navigation Bar */}
-        <header className="h-16 px-4 sm:px-6 bg-neutral-900/90 backdrop-blur-md border-b border-neutral-800 sticky top-0 z-20 flex items-center justify-between gap-4">
+        <header className="h-16 px-4 sm:px-6 bg-neutral-900/90 backdrop-blur-md border-b border-neutral-800 sticky top-0 z-30 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             <button
               onClick={toggleSidebar}
@@ -615,18 +731,32 @@ export default function App() {
             {/* Breadcrumb / Current Shelf Title */}
             <div className="min-w-0">
               <nav aria-label="Breadcrumb" className="text-sm sm:text-base font-bold text-neutral-100 truncate flex items-center gap-1.5">
-                {selectedShelf ? (
+                <button
+                  onClick={selectAllLibraries}
+                  className="flex items-center gap-1.5 text-neutral-400 hover:text-amber-400 transition-colors cursor-pointer shrink-0"
+                  title={t('allLibraries')}
+                >
+                  <Library className="w-4 h-4 shrink-0 text-amber-500" />
+                  <span className="hidden sm:inline font-medium text-xs sm:text-sm">{t('backToLibraries')}</span>
+                </button>
+                <span className="text-neutral-600">/</span>
+
+                <button
+                  onClick={() => navigateToShelf(null)}
+                  className={`flex items-center gap-1.5 hover:text-amber-400 transition-colors cursor-pointer truncate ${
+                    !selectedShelf ? 'text-neutral-100' : 'text-neutral-400'
+                  }`}
+                  title={activeLibraryObj?.name || activeLibraryId}
+                >
+                  <span className="font-semibold text-xs sm:text-sm truncate">
+                    {activeLibraryObj?.name || t('allBooks')}
+                  </span>
+                </button>
+
+                {selectedShelf && (
                   <>
-                    <button
-                      onClick={() => navigateToShelf(null)}
-                      className="flex items-center gap-1.5 text-neutral-400 hover:text-amber-400 transition-colors cursor-pointer"
-                      title={t('allBooks')}
-                    >
-                      <Home className="w-4 h-4 shrink-0" />
-                      <span className="hidden sm:inline font-medium text-xs sm:text-sm">{t('allBooks')}</span>
-                    </button>
                     <span className="text-neutral-600">/</span>
-                    <span className="truncate flex items-center gap-1.5 text-neutral-100">
+                    <span className="truncate flex items-center gap-1.5 text-neutral-100 text-xs sm:text-sm">
                       {selectedShelf === 'continue-reading' ? (
                         <>
                           <Bookmark className="w-4 h-4 text-emerald-500 fill-emerald-500 shrink-0" />
@@ -647,14 +777,6 @@ export default function App() {
                       )}
                     </span>
                   </>
-                ) : (
-                  <button
-                    onClick={() => navigateToShelf(null)}
-                    className="flex items-center gap-2 text-neutral-100 hover:text-amber-400 transition-colors cursor-pointer"
-                  >
-                    <Home className="w-4 h-4 text-amber-500 shrink-0" />
-                    <span>{t('allBooks')}</span>
-                  </button>
                 )}
               </nav>
             </div>
@@ -719,7 +841,7 @@ export default function App() {
         </header>
 
         {/* Books Content */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto relative z-0">
           {/* Continue Reading Shelf (only displayed when browsing all books without active search) */}
           {!selectedShelf && !debouncedQuery && continueReading.length > 0 && (
             <ContinueReading 
@@ -910,17 +1032,14 @@ export default function App() {
         onToggleFileExtension={handleToggleFileExtension}
         onLibraryChanged={(newActiveId) => {
           loadLibraries();
-          const targetId = newActiveId || activeLibraryId;
           if (newActiveId && newActiveId !== activeLibraryId) {
-            setActiveLibraryId(newActiveId);
-            setSelectedShelf(null);
-            setSearchQuery('');
-            window.history.pushState(null, '', '/');
+            selectLibrary(newActiveId);
+          } else if (activeLibraryId) {
+            loadShelves(activeLibraryId);
+            loadBooks(activeLibraryId);
+            loadContinueReading(activeLibraryId);
+            loadFavorites(activeLibraryId);
           }
-          loadShelves(targetId);
-          loadBooks(targetId);
-          loadContinueReading(targetId);
-          loadFavorites(targetId);
         }}
       />
     </div>

@@ -78,16 +78,9 @@ class ConfigManager:
                     break
 
         config["libraries"] = libraries
-        active_id = config.get("active_library_id", "")
-        valid_ids = [lib["id"] for lib in libraries if isinstance(lib, dict) and "id" in lib]
-        if active_id not in valid_ids and valid_ids:
-            config["active_library_id"] = valid_ids[0]
-        elif not valid_ids:
-            config["active_library_id"] = ""
-
-        # Keep legacy library_path synchronized
-        active_lib = next((l for l in libraries if l["id"] == config["active_library_id"]), None)
-        config["library_path"] = active_lib["path"] if active_lib else ""
+        # Active library is NO LONGER persisted in config.json
+        config.pop("active_library_id", None)
+        config.pop("library_path", None)
 
         # Display preference: show file extension badges (EPUB, PDF)
         if "show_file_extension" not in config:
@@ -98,8 +91,10 @@ class ConfigManager:
     def _save(self):
         os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
         try:
+            # Ensure active_library_id and library_path are never persisted to disk
+            save_data = {k: v for k, v in self._config.items() if k not in ("active_library_id", "library_path")}
             with open(self.config_path, "w", encoding="utf-8") as f:
-                json.dump(self._config, f, indent=2, ensure_ascii=False)
+                json.dump(save_data, f, indent=2, ensure_ascii=False)
             if os.path.exists(self.config_path):
                 self._last_mtime = os.path.getmtime(self.config_path)
         except Exception as e:
@@ -112,16 +107,17 @@ class ConfigManager:
             return [dict(lib) for lib in self._config.get("libraries", [])]
 
     def get_active_library_id(self) -> str:
-        """Returns the ID of the currently active library."""
+        """Returns the in-memory active library ID (not persisted across restarts)."""
         with self._lock:
-            self._reload_if_changed()
-            return self._config.get("active_library_id", "")
+            return getattr(self, "_runtime_active_id", "") or ""
 
     def get_active_library(self) -> Optional[Dict[str, Any]]:
-        """Returns metadata for the currently active library."""
+        """Returns metadata for the currently active library in-memory."""
         with self._lock:
             self._reload_if_changed()
             active_id = self.get_active_library_id()
+            if not active_id:
+                return None
             for lib in self._config.get("libraries", []):
                 if lib.get("id") == active_id:
                     return dict(lib)
@@ -137,13 +133,11 @@ class ConfigManager:
             return None
 
     def set_active_library(self, library_id: str) -> bool:
-        """Sets the active library ID and persists configuration."""
+        """Sets the runtime in-memory active library ID without persisting to config.json."""
         with self._lock:
             for lib in self._config.get("libraries", []):
                 if lib.get("id") == library_id:
-                    self._config["active_library_id"] = library_id
-                    self._config["library_path"] = lib.get("path", "")
-                    self._save()
+                    self._runtime_active_id = library_id
                     return True
             return False
 
@@ -163,9 +157,8 @@ class ConfigManager:
             libraries.append(new_lib)
             self._config["libraries"] = libraries
 
-            if set_active or len(libraries) == 1:
-                self._config["active_library_id"] = lib_id
-                self._config["library_path"] = clean_path
+            if set_active:
+                self._runtime_active_id = lib_id
 
             self._save()
             return dict(new_lib)
@@ -180,8 +173,6 @@ class ConfigManager:
                     if path is not None and path.strip():
                         clean_path = os.path.abspath(os.path.expanduser(path.strip()))
                         lib["path"] = clean_path
-                        if self._config.get("active_library_id") == library_id:
-                            self._config["library_path"] = clean_path
 
                     self._save()
                     return dict(lib)
@@ -201,23 +192,21 @@ class ConfigManager:
             removed = libraries.pop(idx_to_remove)
             self._config["libraries"] = libraries
 
-            # If active library was removed, fallback to first available
-            if self._config.get("active_library_id") == library_id:
-                new_active = libraries[0]["id"]
-                self._config["active_library_id"] = new_active
-                self._config["library_path"] = libraries[0].get("path", "")
+            if getattr(self, "_runtime_active_id", "") == library_id:
+                self._runtime_active_id = ""
 
             self._save()
             return True
 
     def get_library_path(self) -> str:
-        """Returns the active library path."""
+        """Returns the in-memory active library path or first library path."""
         with self._lock:
             self._reload_if_changed()
             active = self.get_active_library()
             if active and active.get("path"):
                 return active["path"]
-            return self._config.get("library_path", "")
+            libs = self.get_libraries()
+            return libs[0]["path"] if libs else ""
 
     def set_library_path(self, path: str) -> str:
         """Sets and persists a library path for the active library (or creates one)."""

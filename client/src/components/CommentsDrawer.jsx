@@ -125,11 +125,11 @@ export default function CommentsDrawer({
                   <div className="flex items-center justify-between mb-2">
                     <button
                       onClick={() => onJumpToAnnotation && onJumpToAnnotation(ann)}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-neutral-800 hover:bg-amber-500/20 text-neutral-300 hover:text-amber-300 transition cursor-pointer"
-                      title={t('jumpToPage', { page: ann.page })}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-neutral-800 hover:bg-amber-500/20 text-neutral-300 hover:text-amber-300 transition cursor-pointer max-w-[180px]"
+                      title={ann.chapter ? `Jump to ${ann.chapter}` : t('jumpToPage', { page: ann.page })}
                     >
-                      <span>{t('pageBadge', { page: ann.page })}</span>
-                      <ArrowUpRight className="w-3 h-3 text-amber-400" />
+                      <span className="truncate">{ann.chapter || t('pageBadge', { page: ann.page })}</span>
+                      <ArrowUpRight className="w-3 h-3 text-amber-400 shrink-0" />
                     </button>
 
                     <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
