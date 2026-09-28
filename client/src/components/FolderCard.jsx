@@ -1,0 +1,168 @@
+import React from 'react';
+import { BookOpen } from 'lucide-react';
+import ShelfIcon from './ShelfIcon';
+import { useI18n } from '../i18n';
+
+export function getFolderCovers(folder, books = []) {
+  if (folder.sample_covers && folder.sample_covers.length > 0) {
+    return folder.sample_covers;
+  }
+  if (books && books.length > 0) {
+    const matching = books.filter(b => b.shelf === folder.id || b.folder === folder.id);
+    return matching.slice(0, 4).map(b => b.cover_url);
+  }
+  return [];
+}
+
+export default function FolderCard({
+  folder,
+  covers,
+  books = [],
+  onSelectFolder,
+  onContextMenu,
+  className = ''
+}) {
+  const { t } = useI18n();
+  const folderCovers = covers !== undefined ? covers : getFolderCovers(folder, books);
+
+  return (
+    <div
+      onClick={() => onSelectFolder && onSelectFolder(folder.id)}
+      onContextMenu={(e) => {
+        if (onContextMenu) {
+          e.preventDefault();
+          onContextMenu(e, folder);
+        }
+      }}
+      className={`group relative cursor-pointer bg-neutral-900/60 hover:bg-neutral-800/90 border border-neutral-800 hover:border-amber-500/40 rounded-2xl p-3.5 sm:p-4 flex flex-col items-center justify-between transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1 select-none isolate ${className}`}
+    >
+      {/* Thumbnail Stack Container */}
+      <div className="relative w-full h-36 sm:h-40 flex items-center justify-center my-1 isolate">
+        {folderCovers.length === 0 ? (
+          /* Empty state placeholder */
+          <div className="w-20 aspect-[1/1.45] rounded-lg bg-neutral-800/40 border border-neutral-700/40 flex flex-col items-center justify-center text-neutral-500 gap-1.5 shadow-inner">
+            <ShelfIcon icon={folder.icon} className="w-6 h-6 text-neutral-600" />
+            <span className="text-[10px] text-neutral-600 font-medium">Empty</span>
+          </div>
+        ) : folderCovers.length === 1 ? (
+          /* Single book cover */
+          <div className="relative w-20 sm:w-22 aspect-[1/1.45] rounded-md overflow-hidden shadow-lg border border-neutral-700/70 group-hover:border-amber-500/50 group-hover:scale-105 transition-all duration-300 bg-neutral-950">
+            <div className="absolute inset-0 flex items-center justify-center bg-neutral-900 text-neutral-600">
+              <BookOpen className="w-6 h-6 opacity-30" />
+            </div>
+            <img
+              src={folderCovers[0]}
+              alt=""
+              loading="lazy"
+              className="relative z-10 w-full h-full object-cover"
+              onError={(e) => {
+                e.target.style.display = 'none';
+              }}
+            />
+          </div>
+        ) : folderCovers.length === 2 ? (
+          /* 2 Books Stack */
+          <>
+            {/* Back Cover */}
+            <div className="absolute w-19 sm:w-21 aspect-[1/1.45] rounded-md overflow-hidden shadow-md border border-neutral-700/60 -rotate-8 -translate-x-3.5 -translate-y-1 opacity-70 group-hover:-rotate-12 group-hover:-translate-x-5 transition-all duration-300 bg-neutral-950 z-10">
+              <div className="absolute inset-0 flex items-center justify-center bg-neutral-900 text-neutral-600">
+                <BookOpen className="w-5 h-5 opacity-30" />
+              </div>
+              <img
+                src={folderCovers[1]}
+                alt=""
+                loading="lazy"
+                className="relative z-10 w-full h-full object-cover"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                }}
+              />
+            </div>
+            {/* Front Cover */}
+            <div className="relative w-19 sm:w-21 aspect-[1/1.45] rounded-md overflow-hidden shadow-xl border border-neutral-600/80 rotate-2 translate-x-1 translate-y-1 group-hover:rotate-0 group-hover:scale-105 transition-all duration-300 bg-neutral-950 z-20">
+              <div className="absolute inset-0 flex items-center justify-center bg-neutral-900 text-neutral-600">
+                <BookOpen className="w-5 h-5 opacity-30" />
+              </div>
+              <img
+                src={folderCovers[0]}
+                alt=""
+                loading="lazy"
+                className="relative z-10 w-full h-full object-cover"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                }}
+              />
+            </div>
+          </>
+        ) : (
+          /* 3+ Books Stack (Fanned Deck) */
+          <>
+            {/* Back Left Cover */}
+            <div className="absolute w-18 sm:w-20 aspect-[1/1.45] rounded-md overflow-hidden shadow-md border border-neutral-700/50 -rotate-12 -translate-x-5 -translate-y-1 opacity-60 group-hover:-rotate-16 group-hover:-translate-x-7 transition-all duration-300 bg-neutral-950 z-10">
+              <div className="absolute inset-0 flex items-center justify-center bg-neutral-900 text-neutral-600">
+                <BookOpen className="w-5 h-5 opacity-25" />
+              </div>
+              <img
+                src={folderCovers[2]}
+                alt=""
+                loading="lazy"
+                className="relative z-10 w-full h-full object-cover"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                }}
+              />
+            </div>
+            {/* Middle Right Cover */}
+            <div className="absolute w-18 sm:w-20 aspect-[1/1.45] rounded-md overflow-hidden shadow-lg border border-neutral-700/70 rotate-8 translate-x-4 -translate-y-0.5 opacity-80 group-hover:rotate-12 group-hover:translate-x-6 transition-all duration-300 bg-neutral-950 z-20">
+              <div className="absolute inset-0 flex items-center justify-center bg-neutral-900 text-neutral-600">
+                <BookOpen className="w-5 h-5 opacity-25" />
+              </div>
+              <img
+                src={folderCovers[1]}
+                alt=""
+                loading="lazy"
+                className="relative z-10 w-full h-full object-cover"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                }}
+              />
+            </div>
+            {/* Front Center Cover */}
+            <div className="relative w-18 sm:w-20 aspect-[1/1.45] rounded-md overflow-hidden shadow-2xl border border-neutral-600/90 rotate-0 translate-x-0 translate-y-1.5 group-hover:scale-105 group-hover:translate-y-0 transition-all duration-300 bg-neutral-950 z-30">
+              <div className="absolute inset-0 flex items-center justify-center bg-neutral-900 text-neutral-600">
+                <BookOpen className="w-5 h-5 opacity-30" />
+              </div>
+              <img
+                src={folderCovers[0]}
+                alt=""
+                loading="lazy"
+                className="relative z-10 w-full h-full object-cover"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                }}
+              />
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Folder Details */}
+      <div className="w-full text-center mt-2 pt-2 border-t border-neutral-800/60">
+        <div className="flex items-center justify-center min-h-[2.25rem] mb-1 px-1">
+          <h3 
+            className="text-xs font-semibold text-neutral-200 group-hover:text-amber-400 transition-colors line-clamp-2 leading-snug break-words text-center"
+            title={folder.name}
+          >
+            <ShelfIcon icon={folder.icon} className="inline-block w-3.5 h-3.5 text-amber-500/90 mr-1.5 -mt-0.5 align-middle shrink-0" />
+            {folder.name}
+          </h3>
+        </div>
+        <span className="inline-block text-[11px] text-neutral-400 font-medium">
+          {folder.book_count === 1
+            ? t('folderBooksCount_one')
+            : t('folderBooksCount', { count: folder.book_count })}
+        </span>
+      </div>
+    </div>
+  );
+}

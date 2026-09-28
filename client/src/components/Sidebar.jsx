@@ -260,6 +260,32 @@ export default function Sidebar({
               </button>
             )}
 
+            {/* Folders Dedicated Page Option */}
+            {shelves.length > 0 && (
+              <button
+                onClick={() => {
+                  onSelectShelf('folders');
+                }}
+                className={`
+                  w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors
+                  ${selectedShelf === 'folders' 
+                    ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' 
+                    : 'text-neutral-300 hover:bg-neutral-800 hover:text-white'}
+                `}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Folder className={`w-4 h-4 shrink-0 ${selectedShelf === 'folders' ? 'text-amber-400' : 'text-neutral-400'}`} />
+                  <span className="truncate">{t('folders')}</span>
+                </div>
+                <span className={`
+                  text-[11px] px-2 py-0.5 rounded-full font-mono font-semibold
+                  ${selectedShelf === 'folders' ? 'bg-amber-500/20 text-amber-300' : 'bg-neutral-800 text-neutral-400'}
+                `}>
+                  {shelves.length}
+                </span>
+              </button>
+            )}
+
             <div className="pt-2 pb-1 px-3">
               <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider">
                 {t('categories', { count: filteredShelves.length })}

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Heart, ChevronRight } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Heart, ChevronLeft, ChevronRight, LayoutGrid, Layers } from 'lucide-react';
 import BookCard from './BookCard';
 import { useI18n } from '../i18n';
 
@@ -12,52 +12,116 @@ export default function FavoriteBooks({
   showFileExtension
 }) {
   const { t } = useI18n();
+  const scrollContainerRef = useRef(null);
+  const [isGridView, setIsGridView] = useState(false);
 
   if (!books || books.length === 0) return null;
 
+  const scroll = (direction) => {
+    if (!scrollContainerRef.current) return;
+    const scrollAmount = Math.max(200, Math.floor(scrollContainerRef.current.clientWidth * 0.75));
+    scrollContainerRef.current.scrollBy({
+      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      behavior: 'smooth'
+    });
+  };
+
+  const showControls = books.length > 2;
+
   return (
     <section className="mb-8">
+      {/* Section Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Heart className="w-5 h-5 text-rose-500 fill-rose-500" />
-          <h2 className="text-base font-semibold text-neutral-100">{t('favorites')}</h2>
+          {onViewAll ? (
+            <button
+              onClick={onViewAll}
+              className="text-base font-semibold text-neutral-100 hover:text-rose-400 transition-colors cursor-pointer text-left"
+              title={t('favorites')}
+            >
+              <h2>{t('favorites')}</h2>
+            </button>
+          ) : (
+            <h2 className="text-base font-semibold text-neutral-100">{t('favorites')}</h2>
+          )}
           <span className="text-xs text-neutral-500 font-normal">
             {t('favoriteBooksCount', { count: books.length })}
           </span>
         </div>
-        {onViewAll && books.length > 2 && (
-          <button
-            onClick={onViewAll}
-            className="text-xs font-medium text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors cursor-pointer"
-          >
-            <span>{t('viewAll')}</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
+
+        {showControls && (
+          <div className="flex items-center gap-2">
+            {/* Toggle View (Carousel / Grid) */}
+            <button
+              onClick={() => setIsGridView(prev => !prev)}
+              className="text-xs font-medium text-neutral-400 hover:text-rose-400 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-900/60 hover:bg-neutral-800 border border-neutral-800 transition-colors cursor-pointer"
+              title={isGridView ? t('showCarousel') : t('viewAll')}
+            >
+              {isGridView ? (
+                <>
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>{t('showCarousel')}</span>
+                </>
+              ) : (
+                <>
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span>{t('viewAll')}</span>
+                </>
+              )}
+            </button>
+
+            {/* Scroll Navigation Buttons (Only in carousel mode) */}
+            {!isGridView && (
+              <div className="flex items-center gap-1 pl-1 border-l border-neutral-800">
+                <button
+                  onClick={() => scroll('left')}
+                  className="p-1 rounded-lg text-neutral-400 hover:text-neutral-200 bg-neutral-900/60 hover:bg-neutral-800 border border-neutral-800 transition-colors cursor-pointer"
+                  aria-label="Scroll left"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => scroll('right')}
+                  className="p-1 rounded-lg text-neutral-400 hover:text-neutral-200 bg-neutral-900/60 hover:bg-neutral-800 border border-neutral-800 transition-colors cursor-pointer"
+                  aria-label="Scroll right"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5 sm:gap-6 overflow-hidden">
-        {books.slice(0, 6).map((book, idx) => {
-          const visibilityClass =
-            idx < 2 ? 'block' :
-            idx === 2 ? 'hidden sm:block' :
-            idx === 3 ? 'hidden md:block' :
-            idx === 4 ? 'hidden lg:block' :
-            'hidden xl:block';
-
-          return (
-            <div key={`fav-${book.id}`} className={visibilityClass}>
-              <BookCard
-                book={book}
-                isFavorite={true}
-                onSelectBook={onSelectBook}
-                onContextMenu={onContextMenu}
-                onToggleFavorite={onToggleFavorite}
-                showFileExtension={showFileExtension}
-              />
-            </div>
-          );
-        })}
+      {/* Favorite Books Container */}
+      <div
+        ref={scrollContainerRef}
+        className={
+          isGridView
+            ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5 sm:gap-6'
+            : 'flex gap-5 sm:gap-6 overflow-x-auto no-scrollbar scroll-smooth py-1 px-0.5'
+        }
+      >
+        {books.map((book) => (
+          <div 
+            key={`fav-${book.id}`} 
+            className={
+              !isGridView 
+                ? 'w-[calc((100%-1.25rem)/2)] sm:w-[calc((100%-3rem)/3)] md:w-[calc((100%-4.5rem)/4)] lg:w-[calc((100%-6rem)/5)] xl:w-[calc((100%-7.5rem)/6)] shrink-0' 
+                : 'w-full'
+            }
+          >
+            <BookCard
+              book={book}
+              isFavorite={true}
+              onSelectBook={onSelectBook}
+              onContextMenu={onContextMenu}
+              onToggleFavorite={onToggleFavorite}
+              showFileExtension={showFileExtension}
+            />
+          </div>
+        ))}
       </div>
     </section>
   );

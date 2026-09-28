@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Search, SlidersHorizontal, Menu, X, BookOpen, 
   ArrowUpDown, FolderOpen, RefreshCw, PanelLeftClose, PanelLeftOpen,
-  Settings, Heart, Bookmark, Home, Maximize2, Minimize2, Library
+  Settings, Heart, Bookmark, Home, Maximize2, Minimize2, Library, Folder
 } from 'lucide-react';
 
 import Sidebar from './components/Sidebar';
@@ -10,6 +10,8 @@ import BookCard from './components/BookCard';
 import ContinueReading from './components/ContinueReading';
 import FavoriteBooks from './components/FavoriteBooks';
 import LibraryFolders from './components/LibraryFolders';
+import FolderCard from './components/FolderCard';
+import AllBooks from './components/AllBooks';
 import LibrarySelector from './components/LibrarySelector';
 import Reader from './components/Reader';
 import ContextMenu from './components/ContextMenu';
@@ -51,6 +53,9 @@ function parseRoute() {
   if (segments[0] === 'favorites') {
     return { view: 'favorites', libraryId: null, shelfId: 'favorites', bookId: null };
   }
+  if (segments[0] === 'folders' || segments[0] === 'shelves') {
+    return { view: 'folders', libraryId: null, shelfId: 'folders', bookId: null };
+  }
   if ((segments[0] === 'folder' || segments[0] === 'shelf') && segments[1]) {
     return { view: 'folder', libraryId: null, shelfId: segments[1], bookId: null };
   }
@@ -84,6 +89,11 @@ function parseRoute() {
     return { view: 'favorites', libraryId: libId, shelfId: 'favorites', bookId: null };
   }
 
+  // /:libraryId/folders or /:libraryId/shelves
+  if (rest[0] === 'folders' || rest[0] === 'shelves') {
+    return { view: 'folders', libraryId: libId, shelfId: 'folders', bookId: null };
+  }
+
   // /:libraryId/folder/:folderId or /:libraryId/shelf/:folderId
   if ((rest[0] === 'folder' || rest[0] === 'shelf') && rest[1]) {
     return { view: 'folder', libraryId: libId, shelfId: rest[1], bookId: null };
@@ -98,6 +108,7 @@ function getPathForShelf(shelfId, libraryId) {
   if (!shelfId) return base;
   if (shelfId === 'continue-reading') return `${base}/continue-reading`;
   if (shelfId === 'favorites') return `${base}/favorites`;
+  if (shelfId === 'folders' || shelfId === 'shelves') return `${base}/folders`;
   return `${base}/folder/${encodeURIComponent(shelfId)}`;
 }
 const getPathForFolder = getPathForShelf;
@@ -303,8 +314,8 @@ export default function App() {
     const shelfToUse = targetShelf !== undefined ? targetShelf : selectedShelf;
     const params = new URLSearchParams();
     params.append('library_id', targetLib);
-    if (shelfToUse) params.append('shelf', shelfToUse);
-    if (debouncedQuery) params.append('query', debouncedQuery);
+    if (shelfToUse && shelfToUse !== 'folders') params.append('shelf', shelfToUse);
+    if (debouncedQuery && shelfToUse !== 'folders') params.append('query', debouncedQuery);
     if (sortBy) params.append('sort', sortBy);
 
     fetch(`/api/books?${params.toString()}`)
@@ -650,6 +661,8 @@ export default function App() {
       document.title = `${t('continueReading')} - ${activeLibraryObj?.name || t('appTitle')}`;
     } else if (selectedShelf === 'favorites') {
       document.title = `${t('favorites')} - ${activeLibraryObj?.name || t('appTitle')}`;
+    } else if (selectedShelf === 'folders') {
+      document.title = `${t('folders')} - ${activeLibraryObj?.name || t('appTitle')}`;
     } else if (currentShelfObj) {
       document.title = `${currentShelfObj.name} - ${activeLibraryObj?.name || t('appTitle')}`;
     } else if (activeLibraryObj) {
@@ -767,6 +780,11 @@ export default function App() {
                           <Heart className="w-4 h-4 text-rose-500 fill-rose-500 shrink-0" />
                           <span>{t('favorites')}</span>
                         </>
+                      ) : selectedShelf === 'folders' ? (
+                        <>
+                          <Folder className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />
+                          <span>{t('folders')}</span>
+                        </>
                       ) : (
                         <>
                           {currentShelfObj ? (
@@ -865,40 +883,85 @@ export default function App() {
             />
           )}
 
-          {/* Folders in Library (displayed when browsing all books without active search) */}
+          {/* Folders (displayed when browsing all books without active search) */}
           {!selectedShelf && !debouncedQuery && shelves.length > 0 && (
             <LibraryFolders
               folders={shelves}
               books={books}
               onSelectFolder={(folderId) => navigateToShelf(folderId)}
               onContextMenu={handleShelfContextMenu}
+              onViewAll={() => navigateToShelf('folders')}
             />
           )}
 
-          {/* Shelf Section Title & Count */}
-          <div className="flex items-center justify-between mb-6 pb-2 border-b border-neutral-800">
-            <div>
-              <h2 className="text-lg sm:text-xl font-bold text-neutral-100 tracking-tight">
-                {selectedShelf === 'continue-reading'
-                  ? t('continueReading')
-                  : selectedShelf === 'favorites' 
-                    ? t('favorites') 
-                    : currentShelfObj 
-                      ? currentShelfObj.name 
-                      : t('allBooksLibrary')}
-              </h2>
-              <p className="text-xs text-neutral-400 mt-0.5">
-                {debouncedQuery 
-                  ? t('searchResults', { query: debouncedQuery, count: books.length })
-                  : !selectedShelf
-                    ? t('booksInLibrary', { count: books.length })
-                    : t('booksInShelf', { count: books.length })}
-              </p>
+          {/* Shelf Section Title & Count (displayed when browsing a specific folder, shelf, or search query) */}
+          {(selectedShelf || debouncedQuery) && (
+            <div className="flex items-center justify-between mb-6 pb-2 border-b border-neutral-800">
+              <div>
+                <h2 className="text-lg sm:text-xl font-bold text-neutral-100 tracking-tight">
+                  {selectedShelf === 'continue-reading'
+                    ? t('continueReading')
+                    : selectedShelf === 'favorites' 
+                      ? t('favorites') 
+                      : selectedShelf === 'folders'
+                        ? t('folders')
+                        : currentShelfObj 
+                          ? currentShelfObj.name 
+                          : t('allBooksLibrary')}
+                </h2>
+                <p className="text-xs text-neutral-400 mt-0.5">
+                  {debouncedQuery 
+                    ? t('searchResults', { 
+                        query: debouncedQuery, 
+                        count: selectedShelf === 'folders'
+                          ? shelves.filter(s => s.name.toLowerCase().includes(debouncedQuery.toLowerCase())).length
+                          : books.length 
+                      })
+                    : selectedShelf === 'folders'
+                      ? t('foldersCount', { count: shelves.length })
+                      : t('booksInShelf', { count: books.length })}
+                </p>
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Book Cards Grid */}
-          {loading ? (
+          {/* Content: Dedicated Folders Page Grid, Loading Skeletons, AllBooks Carousel, or Books Grid */}
+          {selectedShelf === 'folders' ? (
+            (() => {
+              const displayFolders = debouncedQuery
+                ? shelves.filter(s => s.name.toLowerCase().includes(debouncedQuery.toLowerCase()))
+                : shelves;
+
+              if (displayFolders.length === 0) {
+                return (
+                  <div className="text-center py-20 flex flex-col items-center justify-center">
+                    <div className="w-16 h-16 rounded-2xl bg-neutral-900 flex items-center justify-center text-neutral-600 mb-4">
+                      <Folder className="w-8 h-8 text-neutral-600" />
+                    </div>
+                    <h3 className="text-base font-semibold text-neutral-300">{t('noBooksFound')}</h3>
+                    <p className="text-xs text-neutral-500 mt-1 max-w-sm">
+                      {t('noBooksDesc')}
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-5">
+                  {displayFolders.map((folder) => (
+                    <FolderCard
+                      key={folder.id}
+                      folder={folder}
+                      books={books}
+                      onSelectFolder={(folderId) => navigateToShelf(folderId)}
+                      onContextMenu={handleShelfContextMenu}
+                      className="w-full"
+                    />
+                  ))}
+                </div>
+              );
+            })()
+          ) : loading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5 sm:gap-6">
               {[...Array(12)].map((_, i) => (
                 <div key={i} className="flex flex-col gap-2">
@@ -909,19 +972,30 @@ export default function App() {
               ))}
             </div>
           ) : books.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5 sm:gap-6">
-              {books.map((book) => (
-                <BookCard
-                  key={book.id}
-                  book={book}
-                  isFavorite={favoriteIds.has(book.id)}
-                  onSelectBook={(selected) => openReader(selected)}
-                  onContextMenu={handleContextMenu}
-                  onToggleFavorite={handleToggleFavorite}
-                  showFileExtension={showFileExtension}
-                />
-              ))}
-            </div>
+            !selectedShelf && !debouncedQuery ? (
+              <AllBooks
+                books={books}
+                favoriteIds={favoriteIds}
+                onSelectBook={(selected) => openReader(selected)}
+                onContextMenu={handleContextMenu}
+                onToggleFavorite={handleToggleFavorite}
+                showFileExtension={showFileExtension}
+              />
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5 sm:gap-6">
+                {books.map((book) => (
+                  <BookCard
+                    key={book.id}
+                    book={book}
+                    isFavorite={favoriteIds.has(book.id)}
+                    onSelectBook={(selected) => openReader(selected)}
+                    onContextMenu={handleContextMenu}
+                    onToggleFavorite={handleToggleFavorite}
+                    showFileExtension={showFileExtension}
+                  />
+                ))}
+              </div>
+            )
           ) : totalBooks === 0 && !debouncedQuery ? (
             <div className="text-center py-20 flex flex-col items-center justify-center max-w-md mx-auto">
               <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-4 shadow-lg shadow-amber-500/10">

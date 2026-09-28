@@ -33,17 +33,20 @@ export const translations = {
     pageOf: 'Page {page} of {total}',
     progress: 'Progress',
 
-    // Folders in library
-    foldersInLibrary: 'Folders in library',
+    // Folders
+    folders: 'Folders',
+    foldersInLibrary: 'Folders',
     foldersCount: '({count} folders)',
     folderBooksCount: '{count} books',
     folderBooksCount_one: '1 book',
     viewAllFolders: 'View all',
     collapseFolders: 'Show carousel',
+    showCarousel: 'Show carousel',
 
     // All books in library
     allBooksLibrary: 'All books in library',
     booksInLibrary: '{count} books in library',
+    allBooksCount: '({count} books in library)',
 
     // Favorites
     favorites: 'Favorites',
@@ -234,17 +237,20 @@ export const translations = {
     pageOf: 'Pág. {page} de {total}',
     progress: 'Progresso',
 
-    // Folders in library
-    foldersInLibrary: 'Pastas na biblioteca',
+    // Folders
+    folders: 'Pastas',
+    foldersInLibrary: 'Pastas',
     foldersCount: '({count} pastas)',
     folderBooksCount: '{count} livros',
     folderBooksCount_one: '1 livro',
     viewAllFolders: 'Ver todos',
     collapseFolders: 'Mostrar carrossel',
+    showCarousel: 'Mostrar carrossel',
 
     // All books in library
     allBooksLibrary: 'Todos os livros na biblioteca',
     booksInLibrary: '{count} livros na biblioteca',
+    allBooksCount: '({count} livros na biblioteca)',
 
     // Favorites
     favorites: 'Favoritos',

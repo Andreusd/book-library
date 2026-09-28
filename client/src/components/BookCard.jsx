@@ -132,6 +132,22 @@ export default function BookCard({
           </div>
         </div>
 
+        {/* Format Badge (EPUB / PDF) in Lower Right Corner of Cover */}
+        {shouldShowExtension && (
+          <div className="absolute bottom-2 right-2 z-10 transition-opacity duration-200 group-hover:opacity-0 pointer-events-none">
+            {isEpub && (
+              <span className="px-1.5 py-0.5 text-[9px] font-bold tracking-wider rounded bg-neutral-950/85 backdrop-blur-md border border-indigo-500/50 text-indigo-300 shadow-md uppercase">
+                EPUB
+              </span>
+            )}
+            {isPdf && (
+              <span className="px-1.5 py-0.5 text-[9px] font-bold tracking-wider rounded bg-neutral-950/85 backdrop-blur-md border border-rose-500/50 text-rose-300 shadow-md uppercase">
+                PDF
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Subtle Bottom Reading Progress Bar */}
         {hasProgress && !isFinished && (
           <div className="absolute bottom-0 inset-x-0 h-1 bg-neutral-900/80">
@@ -157,20 +173,8 @@ export default function BookCard({
           </p>
         )}
         <div className="flex items-center justify-between mt-1 text-[11px] text-neutral-500">
-          <span className="truncate max-w-[65%]">{book.shelf_display || book.folder_display}</span>
-          <div className="flex items-center gap-1.5 shrink-0">
-            {shouldShowExtension && isEpub && (
-              <span className="px-1.5 py-0.2 text-[9px] font-bold tracking-wider rounded bg-indigo-950/80 border border-indigo-500/40 text-indigo-300 uppercase">
-                EPUB
-              </span>
-            )}
-            {shouldShowExtension && isPdf && (
-              <span className="px-1.5 py-0.2 text-[9px] font-bold tracking-wider rounded bg-rose-950/80 border border-rose-500/40 text-rose-300 uppercase">
-                PDF
-              </span>
-            )}
-            <span>{book.size_formatted}</span>
-          </div>
+          <span className="truncate max-w-[70%]">{book.shelf_display || book.folder_display}</span>
+          <span className="shrink-0">{book.size_formatted}</span>
         </div>
       </div>
     </div>

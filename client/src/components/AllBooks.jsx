@@ -1,51 +1,52 @@
 import React, { useRef, useState } from 'react';
-import { Folder, ChevronLeft, ChevronRight, LayoutGrid, Layers } from 'lucide-react';
-import FolderCard, { getFolderCovers } from './FolderCard';
+import { BookOpen, ChevronLeft, ChevronRight, LayoutGrid, Layers } from 'lucide-react';
+import BookCard from './BookCard';
 import { useI18n } from '../i18n';
 
-export default function LibraryFolders({
-  folders = [],
+export default function AllBooks({
   books = [],
-  onSelectFolder,
+  favoriteIds,
+  onSelectBook,
   onContextMenu,
-  onViewAll
+  onToggleFavorite,
+  showFileExtension
 }) {
   const { t } = useI18n();
   const scrollContainerRef = useRef(null);
   const [isGridView, setIsGridView] = useState(false);
 
-  if (!folders || folders.length === 0) return null;
+  if (!books || books.length === 0) return null;
 
   const scroll = (direction) => {
     if (!scrollContainerRef.current) return;
-    const scrollAmount = 360;
+    const scrollAmount = Math.max(200, Math.floor(scrollContainerRef.current.clientWidth * 0.75));
     scrollContainerRef.current.scrollBy({
       left: direction === 'left' ? -scrollAmount : scrollAmount,
       behavior: 'smooth'
     });
   };
 
-  const showControls = folders.length > 4;
+  const showControls = books.length > 2;
+
+  const isFavoriteBook = (bookId) => {
+    if (favoriteIds instanceof Set) {
+      return favoriteIds.has(bookId);
+    }
+    if (Array.isArray(favoriteIds)) {
+      return favoriteIds.includes(bookId);
+    }
+    return Boolean(favoriteIds?.[bookId]);
+  };
 
   return (
-    <section className="mb-10">
+    <section className="mb-8">
       {/* Section Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Folder className="w-5 h-5 text-amber-500 fill-amber-500" />
-          {onViewAll ? (
-            <button
-              onClick={onViewAll}
-              className="text-base font-semibold text-neutral-100 hover:text-amber-400 transition-colors cursor-pointer text-left"
-              title={t('folders')}
-            >
-              <h2>{t('folders')}</h2>
-            </button>
-          ) : (
-            <h2 className="text-base font-semibold text-neutral-100">{t('folders')}</h2>
-          )}
+          <BookOpen className="w-5 h-5 text-sky-500 fill-sky-500" />
+          <h2 className="text-base font-semibold text-neutral-100">{t('allBooksLibrary')}</h2>
           <span className="text-xs text-neutral-500 font-normal">
-            {t('foldersCount', { count: folders.length })}
+            {t('allBooksCount', { count: books.length })}
           </span>
         </div>
 
@@ -54,18 +55,18 @@ export default function LibraryFolders({
             {/* Toggle View (Carousel / Grid) */}
             <button
               onClick={() => setIsGridView(prev => !prev)}
-              className="text-xs font-medium text-neutral-400 hover:text-amber-400 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-900/60 hover:bg-neutral-800 border border-neutral-800 transition-colors cursor-pointer"
-              title={isGridView ? t('collapseFolders') : t('viewAllFolders')}
+              className="text-xs font-medium text-neutral-400 hover:text-sky-400 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-900/60 hover:bg-neutral-800 border border-neutral-800 transition-colors cursor-pointer"
+              title={isGridView ? t('showCarousel') : t('viewAll')}
             >
               {isGridView ? (
                 <>
                   <Layers className="w-3.5 h-3.5" />
-                  <span>{t('collapseFolders')}</span>
+                  <span>{t('showCarousel')}</span>
                 </>
               ) : (
                 <>
                   <LayoutGrid className="w-3.5 h-3.5" />
-                  <span>{t('viewAllFolders')}</span>
+                  <span>{t('viewAll')}</span>
                 </>
               )}
             </button>
@@ -93,31 +94,34 @@ export default function LibraryFolders({
         )}
       </div>
 
-      {/* Folders Container */}
+      {/* Books Container */}
       <div
         ref={scrollContainerRef}
         className={
           isGridView
-            ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-5'
-            : folders.length <= 4
-              ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 sm:gap-5'
-              : 'flex gap-4 sm:gap-5 overflow-x-auto no-scrollbar scroll-smooth py-1 px-0.5'
+            ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5 sm:gap-6'
+            : 'flex gap-5 sm:gap-6 overflow-x-auto no-scrollbar scroll-smooth py-1 px-0.5'
         }
       >
-        {folders.map((folder) => {
-          const covers = getFolderCovers(folder, books);
-
-          return (
-            <FolderCard
-              key={folder.id}
-              folder={folder}
-              covers={covers}
-              onSelectFolder={onSelectFolder}
+        {books.map((book) => (
+          <div
+            key={`all-${book.id}`}
+            className={
+              !isGridView
+                ? 'w-[calc((100%-1.25rem)/2)] sm:w-[calc((100%-3rem)/3)] md:w-[calc((100%-4.5rem)/4)] lg:w-[calc((100%-6rem)/5)] xl:w-[calc((100%-7.5rem)/6)] shrink-0'
+                : 'w-full'
+            }
+          >
+            <BookCard
+              book={book}
+              isFavorite={isFavoriteBook(book.id)}
+              onSelectBook={onSelectBook}
               onContextMenu={onContextMenu}
-              className={!isGridView && folders.length > 4 ? 'w-44 sm:w-48 shrink-0' : 'w-full'}
+              onToggleFavorite={onToggleFavorite}
+              showFileExtension={showFileExtension}
             />
-          );
-        })}
+          </div>
+        ))}
       </div>
     </section>
   );
