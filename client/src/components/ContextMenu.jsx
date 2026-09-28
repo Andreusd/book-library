@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { 
   BookOpen, Heart, RotateCcw, CheckCircle2, 
-  Copy, Check, Tag 
+  Copy, Check, Tag, Info 
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 
@@ -12,6 +12,7 @@ export default function ContextMenu({
   isFavorite,
   onClose, 
   onOpenReader, 
+  onOpenDetails,
   onMarkStatus,
   onToggleFavorite,
   onManageTags
@@ -51,7 +52,7 @@ export default function ContextMenu({
 
   // Adjust coordinates to ensure the menu stays within viewport boundaries
   const menuWidth = 230;
-  const menuHeight = 265;
+  const menuHeight = 300;
   const posX = Math.min(Math.max(10, x), window.innerWidth - menuWidth - 10);
   const posY = Math.min(Math.max(10, y), window.innerHeight - menuHeight - 10);
 
@@ -121,6 +122,17 @@ export default function ContextMenu({
       >
         <Heart className={`w-4 h-4 shrink-0 ${isFav ? 'fill-rose-500 text-rose-500' : 'text-neutral-400'}`} />
         <span>{isFav ? t('removeFromFavorites') : t('addToFavorites')}</span>
+      </button>
+
+      <button
+        onClick={() => {
+          if (onOpenDetails) onOpenDetails(book);
+          onClose();
+        }}
+        className="w-full px-3 py-1.5 flex items-center gap-2.5 hover:bg-neutral-800 text-neutral-300 hover:text-neutral-100 text-left transition"
+      >
+        <Info className="w-4 h-4 text-sky-400 shrink-0" />
+        <span>{t('viewDetails')}</span>
       </button>
 
       <button

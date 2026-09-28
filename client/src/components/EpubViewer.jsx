@@ -409,6 +409,24 @@ export default function EpubViewer({
     readerSettingsOpenRef.current = readerSettingsOpen;
   }, [readerSettingsOpen]);
 
+  const [showBottomProgress, setShowBottomProgress] = useState(() => {
+    try {
+      return localStorage.getItem('reader_bottom_progress') !== 'false';
+    } catch (e) {
+      return true;
+    }
+  });
+
+  const toggleBottomProgress = useCallback(() => {
+    setShowBottomProgress(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('reader_bottom_progress', String(next));
+      } catch (e) {}
+      return next;
+    });
+  }, []);
+
   const [trackpadSwipeEnabled, setTrackpadSwipeEnabled] = useState(() => {
     try {
       return localStorage.getItem('reader_trackpad_swipe') !== 'false';
@@ -2495,14 +2513,14 @@ export default function EpubViewer({
                   className="fixed inset-0 z-40 bg-transparent" 
                   onClick={() => setReaderSettingsOpen(false)}
                 />
-                <div className={`absolute right-0 top-full mt-2 w-72 sm:w-80 rounded-2xl p-3.5 z-50 text-left select-none animate-in fade-in zoom-in-95 duration-150 border ${
+                <div className={`absolute right-0 top-full mt-2 w-72 sm:w-80 max-h-[calc(100vh-5.5rem)] flex flex-col rounded-2xl p-3.5 z-50 text-left select-none animate-in fade-in zoom-in-95 duration-150 border ${
                   theme === 'dark' 
                     ? 'bg-neutral-900 border-neutral-700 shadow-2xl shadow-black/80 text-neutral-100' 
                     : theme === 'sepia'
                     ? 'bg-[#fbf0d9] border-[#d8c5a0] shadow-2xl shadow-neutral-900/15 text-[#292014]'
                     : 'bg-white border-neutral-200 shadow-2xl shadow-neutral-900/15 text-neutral-800'
                 }`}>
-                  <div className={`flex items-center justify-between pb-2.5 mb-2.5 border-b ${
+                  <div className={`flex items-center justify-between pb-2.5 mb-2.5 border-b shrink-0 ${
                     theme === 'dark' ? 'border-neutral-800' : theme === 'sepia' ? 'border-[#d8c5a0]' : 'border-neutral-200'
                   }`}>
                     <div className="flex items-center gap-2">
@@ -2525,7 +2543,34 @@ export default function EpubViewer({
                     </button>
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 reader-settings-scroll flex-1 pr-1">
+                    {/* Toggle Bottom Progress Bar */}
+                    <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${
+                      theme === 'dark' ? 'hover:bg-neutral-800/60' : theme === 'sepia' ? 'hover:bg-[#efe0c2]/60' : 'hover:bg-neutral-100'
+                    }`}>
+                      <div className="min-w-0 flex-1">
+                        <span className={`text-xs font-semibold block transition-colors ${
+                          theme === 'dark' ? 'text-neutral-100 group-hover:text-amber-300' : theme === 'sepia' ? 'text-[#292014] group-hover:text-amber-700' : 'text-neutral-900 group-hover:text-amber-600'
+                        }`}>
+                          {t('bottomProgressBar')}
+                        </span>
+                        <span className={`text-[11px] leading-snug block mt-0.5 ${
+                          theme === 'dark' ? 'text-neutral-300' : theme === 'sepia' ? 'text-[#7c6a53]' : 'text-neutral-500'
+                        }`}>
+                          {t('bottomProgressBarDesc')}
+                        </span>
+                      </div>
+                      <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                        <input 
+                          type="checkbox"
+                          checked={showBottomProgress}
+                          onChange={toggleBottomProgress}
+                          className="sr-only peer"
+                        />
+                        <div className={`w-9 h-5 ${theme === 'dark' ? 'bg-neutral-800 border-neutral-700' : 'bg-neutral-300 border-neutral-300'} border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500`}></div>
+                      </div>
+                    </label>
+
                     {/* Toggle Trackpad Swipe */}
                     <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${
                       theme === 'dark' ? 'hover:bg-neutral-800/60' : theme === 'sepia' ? 'hover:bg-[#efe0c2]/60' : 'hover:bg-neutral-100'
@@ -2736,6 +2781,7 @@ export default function EpubViewer({
           onJumpToAnnotation={handleJumpToAnnotation}
           onUpdateComment={handleUpdateComment}
           onDeleteAnnotation={handleDeleteAnnotation}
+          book={book}
         />
 
         {/* Floating In-Book Search Bar */}
@@ -2784,14 +2830,16 @@ export default function EpubViewer({
       )}
 
       {/* Floating Bottom Progress Indicator (Always subtle at bottom edge) */}
-      <footer className={`fixed bottom-0 inset-x-0 h-1.5 z-30 pointer-events-none ${
-        theme === 'dark' ? 'bg-black/60' : theme === 'sepia' ? 'bg-[#d8c5a0]/40' : 'bg-neutral-300/40'
-      }`}>
-        <div 
-          className="h-full bg-amber-500 transition-all duration-300"
-          style={{ width: `${locationInfo.percentage}%` }}
-        />
-      </footer>
+      {showBottomProgress && (
+        <footer className={`fixed bottom-0 inset-x-0 h-1.5 z-30 pointer-events-none ${
+          theme === 'dark' ? 'bg-black/60' : theme === 'sepia' ? 'bg-[#d8c5a0]/40' : 'bg-neutral-300/40'
+        }`}>
+          <div 
+            className="h-full bg-amber-500 transition-all duration-300"
+            style={{ width: `${locationInfo.percentage}%` }}
+          />
+        </footer>
+      )}
     </div>
   );
 }

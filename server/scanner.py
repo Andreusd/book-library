@@ -171,6 +171,16 @@ class LibraryScanner:
                     m_author = re.search(r'<dc:creator[^>]*>([^<]+)</dc:creator>', opf_text, re.IGNORECASE)
                     if m_author:
                         meta['author'] = html.unescape(m_author.group(1).strip())
+                    m_desc = re.search(r'<dc:description[^>]*>([\s\S]*?)</dc:description>', opf_text, re.IGNORECASE)
+                    if m_desc:
+                        clean_desc = re.sub(r'<[^>]+>', ' ', m_desc.group(1))
+                        meta['description'] = html.unescape(re.sub(r'\s+', ' ', clean_desc)).strip()
+                    m_pub = re.search(r'<dc:publisher[^>]*>([^<]+)</dc:publisher>', opf_text, re.IGNORECASE)
+                    if m_pub:
+                        meta['publisher'] = html.unescape(m_pub.group(1).strip())
+                    m_date = re.search(r'<dc:date[^>]*>([^<]+)</dc:date>', opf_text, re.IGNORECASE)
+                    if m_date:
+                        meta['date'] = html.unescape(m_date.group(1).strip())
                     spine_items = re.findall(r'<itemref\b', opf_text, re.IGNORECASE)
                     meta['spine_count'] = len(spine_items)
         except Exception as e:
@@ -381,6 +391,9 @@ class LibraryScanner:
                     "size_formatted": format_size(size),
                     "modified_time": mtime,
                     "path": full_path,
+                    "description": meta.get("description", ""),
+                    "publisher": meta.get("publisher", ""),
+                    "published_date": meta.get("date", ""),
                 })
 
         # Subdirectory shelves/folders
@@ -432,6 +445,9 @@ class LibraryScanner:
                     "size_formatted": format_size(size),
                     "modified_time": mtime,
                     "path": full_path,
+                    "description": meta.get("description", ""),
+                    "publisher": meta.get("publisher", ""),
+                    "published_date": meta.get("date", ""),
                 })
 
         return books

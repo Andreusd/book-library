@@ -7,6 +7,7 @@ export default function AllBooks({
   books = [],
   favoriteIds,
   onSelectBook,
+  onOpenDetails,
   onContextMenu,
   onToggleFavorite,
   onSelectTag,
@@ -117,6 +118,7 @@ export default function AllBooks({
               book={book}
               isFavorite={isFavoriteBook(book.id)}
               onSelectBook={onSelectBook}
+              onOpenDetails={onOpenDetails}
               onContextMenu={onContextMenu}
               onToggleFavorite={onToggleFavorite}
               onSelectTag={onSelectTag}

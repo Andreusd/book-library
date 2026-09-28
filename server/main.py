@@ -18,6 +18,7 @@ from .annotations import AnnotationsManager
 from .favorites import FavoritesManager
 from .lookup import LookupManager
 from .tags import TagsManager
+from .users import UserManager
 
 # Base paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -26,11 +27,15 @@ CLIENT_DIST = os.path.abspath(os.path.join(BASE_DIR, "..", "client", "dist"))
 # Core components
 scanner = LibraryScanner()
 cover_mgr = CoverManager()
-tracker = ProgressTracker()
-annotations_mgr = AnnotationsManager()
-favorites_mgr = FavoritesManager()
 lookup_mgr = LookupManager()
-tags_mgr = TagsManager()
+user_mgr = UserManager()
+
+def get_request_user(request: Request) -> str:
+    """Extracts username from X-User header or user query param."""
+    x_user = request.headers.get("x-user") or request.headers.get("X-User")
+    if not x_user:
+        x_user = request.query_params.get("user")
+    return (x_user or "default").strip() or "default"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -143,6 +148,44 @@ class SetBookTagsPayload(BaseModel):
 
 class ToggleBookTagPayload(BaseModel):
     tag_id: str
+
+class UserPayload(BaseModel):
+    username: str
+
+@app.get("/api/users")
+def list_users():
+    """Returns list of registered users sorted by recent activity."""
+    return {"users": user_mgr.list_users()}
+
+@app.post("/api/users")
+def register_user(payload: UserPayload):
+    """Registers or touches a user profile."""
+    clean = payload.username.strip()
+    if not clean:
+        raise HTTPException(status_code=400, detail="Username cannot be empty")
+    profile = user_mgr.touch_user(clean)
+    return {"status": "ok", "user": profile, "users": user_mgr.list_users()}
+
+@app.get("/api/users/current")
+def get_current_user_profile(request: Request):
+    """Returns profile for the current requesting user."""
+    user = get_request_user(request)
+    profile = user_mgr.touch_user(user)
+    return {"user": profile}
+
+@app.delete("/api/users/{username}")
+def delete_user(username: str):
+    """Deletes a user profile and all their scoped data from disk."""
+    clean = username.strip()
+    if not clean:
+        raise HTTPException(status_code=400, detail="Username cannot be empty")
+    success = user_mgr.delete_user(clean)
+    return {
+        "status": "ok" if success else "not_found",
+        "deleted": clean,
+        "users": user_mgr.list_users()
+    }
+
 
 @app.get("/api/libraries")
 def list_libraries(library_id: Optional[str] = Query(None)):
@@ -356,6 +399,7 @@ def set_folder_icon(payload: SetShelfIconPayload):
 
 @app.get("/api/books")
 def list_books(
+    request: Request,
     shelf: Optional[str] = Query(None, description="Filter by folder or shelf name"),
     folder: Optional[str] = Query(None, description="Filter by folder name"),
     tag: Optional[str] = Query(None, description="Filter by tag ID"),
@@ -363,7 +407,12 @@ def list_books(
     query: Optional[str] = Query(None, description="Search query across titles"),
     sort: Optional[str] = Query("title_asc", description="Sort order: title_asc, title_desc, size_desc, recent")
 ):
-    """Returns books enriched with reading progress, favorite status, tags, and cover URLs, strictly isolated by library."""
+    """Returns books enriched with reading progress, favorite status, tags, and cover URLs, strictly isolated by library and user."""
+    user = get_request_user(request)
+    tracker = user_mgr.get_tracker(user)
+    favorites_mgr = user_mgr.get_favorites_mgr(user)
+    tags_mgr = user_mgr.get_tags_mgr(user)
+
     shelf_val = shelf if isinstance(shelf, str) else None
     folder_val = folder if isinstance(folder, str) else None
     tag_val = tag if isinstance(tag, str) else None
@@ -445,8 +494,13 @@ def list_books(
     }
 
 @app.get("/api/continue-reading")
-def continue_reading(library_id: Optional[str] = Query(None)):
-    """Returns recently opened books that have reading progress, strictly scoped to library."""
+def continue_reading(request: Request, library_id: Optional[str] = Query(None)):
+    """Returns recently opened books that have reading progress, strictly scoped to library and user."""
+    user = get_request_user(request)
+    tracker = user_mgr.get_tracker(user)
+    favorites_mgr = user_mgr.get_favorites_mgr(user)
+    tags_mgr = user_mgr.get_tags_mgr(user)
+
     lib_val = library_id if isinstance(library_id, str) else None
     recents = tracker.get_recent(limit=25)
     # Strictly isolate: only books physically belonging to this library
@@ -486,8 +540,11 @@ def continue_reading(library_id: Optional[str] = Query(None)):
     return {"books": results}
 
 @app.post("/api/progress")
-def save_progress(payload: ProgressPayload):
+def save_progress(payload: ProgressPayload, request: Request):
     """Saves the current reading page/cfi, zoom, and night reading mode for a book."""
+    user = get_request_user(request)
+    tracker = user_mgr.get_tracker(user)
+
     pct = payload.percent
     if (pct is None or pct <= 0) and payload.cfi:
         b = scanner.find_book(payload.book_id)
@@ -508,20 +565,27 @@ def save_progress(payload: ProgressPayload):
     return {"status": "ok", "progress": record}
 
 @app.post("/api/book/zoom")
-def save_zoom(payload: ZoomPayload):
+def save_zoom(payload: ZoomPayload, request: Request):
     """Saves the preferred zoom level for a book."""
+    user = get_request_user(request)
+    tracker = user_mgr.get_tracker(user)
     record = tracker.set_zoom(payload.book_id, payload.zoom)
     return {"status": "ok", "record": record}
 
 @app.post("/api/book/night-mode")
-def save_night_mode(payload: NightModePayload):
+def save_night_mode(payload: NightModePayload, request: Request):
     """Saves the preferred night reading mode (invert colors) for a book."""
+    user = get_request_user(request)
+    tracker = user_mgr.get_tracker(user)
     record = tracker.set_night_mode(payload.book_id, payload.invert_colors)
     return {"status": "ok", "record": record}
 
 @app.post("/api/book/status")
-def update_book_status(payload: StatusPayload):
+def update_book_status(payload: StatusPayload, request: Request):
     """Marks a book as not started or completed."""
+    user = get_request_user(request)
+    tracker = user_mgr.get_tracker(user)
+
     b = scanner.find_book(payload.book_id)
     if not b:
         raise HTTPException(status_code=404, detail="Book not found")
@@ -549,8 +613,14 @@ def update_book_status(payload: StatusPayload):
         raise HTTPException(status_code=400, detail="Invalid status. Must be 'not_started' or 'completed'")
 
 @app.get("/api/book/{book_id}")
-def get_book(book_id: str):
-    """Returns details for a single book."""
+def get_book(book_id: str, request: Request):
+    """Returns details for a single book enriched with reading stats, annotations, and metadata."""
+    user = get_request_user(request)
+    tracker = user_mgr.get_tracker(user)
+    favorites_mgr = user_mgr.get_favorites_mgr(user)
+    tags_mgr = user_mgr.get_tags_mgr(user)
+    annotations_mgr = user_mgr.get_annotations_mgr(user)
+
     b = scanner.find_book(book_id)
     if not b:
         raise HTTPException(status_code=404, detail="Book not found")
@@ -569,6 +639,36 @@ def get_book(book_id: str):
     b_copy["cover_url"] = f"/api/cover/{book_id}"
     b_copy["is_favorite"] = favorites_mgr.is_favorite(book_id)
     b_copy["tags"] = tags_mgr.get_book_tags(book_id)
+
+    # Annotations summary
+    book_annotations = annotations_mgr.get_annotations(book_id)
+    b_copy["annotations"] = book_annotations
+    b_copy["annotations_count"] = len(book_annotations)
+
+    # Technical file metadata for PDF
+    if b.get("format") == "pdf" and b.get("path") and os.path.isfile(b["path"]):
+        try:
+            pdf = pdfium.PdfDocument(b["path"])
+            total_pages = len(pdf)
+            b_copy["total_pages"] = total_pages
+            if not b_copy["progress"].get("total_pages") or b_copy["progress"]["total_pages"] <= 1:
+                b_copy["progress"]["total_pages"] = total_pages
+            meta = pdf.get_metadata_dict()
+            if meta:
+                raw_auth = meta.get("Author")
+                if raw_auth and not b_copy.get("author") and not any(ord(c) < 32 for c in raw_auth):
+                    b_copy["author"] = raw_auth.strip()
+                raw_subj = meta.get("Subject")
+                if raw_subj and raw_subj != "None" and not b_copy.get("description"):
+                    b_copy["description"] = raw_subj.strip()
+                if meta.get("Creator"):
+                    b_copy["creator"] = meta["Creator"].strip()
+                if meta.get("CreationDate"):
+                    b_copy["creation_date"] = meta["CreationDate"].strip()
+            pdf.close()
+        except Exception:
+            pass
+
     return b_copy
 
 @app.get("/api/cover/{book_id}")
@@ -607,8 +707,13 @@ def stream_book_file(book_id: str):
     )
 
 @app.get("/api/favorites")
-def get_favorites(library_id: Optional[str] = Query(None)):
-    """Returns list of favorite book IDs and favorite books strictly scoped to library."""
+def get_favorites(request: Request, library_id: Optional[str] = Query(None)):
+    """Returns list of favorite book IDs and favorite books strictly scoped to library and user."""
+    user = get_request_user(request)
+    favorites_mgr = user_mgr.get_favorites_mgr(user)
+    tracker = user_mgr.get_tracker(user)
+    tags_mgr = user_mgr.get_tags_mgr(user)
+
     lib_val = library_id if isinstance(library_id, str) else None
     fav_ids = set(favorites_mgr.get_favorite_ids())
     all_progress = tracker.get_all()
@@ -631,8 +736,10 @@ def get_favorites(library_id: Optional[str] = Query(None)):
     }
 
 @app.post("/api/favorites/toggle")
-def toggle_favorite(payload: ToggleFavoritePayload):
+def toggle_favorite(payload: ToggleFavoritePayload, request: Request):
     """Toggles a book's favorite status."""
+    user = get_request_user(request)
+    favorites_mgr = user_mgr.get_favorites_mgr(user)
     is_fav = favorites_mgr.toggle_favorite(payload.book_id)
     return {
         "status": "ok",
@@ -644,8 +751,10 @@ def toggle_favorite(payload: ToggleFavoritePayload):
 # --- Virtual Tags & Custom Collections API ---
 
 @app.get("/api/tags")
-def list_tags(library_id: Optional[str] = Query(None)):
-    """Returns all virtual tags with book counts (scoped to library if provided)."""
+def list_tags(request: Request, library_id: Optional[str] = Query(None)):
+    """Returns all virtual tags with book counts (scoped to library and user)."""
+    user = get_request_user(request)
+    tags_mgr = user_mgr.get_tags_mgr(user)
     lib_val = library_id if isinstance(library_id, str) else None
     if lib_val:
         lib_books = scanner.get_books(library_id=lib_val)
@@ -654,8 +763,10 @@ def list_tags(library_id: Optional[str] = Query(None)):
     return {"tags": tags_mgr.get_tags()}
 
 @app.post("/api/tags")
-def create_tag(payload: CreateTagPayload):
+def create_tag(payload: CreateTagPayload, request: Request):
     """Creates a new virtual tag."""
+    user = get_request_user(request)
+    tags_mgr = user_mgr.get_tags_mgr(user)
     clean = payload.name.strip()
     if not clean:
         raise HTTPException(status_code=400, detail="Tag name cannot be empty")
@@ -663,29 +774,37 @@ def create_tag(payload: CreateTagPayload):
     return {"status": "ok", "tag": tag, "tags": tags_mgr.get_tags()}
 
 @app.put("/api/tags/{tag_id}")
-def update_tag(tag_id: str, payload: UpdateTagPayload):
+def update_tag(tag_id: str, payload: UpdateTagPayload, request: Request):
     """Updates an existing tag's name or color."""
+    user = get_request_user(request)
+    tags_mgr = user_mgr.get_tags_mgr(user)
     tag = tags_mgr.update_tag(tag_id, name=payload.name, color=payload.color)
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
     return {"status": "ok", "tag": tag, "tags": tags_mgr.get_tags()}
 
 @app.delete("/api/tags/{tag_id}")
-def delete_tag(tag_id: str):
+def delete_tag(tag_id: str, request: Request):
     """Deletes a virtual tag and untags all books."""
+    user = get_request_user(request)
+    tags_mgr = user_mgr.get_tags_mgr(user)
     success = tags_mgr.delete_tag(tag_id)
     if not success:
         raise HTTPException(status_code=404, detail="Tag not found")
     return {"status": "ok", "tags": tags_mgr.get_tags()}
 
 @app.get("/api/books/{book_id}/tags")
-def get_book_tags(book_id: str):
+def get_book_tags(book_id: str, request: Request):
     """Returns the tags assigned to a book."""
+    user = get_request_user(request)
+    tags_mgr = user_mgr.get_tags_mgr(user)
     return {"tags": tags_mgr.get_book_tags(book_id)}
 
 @app.post("/api/books/{book_id}/tags")
-def set_book_tags(book_id: str, payload: SetBookTagsPayload):
+def set_book_tags(book_id: str, payload: SetBookTagsPayload, request: Request):
     """Sets the tags for a book."""
+    user = get_request_user(request)
+    tags_mgr = user_mgr.get_tags_mgr(user)
     b = scanner.find_book(book_id)
     if not b:
         raise HTTPException(status_code=404, detail="Book not found")
@@ -693,8 +812,10 @@ def set_book_tags(book_id: str, payload: SetBookTagsPayload):
     return {"status": "ok", "book_id": book_id, "tags": tags}
 
 @app.post("/api/books/{book_id}/tags/toggle")
-def toggle_book_tag(book_id: str, payload: ToggleBookTagPayload):
+def toggle_book_tag(book_id: str, payload: ToggleBookTagPayload, request: Request):
     """Toggles a tag on a book."""
+    user = get_request_user(request)
+    tags_mgr = user_mgr.get_tags_mgr(user)
     b = scanner.find_book(book_id)
     if not b:
         raise HTTPException(status_code=404, detail="Book not found")
@@ -708,19 +829,25 @@ def toggle_book_tag(book_id: str, payload: ToggleBookTagPayload):
     }
 
 @app.get("/api/annotations/{book_id}")
-def get_annotations(book_id: str):
+def get_annotations(book_id: str, request: Request):
     """Returns all highlights and comments for a book."""
+    user = get_request_user(request)
+    annotations_mgr = user_mgr.get_annotations_mgr(user)
     return {"annotations": annotations_mgr.get_annotations(book_id)}
 
 @app.post("/api/annotations")
-def create_annotation(payload: AnnotationPayload):
+def create_annotation(payload: AnnotationPayload, request: Request):
     """Saves a new highlight or comment for a book."""
+    user = get_request_user(request)
+    annotations_mgr = user_mgr.get_annotations_mgr(user)
     record = annotations_mgr.add_annotation(payload.book_id, payload.dict())
     return {"status": "ok", "annotation": record}
 
 @app.put("/api/annotations/{book_id}/{annotation_id}")
-def update_annotation(book_id: str, annotation_id: str, payload: UpdateAnnotationPayload):
+def update_annotation(book_id: str, annotation_id: str, payload: UpdateAnnotationPayload, request: Request):
     """Updates an existing annotation's comment or color."""
+    user = get_request_user(request)
+    annotations_mgr = user_mgr.get_annotations_mgr(user)
     data = {}
     if payload.comment is not None:
         data["comment"] = payload.comment
@@ -732,8 +859,10 @@ def update_annotation(book_id: str, annotation_id: str, payload: UpdateAnnotatio
     return {"status": "ok", "annotation": record}
 
 @app.delete("/api/annotations/{book_id}/{annotation_id}")
-def delete_annotation(book_id: str, annotation_id: str):
+def delete_annotation(book_id: str, annotation_id: str, request: Request):
     """Deletes an annotation."""
+    user = get_request_user(request)
+    annotations_mgr = user_mgr.get_annotations_mgr(user)
     success = annotations_mgr.delete_annotation(book_id, annotation_id)
     if not success:
         raise HTTPException(status_code=404, detail="Annotation not found")

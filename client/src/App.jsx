@@ -21,8 +21,10 @@ import ShelfIconModal from './components/ShelfIconModal';
 import ShelfIcon from './components/ShelfIcon';
 import SettingsModal from './components/SettingsModal';
 import TagManagerModal from './components/TagManagerModal';
+import BookDetailsModal from './components/BookDetailsModal';
 import { getTagColorConfig } from './utils/tagColors';
 import { useI18n } from './i18n';
+import { getCurrentUser, setCurrentUser } from './api';
 
 // Helper to extract view & route information from URL
 // Scoped routes: /:libraryId, /:libraryId/folder/:id, /:libraryId/continue-reading, /:libraryId/favorites, /:libraryId/book/:id
@@ -135,6 +137,7 @@ export default function App() {
   const [shelves, setShelves] = useState([]);
   const [totalBooks, setTotalBooks] = useState(0);
   const [libraries, setLibraries] = useState([]);
+  const [currentUser, setCurrentUserState] = useState(() => getCurrentUser());
   const [activeLibraryId, setActiveLibraryId] = useState(() => initialRoute.libraryId || '');
   const [selectedShelf, setSelectedShelf] = useState(() => initialRoute.shelfId);
   const [books, setBooks] = useState([]);
@@ -143,6 +146,7 @@ export default function App() {
   const [favoriteIds, setFavoriteIds] = useState(new Set());
   const [tags, setTags] = useState([]);
   const [tagModal, setTagModal] = useState({ isOpen: false, book: null });
+  const [detailsModal, setDetailsModal] = useState({ isOpen: false, book: null });
   const [loading, setLoading] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showFileExtension, setShowFileExtension] = useState(() => {
@@ -369,6 +373,27 @@ export default function App() {
       });
   }, [activeLibraryId, selectedShelf, debouncedQuery, sortBy]);
 
+  // Handle User Change (persists to localStorage and reloads user-specific data)
+  const handleUserChange = useCallback((newUsername) => {
+    setCurrentUser(newUsername);
+    setCurrentUserState(newUsername);
+    if (activeLibraryId) {
+      loadContinueReading(activeLibraryId);
+      loadFavorites(activeLibraryId);
+      loadTags(activeLibraryId);
+      loadBooks(activeLibraryId);
+    }
+  }, [activeLibraryId, loadContinueReading, loadFavorites, loadTags, loadBooks]);
+
+  useEffect(() => {
+    const onUserChanged = (e) => {
+      const u = e?.detail?.user || '';
+      setCurrentUserState(u);
+    };
+    window.addEventListener('book_library_user_changed', onUserChanged);
+    return () => window.removeEventListener('book_library_user_changed', onUserChanged);
+  }, []);
+
   // Select Library from selector screen
   const selectLibrary = useCallback((libraryId) => {
     setActiveLibraryId(libraryId);
@@ -576,6 +601,7 @@ export default function App() {
   // Handle book progress update from Reader or status change
   const handleProgressUpdate = useCallback((bookId, newProgress) => {
     setBooks(prev => prev.map(b => (b.id === bookId ? { ...b, progress: newProgress } : b)));
+    setDetailsModal(prev => (prev.isOpen && prev.book?.id === bookId ? { ...prev, book: { ...prev.book, progress: newProgress } } : prev));
     setContinueReading(prev => {
       const isNotReading = !newProgress || 
         newProgress.status === 'not_started' || 
@@ -588,6 +614,10 @@ export default function App() {
       }
       return prev.map(b => (b.id === bookId ? { ...b, progress: newProgress } : b));
     });
+  }, []);
+
+  const handleOpenDetails = useCallback((book) => {
+    setDetailsModal({ isOpen: true, book });
   }, []);
 
   // Right-click context menu handler
@@ -720,8 +750,8 @@ export default function App() {
     }
   }, [activeBook, selectedShelf, currentShelfObj, isTagFilter, currentTagObj, activeLibraryObj, t]);
 
-  // When no active library is selected (e.g. root /), display Library Selection screen
-  if (!activeLibraryId) {
+  // When no active library is selected or no user is set, display Library Selection screen
+  if (!activeLibraryId || !currentUser) {
     return (
       <>
         <LibrarySelector
@@ -729,6 +759,8 @@ export default function App() {
           onSelectLibrary={selectLibrary}
           onOpenSettings={() => setSettingsOpen(true)}
           onAddNewLibrary={() => setSettingsOpen(true)}
+          currentUser={currentUser}
+          onUserChange={handleUserChange}
         />
 
         <SettingsModal
@@ -772,6 +804,7 @@ export default function App() {
         onOpenSettings={() => setSettingsOpen(true)}
         tags={tags}
         onOpenTagManager={() => setTagModal({ isOpen: true, book: null })}
+        currentUser={currentUser}
       />
 
       {/* Main Content Area */}
@@ -924,6 +957,7 @@ export default function App() {
             <ContinueReading 
               books={continueReading} 
               onSelectBook={(book) => openReader(book)} 
+              onOpenDetails={handleOpenDetails}
               onContextMenu={handleContextMenu}
               onViewAll={() => navigateToShelf('continue-reading')}
               onSelectTag={(tg) => navigateToShelf(`tag:${tg.id}`)}
@@ -936,6 +970,7 @@ export default function App() {
             <FavoriteBooks
               books={favorites}
               onSelectBook={(book) => openReader(book)}
+              onOpenDetails={handleOpenDetails}
               onContextMenu={handleContextMenu}
               onToggleFavorite={handleToggleFavorite}
               onViewAll={() => navigateToShelf('favorites')}
@@ -1047,6 +1082,7 @@ export default function App() {
                 books={books}
                 favoriteIds={favoriteIds}
                 onSelectBook={(selected) => openReader(selected)}
+                onOpenDetails={handleOpenDetails}
                 onContextMenu={handleContextMenu}
                 onToggleFavorite={handleToggleFavorite}
                 onSelectTag={(tg) => navigateToShelf(`tag:${tg.id}`)}
@@ -1060,6 +1096,7 @@ export default function App() {
                     book={book}
                     isFavorite={favoriteIds.has(book.id)}
                     onSelectBook={(selected) => openReader(selected)}
+                    onOpenDetails={handleOpenDetails}
                     onContextMenu={handleContextMenu}
                     onToggleFavorite={handleToggleFavorite}
                     onSelectTag={(tg) => navigateToShelf(`tag:${tg.id}`)}
@@ -1136,6 +1173,7 @@ export default function App() {
           isFavorite={favoriteIds.has(contextMenu.book.id)}
           onClose={() => setContextMenu({ isOpen: false, x: 0, y: 0, book: null })}
           onOpenReader={(book) => openReader(book)}
+          onOpenDetails={handleOpenDetails}
           onMarkStatus={handleMarkStatus}
           onToggleFavorite={handleToggleFavorite}
           onManageTags={(book) => setTagModal({ isOpen: true, book })}
@@ -1179,6 +1217,26 @@ export default function App() {
         tags={tags}
         onTagsUpdated={() => loadTags(activeLibraryId)}
         onBookTagsUpdated={handleBookTagsUpdated}
+      />
+
+      {/* Book Details & Metadata Inspector Modal */}
+      <BookDetailsModal
+        isOpen={detailsModal.isOpen}
+        onClose={() => setDetailsModal({ isOpen: false, book: null })}
+        book={detailsModal.book}
+        isFavorite={detailsModal.book ? favoriteIds.has(detailsModal.book.id) : false}
+        onOpenReader={(book) => openReader(book)}
+        onToggleFavorite={handleToggleFavorite}
+        onMarkStatus={handleMarkStatus}
+        onManageTags={(book) => {
+          setDetailsModal({ isOpen: false, book: null });
+          setTagModal({ isOpen: true, book: book });
+        }}
+        onSelectTag={(tg) => {
+          setDetailsModal({ isOpen: false, book: null });
+          navigateToShelf(`tag:${tg.id}`);
+        }}
+        showFileExtension={showFileExtension}
       />
 
       {/* Library Settings Modal */}

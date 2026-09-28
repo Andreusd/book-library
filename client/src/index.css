@@ -129,3 +129,29 @@
   animation: slideInLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Slim scrollbar for reader settings popovers */
+.reader-settings-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(140, 140, 140, 0.45) transparent;
+}
+
+.reader-settings-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.reader-settings-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.reader-settings-scroll::-webkit-scrollbar-thumb {
+  background: rgba(140, 140, 140, 0.4);
+  border-radius: 4px;
+}
+
+.reader-settings-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(140, 140, 140, 0.7);
+}
+
+

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, CheckCircle, Heart } from 'lucide-react';
+import { BookOpen, CheckCircle, Heart, Info } from 'lucide-react';
 import { useI18n } from '../i18n';
 import { getTagColorConfig } from '../utils/tagColors';
 
@@ -7,6 +7,7 @@ export default function BookCard({
   book, 
   isFavorite, 
   onSelectBook, 
+  onOpenDetails,
   onContextMenu, 
   onToggleFavorite,
   onSelectTag,
@@ -126,9 +127,22 @@ export default function BookCard({
           </div>
         )}
 
-        {/* Quick Hover Action Button */}
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-end p-2.5">
-          <div className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-semibold transition flex items-center gap-1 shadow-lg">
+        {/* Quick Hover Action Buttons */}
+        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-2.5 pointer-events-none">
+          {onOpenDetails && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenDetails(book);
+              }}
+              className="p-1.5 rounded-lg bg-neutral-900/90 hover:bg-neutral-800 text-neutral-300 hover:text-sky-300 border border-neutral-750 shadow-lg pointer-events-auto transition cursor-pointer active:scale-95"
+              title={t('viewDetails')}
+            >
+              <Info className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <div className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-semibold transition flex items-center gap-1 shadow-lg ml-auto pointer-events-auto">
             <BookOpen className="w-3.5 h-3.5" />
             <span>{t('readButton')}</span>
           </div>

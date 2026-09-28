@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { 
   MessageSquare, Search, X, ArrowUpRight, Trash2, 
-  Edit3, Check, Bookmark, Calendar 
+  Edit3, Check, Bookmark, Calendar, Copy, Download, FileText 
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 
@@ -19,12 +19,80 @@ export default function CommentsDrawer({
   onClose,
   onJumpToAnnotation,
   onUpdateComment,
-  onDeleteAnnotation
+  onDeleteAnnotation,
+  book = null
 }) {
   const { t } = useI18n();
   const [filterQuery, setFilterQuery] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  const getMarkdownContent = () => {
+    const title = book?.title || t('commentsAndHighlights');
+    const author = book?.author || '';
+    const dateStr = new Date().toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    let md = `# 📖 ${title}\n\n`;
+    if (author) {
+      md += `**Author:** ${author}  \n`;
+    }
+    md += `**Export Date:** ${dateStr}  \n`;
+    md += `**Total Highlights & Notes:** ${annotations.length}\n\n`;
+    md += `---\n\n`;
+
+    const sorted = [...annotations].sort((a, b) => {
+      const pageA = typeof a.page === 'number' ? a.page : 0;
+      const pageB = typeof b.page === 'number' ? b.page : 0;
+      return pageA - pageB;
+    });
+
+    sorted.forEach((ann, idx) => {
+      const loc = ann.chapter || (ann.page ? `Page ${ann.page}` : `Item ${idx + 1}`);
+      md += `### ${loc}\n\n`;
+      if (ann.text) {
+        md += `> ${ann.text.split('\n').join('\n> ')}\n\n`;
+      }
+      if (ann.comment) {
+        md += `💬 **Note:** ${ann.comment}\n\n`;
+      }
+      if (ann.color) {
+        const colorName = ann.color.charAt(0).toUpperCase() + ann.color.slice(1);
+        md += `*Highlight: ${colorName}*\n\n`;
+      }
+      md += `---\n\n`;
+    });
+
+    return md;
+  };
+
+  const handleCopyMarkdown = () => {
+    const md = getMarkdownContent();
+    navigator.clipboard.writeText(md).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const handleDownloadMarkdown = () => {
+    const md = getMarkdownContent();
+    const safeTitle = (book?.title || 'book-notes').replace(/[^a-z0-9_-]/gi, '_').toLowerCase();
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${safeTitle}-notes.md`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const filtered = useMemo(() => {
     const q = filterQuery.trim().toLowerCase();
@@ -81,6 +149,45 @@ export default function CommentsDrawer({
             <X className="w-4 h-4" />
           </button>
         </div>
+
+        {/* Export & Actions Toolbar */}
+        {annotations.length > 0 && (
+          <div className="px-3 py-2 border-b border-neutral-800 bg-neutral-950/60 flex items-center justify-between gap-1.5 shrink-0">
+            <span className="text-[11px] font-medium text-neutral-400 flex items-center gap-1.5 truncate">
+              <FileText className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span>{t('exportMarkdown')}</span>
+            </span>
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={handleCopyMarkdown}
+                className="px-2 py-1 rounded-md bg-neutral-800 hover:bg-neutral-750 text-neutral-200 text-[11px] font-medium transition flex items-center gap-1 cursor-pointer active:scale-95"
+                title={t('copyMarkdown')}
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-3 h-3 text-emerald-400" />
+                    <span className="text-emerald-300 font-semibold">{t('markdownCopied')}</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3 h-3 text-neutral-400" />
+                    <span>{t('copyMarkdown')}</span>
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadMarkdown}
+                className="px-2 py-1 rounded-md bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-[11px] font-medium transition flex items-center gap-1 cursor-pointer active:scale-95"
+                title={t('downloadMarkdown')}
+              >
+                <Download className="w-3 h-3" />
+                <span>.md</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Filter Input */}
         {annotations.length > 0 && (

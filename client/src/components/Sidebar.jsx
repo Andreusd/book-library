@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Library, Search, Folder, Heart, Bookmark, Home, 
-  ChevronDown, Check, Plus, Settings, Tag
+  ChevronDown, Check, Plus, Settings, Tag, User
 } from 'lucide-react';
 import ShelfIcon from './ShelfIcon';
 import { useI18n } from '../i18n';
@@ -23,7 +23,8 @@ export default function Sidebar({
   onSelectAllLibraries,
   onOpenSettings,
   tags = [],
-  onOpenTagManager
+  onOpenTagManager,
+  currentUser = ''
 }) {
   const [shelfFilter, setShelfFilter] = useState('');
   const [libraryDropdownOpen, setLibraryDropdownOpen] = useState(false);
@@ -267,81 +268,10 @@ export default function Sidebar({
               </button>
             )}
 
-            {/* Folders Dedicated Page Option */}
-            {shelves.length > 0 && (
-              <button
-                onClick={() => {
-                  onSelectShelf('folders');
-                }}
-                className={`
-                  w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors
-                  ${selectedShelf === 'folders' 
-                    ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' 
-                    : 'text-neutral-300 hover:bg-neutral-800 hover:text-white'}
-                `}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <Folder className={`w-4 h-4 shrink-0 ${selectedShelf === 'folders' ? 'text-amber-400' : 'text-neutral-400'}`} />
-                  <span className="truncate">{t('folders')}</span>
-                </div>
-                <span className={`
-                  text-[11px] px-2 py-0.5 rounded-full font-mono font-semibold
-                  ${selectedShelf === 'folders' ? 'bg-amber-500/20 text-amber-300' : 'bg-neutral-800 text-neutral-400'}
-                `}>
-                  {shelves.length}
-                </span>
-              </button>
-            )}
-
-            <div className="pt-2 pb-1 px-3">
+            {/* Virtual Tags Section */}
+            <div className="pt-3 pb-1 px-3 flex items-center justify-between">
               <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider">
-                {t('categories', { count: filteredShelves.length })}
-              </span>
-            </div>
-
-            {/* Individual Folders */}
-            {filteredShelves.map((s) => {
-              const isSelected = selectedShelf === s.id;
-              return (
-                <button
-                  key={s.id}
-                  onClick={() => {
-                    onSelectShelf(s.id);
-                  }}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    if (onShelfContextMenu) {
-                      onShelfContextMenu(e, s);
-                    }
-                  }}
-                  className={`
-                    w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors
-                    ${isSelected 
-                      ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' 
-                      : 'text-neutral-300 hover:bg-neutral-800 hover:text-white'}
-                  `}
-                  title={s.custom_name ? `${s.name} (${t('originalFolderLabel', { folder: s.folder })})` : s.name}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <ShelfIcon icon={s.icon} className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-amber-400' : 'text-neutral-400'}`} />
-                    <span className="truncate text-left">{s.name}</span>
-                  </div>
-                  <div className="flex items-center shrink-0 ml-2">
-                    <span className={`
-                      text-[11px] px-1.5 py-0.2 rounded font-mono
-                      ${isSelected ? 'bg-amber-500/20 text-amber-300' : 'bg-neutral-800 text-neutral-400'}
-                    `}>
-                      {s.book_count}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-
-            {/* Virtual Tags & Collections Section */}
-            <div className="pt-4 pb-1 px-3 flex items-center justify-between">
-              <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider">
-                {t('tagsAndCollections')} ({filteredTags.length})
+                {t('tags')} ({filteredTags.length})
               </span>
               <button
                 type="button"
@@ -390,8 +320,110 @@ export default function Sidebar({
                 </button>
               );
             })}
+
+            {/* Folders Dedicated Page Option */}
+            {shelves.length > 0 && (
+              <div className="pt-2">
+                <button
+                  onClick={() => {
+                    onSelectShelf('folders');
+                  }}
+                  className={`
+                    w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors
+                    ${selectedShelf === 'folders' 
+                      ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' 
+                      : 'text-neutral-300 hover:bg-neutral-800 hover:text-white'}
+                  `}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Folder className={`w-4 h-4 shrink-0 ${selectedShelf === 'folders' ? 'text-amber-400' : 'text-neutral-400'}`} />
+                    <span className="truncate">{t('folders')}</span>
+                  </div>
+                  <span className={`
+                    text-[11px] px-2 py-0.5 rounded-full font-mono font-semibold
+                    ${selectedShelf === 'folders' ? 'bg-amber-500/20 text-amber-300' : 'bg-neutral-800 text-neutral-400'}
+                  `}>
+                    {shelves.length}
+                  </span>
+                </button>
+              </div>
+            )}
+
+            <div className="pt-2 pb-1 px-3">
+              <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider">
+                {t('categories', { count: filteredShelves.length })}
+              </span>
+            </div>
+
+            {/* Individual Folders */}
+            {filteredShelves.map((s) => {
+              const isSelected = selectedShelf === s.id;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => {
+                    onSelectShelf(s.id);
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    if (onShelfContextMenu) {
+                      onShelfContextMenu(e, s);
+                    }
+                  }}
+                  className={`
+                    w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors
+                    ${isSelected 
+                      ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' 
+                      : 'text-neutral-300 hover:bg-neutral-800 hover:text-white'}
+                  `}
+                  title={s.custom_name ? `${s.name} (${t('originalFolderLabel', { folder: s.folder })})` : s.name}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <ShelfIcon icon={s.icon} className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-amber-400' : 'text-neutral-400'}`} />
+                    <span className="truncate text-left">{s.name}</span>
+                  </div>
+                  <div className="flex items-center shrink-0 ml-2">
+                    <span className={`
+                      text-[11px] px-1.5 py-0.2 rounded font-mono
+                      ${isSelected ? 'bg-amber-500/20 text-amber-300' : 'bg-neutral-800 text-neutral-400'}
+                    `}>
+                      {s.book_count}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
           </nav>
         </div>
+
+        {/* User Profile Footer (Read-Only) */}
+        {currentUser && (
+          <div className="p-3 border-t border-neutral-800 bg-neutral-900/60 shrink-0">
+            <div className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl bg-neutral-950/80 border border-neutral-800/80">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-6 h-6 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                  <User className="w-3.5 h-3.5" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[10px] text-neutral-400 block leading-tight">
+                    {t('whoIsReading')}
+                  </span>
+                  <span className="text-xs font-bold text-neutral-200 block truncate" title={currentUser}>
+                    {currentUser}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onSelectAllLibraries}
+                className="text-[11px] text-amber-400 hover:text-amber-300 font-semibold cursor-pointer shrink-0 hover:underline px-1.5 py-0.5"
+                title={t('changeUserAtHome')}
+              >
+                {t('changeUser')}
+              </button>
+            </div>
+          </div>
+        )}
       </aside>
     </>
   );

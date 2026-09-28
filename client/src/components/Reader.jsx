@@ -6,7 +6,7 @@ import {
   Maximize2, Minimize2, Moon, Sun, ListTree,
   MessageSquare, Heart, Settings, SlidersHorizontal, X,
   PanelTopClose, PanelTopOpen, RotateCcw, StretchHorizontal, BookOpen,
-  Search, Headphones
+  Search, Headphones, ScrollText
 } from 'lucide-react';
 import PdfOutline from './PdfOutline';
 import PdfPageView, { getDualPageSpread, getNextSpreadPage, getPrevSpreadPage } from './PdfPageView';
@@ -217,6 +217,24 @@ export default function Reader({
   });
 
   const [readerSettingsOpen, setReaderSettingsOpen] = useState(false);
+  const [showBottomProgress, setShowBottomProgress] = useState(() => {
+    try {
+      return localStorage.getItem('reader_bottom_progress') !== 'false';
+    } catch (e) {
+      return true;
+    }
+  });
+
+  const toggleBottomProgress = () => {
+    setShowBottomProgress(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('reader_bottom_progress', String(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
   const [trackpadSwipeEnabled, setTrackpadSwipeEnabled] = useState(() => {
     try {
       return localStorage.getItem('reader_trackpad_swipe') !== 'false';
@@ -296,6 +314,147 @@ export default function Reader({
       try {
         localStorage.setItem('reader_up_down_flip', String(next));
       } catch (e) {}
+      return next;
+    });
+  };
+
+  // Continuous Vertical Scroll Mode State
+  const [scrollMode, setScrollMode] = useState(() => {
+    try {
+      return localStorage.getItem('reader_scroll_mode') || 'flip'; // 'flip' | 'continuous'
+    } catch (e) {
+      return 'flip';
+    }
+  });
+
+  const isContinuous = scrollMode === 'continuous';
+
+  const currentPageRef = useRef(currentPage);
+  useEffect(() => {
+    currentPageRef.current = currentPage;
+  }, [currentPage]);
+
+  const [visiblePageNumbers, setVisiblePageNumbers] = useState(() => new Set([currentPage]));
+  const pageDimsMapRef = useRef({});
+  const [pageDimsMap, setPageDimsMap] = useState({});
+  const pageRefsMap = useRef(new Map());
+
+  const handlePageDimensionsLoaded = useCallback((p, dims) => {
+    pageDimsMapRef.current[p] = dims;
+    setPageDimsMap(prev => ({ ...prev, [p]: dims }));
+  }, []);
+
+  const estimatedPageDims = useMemo(() => {
+    const known = Object.values(pageDimsMapRef.current);
+    if (known.length > 0 && known[0].width && known[0].height) {
+      return known[0];
+    }
+    return {
+      width: Math.round(620 * scale),
+      height: Math.round(877 * scale),
+    };
+  }, [scale, pageDimsMap]);
+
+  const scrollToPageInContinuous = useCallback((p, smooth = true) => {
+    setVisiblePageNumbers(prev => {
+      if (prev.has(p)) return prev;
+      const next = new Set(prev);
+      next.add(p);
+      if (p > 1) next.add(p - 1);
+      if (p < totalPages) next.add(p + 1);
+      return next;
+    });
+
+    const scrollAction = () => {
+      const container = containerRef.current;
+      const el = container?.querySelector(`#pdf-page-${p}`);
+      if (container && el) {
+        const targetScrollTop = el.offsetTop - 16;
+        container.scrollTo({
+          top: Math.max(0, targetScrollTop),
+          behavior: smooth ? 'smooth' : 'auto'
+        });
+      }
+    };
+
+    scrollAction();
+    requestAnimationFrame(() => {
+      scrollAction();
+    });
+  }, [totalPages]);
+
+  // Track active page on continuous scroll
+  const scrollRafRef = useRef(null);
+  const handleContinuousScroll = useCallback(() => {
+    if (!isContinuous || !containerRef.current) return;
+    const container = containerRef.current;
+    const scrollTop = container.scrollTop;
+    const clientHeight = container.clientHeight;
+    const scrollHeight = container.scrollHeight;
+
+    if (scrollTop <= 20) {
+      if (currentPageRef.current !== 1) {
+        currentPageRef.current = 1;
+        setCurrentPage(1);
+        setPageInput('1');
+      }
+      return;
+    }
+
+    if (scrollTop + clientHeight >= scrollHeight - 20) {
+      if (currentPageRef.current !== totalPages) {
+        currentPageRef.current = totalPages;
+        setCurrentPage(totalPages);
+        setPageInput(String(totalPages));
+      }
+      return;
+    }
+
+    // Probe point at 35% from the top of the viewport
+    const probe = scrollTop + clientHeight * 0.35;
+
+    let foundPage = null;
+    pageRefsMap.current.forEach((el, p) => {
+      if (!el) return;
+      const top = el.offsetTop;
+      const bottom = top + el.offsetHeight;
+      if (probe >= top && probe <= bottom) {
+        foundPage = p;
+      }
+    });
+
+    if (foundPage && foundPage !== currentPageRef.current) {
+      currentPageRef.current = foundPage;
+      setCurrentPage(foundPage);
+      setPageInput(String(foundPage));
+    }
+  }, [isContinuous, totalPages]);
+
+  const onContainerScroll = useCallback(() => {
+    if (!isContinuous) return;
+    if (scrollRafRef.current) return;
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      handleContinuousScroll();
+    });
+  }, [isContinuous, handleContinuousScroll]);
+
+  const toggleScrollMode = () => {
+    setScrollMode(prev => {
+      const next = prev === 'continuous' ? 'flip' : 'continuous';
+      try {
+        localStorage.setItem('reader_scroll_mode', next);
+      } catch (e) {}
+      if (next === 'continuous') {
+        setVisiblePageNumbers(new Set([
+          Math.max(1, currentPage - 1), 
+          currentPage, 
+          Math.min(totalPages, currentPage + 1)
+        ]));
+        setTimeout(() => {
+          scrollToPageInContinuous(currentPage, false);
+        }, 60);
+      }
       return next;
     });
   };
@@ -482,6 +641,47 @@ export default function Reader({
     return getDualPageSpread(currentPage, totalPages, dualCoverStandalone);
   }, [currentPage, totalPages, dualCoverStandalone]);
 
+  // Continuous Vertical Scroll: Observer for lazy rendering near the viewport
+  useEffect(() => {
+    if (!isContinuous || !containerRef.current || !pdfDoc) return;
+
+    const renderObserver = new IntersectionObserver((entries) => {
+      setVisiblePageNumbers(prev => {
+        const next = new Set(prev);
+        let changed = false;
+        entries.forEach(entry => {
+          const p = Number(entry.target.getAttribute('data-page-number'));
+          if (!p) return;
+          if (entry.isIntersecting) {
+            if (!next.has(p)) {
+              next.add(p);
+              changed = true;
+            }
+          } else {
+            // Keep nearby pages mounted (within 4 pages of active page)
+            if (next.has(p) && Math.abs(p - currentPageRef.current) > 4) {
+              next.delete(p);
+              changed = true;
+            }
+          }
+        });
+        return changed ? next : prev;
+      });
+    }, {
+      root: containerRef.current,
+      rootMargin: '1200px 0px 1200px 0px',
+      threshold: 0
+    });
+
+    pageRefsMap.current.forEach(el => {
+      renderObserver.observe(el);
+    });
+
+    return () => {
+      renderObserver.disconnect();
+    };
+  }, [isContinuous, pdfDoc, totalPages, scale]);
+
   const hasPrev = isDualPage ? spread.currentBase > 1 : currentPage > 1;
   const hasNext = isDualPage 
     ? (dualCoverStandalone && spread.currentBase === 1 ? totalPages > 1 : spread.currentBase + 2 <= totalPages)
@@ -581,20 +781,30 @@ export default function Reader({
 
   // Page Navigation handlers
   const goToNextPage = useCallback(() => {
-    if (!isDualPage) {
+    if (isContinuous) {
+      const nextP = Math.min(currentPage + 1, totalPages);
+      scrollToPageInContinuous(nextP);
+      setCurrentPage(nextP);
+      setPageInput(String(nextP));
+    } else if (!isDualPage) {
       setCurrentPage(prev => (prev < totalPages ? prev + 1 : prev));
     } else {
       setCurrentPage(prev => getNextSpreadPage(prev, totalPages, dualCoverStandalone));
     }
-  }, [isDualPage, totalPages, dualCoverStandalone]);
+  }, [isContinuous, currentPage, totalPages, scrollToPageInContinuous, isDualPage, dualCoverStandalone]);
 
   const goToPrevPage = useCallback(() => {
-    if (!isDualPage) {
+    if (isContinuous) {
+      const prevP = Math.max(currentPage - 1, 1);
+      scrollToPageInContinuous(prevP);
+      setCurrentPage(prevP);
+      setPageInput(String(prevP));
+    } else if (!isDualPage) {
       setCurrentPage(prev => (prev > 1 ? prev - 1 : prev));
     } else {
       setCurrentPage(prev => getPrevSpreadPage(prev, totalPages, dualCoverStandalone));
     }
-  }, [isDualPage, totalPages, dualCoverStandalone]);
+  }, [isContinuous, currentPage, totalPages, scrollToPageInContinuous, isDualPage, dualCoverStandalone]);
 
   // Configure link service
   const handleLinkNavigate = useCallback((target) => {
@@ -604,14 +814,18 @@ export default function Reader({
       goToPrevPage();
     } else if (typeof target === 'number') {
       const targetPage = Math.min(Math.max(1, target), totalPages);
-      if (isDualPage) {
+      if (isContinuous) {
+        scrollToPageInContinuous(targetPage);
+        setCurrentPage(targetPage);
+        setPageInput(String(targetPage));
+      } else if (isDualPage) {
         const sp = getDualPageSpread(targetPage, totalPages, dualCoverStandalone);
         setCurrentPage(sp.currentBase);
       } else {
         setCurrentPage(targetPage);
       }
     }
-  }, [goToNextPage, goToPrevPage, totalPages, isDualPage, dualCoverStandalone]);
+  }, [isContinuous, goToNextPage, goToPrevPage, totalPages, scrollToPageInContinuous, isDualPage, dualCoverStandalone]);
 
   // Handle PDF index/outline item click
   const handleOutlineClick = useCallback((item) => {
@@ -960,7 +1174,11 @@ export default function Reader({
   // Jump directly to an annotation's page
   const handleJumpToAnnotation = (ann) => {
     if (ann.page) {
-      if (isDualPage) {
+      if (isContinuous) {
+        setCurrentPage(ann.page);
+        setPageInput(String(ann.page));
+        scrollToPageInContinuous(ann.page);
+      } else if (isDualPage) {
         const sp = getDualPageSpread(ann.page, totalPages, dualCoverStandalone);
         setCurrentPage(sp.currentBase);
       } else {
@@ -995,12 +1213,27 @@ export default function Reader({
     .catch(err => console.error('Failed to save progress:', err));
   }, [book.id]);
 
-  // Scroll back to top on page change
+  // Scroll back to top on page change (only in flip mode)
   useEffect(() => {
+    if (isContinuous) return;
     if (containerRef.current) {
       containerRef.current.scrollTop = 0;
     }
-  }, [currentPage]);
+  }, [currentPage, isContinuous]);
+
+  // Restore initial scroll position for continuous mode
+  const initialScrollDoneRef = useRef(false);
+  useEffect(() => {
+    if (!isContinuous || !pdfDoc || loading) return;
+    if (initialScrollDoneRef.current) return;
+    initialScrollDoneRef.current = true;
+    const startPage = Math.min(Math.max(1, book.progress?.page || 1), totalPages);
+    if (startPage > 1) {
+      setTimeout(() => {
+        scrollToPageInContinuous(startPage, false);
+      }, 150);
+    }
+  }, [isContinuous, pdfDoc, loading, book.progress?.page, totalPages, scrollToPageInContinuous]);
 
   // Compute text for page input display (e.g. "1-2" in dual mode)
   const getPageDisplayText = useCallback((page) => {
@@ -1074,7 +1307,11 @@ export default function Reader({
     const match = pageInput.trim().match(/^\d+/);
     const num = match ? parseInt(match[0], 10) : NaN;
     if (!isNaN(num) && num >= 1 && num <= totalPages) {
-      if (isDualPage) {
+      if (isContinuous) {
+        setCurrentPage(num);
+        setPageInput(String(num));
+        scrollToPageInContinuous(num);
+      } else if (isDualPage) {
         const sp = getDualPageSpread(num, totalPages, dualCoverStandalone);
         setCurrentPage(sp.currentBase);
       } else {
@@ -1465,11 +1702,22 @@ export default function Reader({
           <button 
             onClick={toggleDualPage}
             className={`h-7 w-7 flex items-center justify-center rounded-lg transition shrink-0 cursor-pointer hidden md:inline-flex ${
-              isDualPage ? btnActiveClass : btnClass
+              isDualPage && !isContinuous ? btnActiveClass : btnClass
             }`}
             title={isDualPage ? t('singlePageMode') : t('dualPageMode')}
           >
             <BookOpen className="w-4 h-4" />
+          </button>
+
+          {/* Toggle Continuous Vertical Scroll */}
+          <button 
+            onClick={toggleScrollMode}
+            className={`h-7 w-7 flex items-center justify-center rounded-lg transition shrink-0 cursor-pointer hidden sm:inline-flex ${
+              isContinuous ? btnActiveClass : btnClass
+            }`}
+            title={isContinuous ? t('pageFlipMode') : t('verticalScrollMode')}
+          >
+            <ScrollText className="w-4 h-4" />
           </button>
 
           <button 
@@ -1588,12 +1836,12 @@ export default function Reader({
                   className="fixed inset-0 z-40 bg-transparent" 
                   onClick={() => setReaderSettingsOpen(false)}
                 />
-                <div className={`absolute right-0 top-full mt-2 w-72 sm:w-80 rounded-2xl p-3.5 z-50 text-left select-none animate-in fade-in zoom-in-95 duration-150 border ${
+                <div className={`absolute right-0 top-full mt-2 w-72 sm:w-80 max-h-[calc(100vh-5.5rem)] flex flex-col rounded-2xl p-3.5 z-50 text-left select-none animate-in fade-in zoom-in-95 duration-150 border ${
                   invertColors 
                     ? 'bg-neutral-900 border-neutral-700 shadow-2xl shadow-black/80 text-neutral-100' 
                     : 'bg-white border-neutral-200 shadow-2xl shadow-neutral-900/15 text-neutral-800'
                 }`}>
-                  <div className={`flex items-center justify-between pb-2.5 mb-2.5 border-b ${invertColors ? 'border-neutral-800' : 'border-neutral-200'}`}>
+                  <div className={`flex items-center justify-between pb-2.5 mb-2.5 border-b shrink-0 ${invertColors ? 'border-neutral-800' : 'border-neutral-200'}`}>
                     <div className="flex items-center gap-2">
                       <SlidersHorizontal className="w-4 h-4 text-amber-500" />
                       <h3 className={`text-xs font-bold uppercase tracking-wider ${invertColors ? 'text-neutral-100' : 'text-neutral-900'}`}>{t('readerSettings')}</h3>
@@ -1606,7 +1854,28 @@ export default function Reader({
                     </button>
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 reader-settings-scroll flex-1 pr-1">
+                    {/* Toggle Bottom Progress Bar */}
+                    <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
+                      <div className="min-w-0 flex-1">
+                        <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
+                          {t('bottomProgressBar')}
+                        </span>
+                        <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                          {t('bottomProgressBarDesc')}
+                        </span>
+                      </div>
+                      <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                        <input 
+                          type="checkbox"
+                          checked={showBottomProgress}
+                          onChange={toggleBottomProgress}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
+                      </div>
+                    </label>
+
                     {/* Toggle Trackpad Swipe */}
                     <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
                       <div className="min-w-0 flex-1">
@@ -1664,6 +1933,27 @@ export default function Reader({
                           type="checkbox"
                           checked={upDownFlipEnabled}
                           onChange={toggleUpDownFlip}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
+                      </div>
+                    </label>
+
+                    {/* Toggle Continuous Vertical Scroll */}
+                    <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
+                      <div className="min-w-0 flex-1">
+                        <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
+                          {t('verticalScrollMode')}
+                        </span>
+                        <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                          {t('verticalScrollDesc')}
+                        </span>
+                      </div>
+                      <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                        <input 
+                          type="checkbox"
+                          checked={isContinuous}
+                          onChange={toggleScrollMode}
                           className="sr-only peer"
                         />
                         <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
@@ -1782,8 +2072,9 @@ export default function Reader({
           <div 
             ref={containerRef}
             tabIndex={0}
+            onScroll={onContainerScroll}
             onContextMenu={handleTextContextMenu}
-            className="flex-1 overflow-y-auto overflow-x-auto p-4 sm:p-6 focus:outline-none scroll-smooth select-text overscroll-none touch-pan-y"
+            className="flex-1 overflow-y-auto overflow-x-auto p-4 sm:p-6 focus:outline-none select-text overscroll-none touch-pan-y"
           >
             {loading ? (
               <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-3 text-neutral-400 select-none">
@@ -1792,7 +2083,63 @@ export default function Reader({
               </div>
             ) : (
               <div className="min-h-full flex justify-center items-start">
-                {isDualPage ? (
+                {isContinuous ? (
+                  <div className="w-full flex flex-col items-center gap-6 pb-24">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => {
+                      const isVisible = visiblePageNumbers.has(p);
+                      const dims = pageDimsMap[p] || estimatedPageDims;
+                      return (
+                        <div
+                          key={p}
+                          id={`pdf-page-${p}`}
+                          data-page-number={p}
+                          ref={(el) => {
+                            if (el) pageRefsMap.current.set(p, el);
+                            else pageRefsMap.current.delete(p);
+                          }}
+                          style={{
+                            minHeight: dims.height ? `${dims.height}px` : `${estimatedPageDims.height}px`,
+                            width: dims.width ? `${dims.width}px` : `${estimatedPageDims.width}px`,
+                          }}
+                          className="pdf-page-container relative flex justify-center items-center select-text"
+                        >
+                          {isVisible ? (
+                            <PdfPageView
+                              pdfDoc={pdfDoc}
+                              pageNum={p}
+                              scale={scale}
+                              invertColors={invertColors}
+                              linkService={linkServiceRef.current}
+                              findController={findControllerRef.current}
+                              eventBus={eventBusRef.current}
+                              annotations={annotations.filter(a => a.page === p)}
+                              onUpdateComment={handleUpdateComment}
+                              onDeleteAnnotation={handleDeleteAnnotation}
+                              pageSide="single"
+                              showBookTexture={bookTextureEnabled}
+                              onDimensionsLoaded={handlePageDimensionsLoaded}
+                            />
+                          ) : (
+                            <div 
+                              style={{
+                                width: dims.width ? `${dims.width}px` : `${estimatedPageDims.width}px`,
+                                height: dims.height ? `${dims.height}px` : `${estimatedPageDims.height}px`,
+                              }}
+                              className={`rounded-sm shadow-md flex flex-col items-center justify-center gap-2 select-none border transition-colors ${
+                                invertColors 
+                                  ? 'bg-neutral-900/60 border-neutral-800 text-neutral-400' 
+                                  : 'bg-neutral-100 border-neutral-200 text-neutral-500'
+                              }`}
+                            >
+                              <div className="w-5 h-5 border-2 border-amber-500/60 border-t-transparent rounded-full animate-spin" />
+                              <span className="text-xs font-mono font-medium">{t('pageBadge', { page: p })}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : isDualPage ? (
                   <div className={`flex items-start justify-center ${bookTextureEnabled ? 'shadow-2xl' : 'shadow-md'}`}>
                     {spread.left && (
                       <PdfPageView
@@ -1888,6 +2235,7 @@ export default function Reader({
           onJumpToAnnotation={handleJumpToAnnotation}
           onUpdateComment={handleUpdateComment}
           onDeleteAnnotation={handleDeleteAnnotation}
+          book={book}
         />
 
         {/* Floating In-Book Search Bar */}
@@ -1936,12 +2284,14 @@ export default function Reader({
       )}
 
       {/* Bottom Progress Bar */}
-      <div className={`h-1 w-full overflow-hidden select-none ${invertColors ? 'bg-black' : 'bg-neutral-200'}`}>
-        <div 
-          className="h-full bg-gradient-to-r from-amber-600 to-amber-400 transition-all duration-300"
-          style={{ width: `${progressPercent}%` }}
-        />
-      </div>
+      {showBottomProgress && (
+        <div className={`h-1 w-full overflow-hidden select-none ${invertColors ? 'bg-black' : 'bg-neutral-200'}`}>
+          <div 
+            className="h-full bg-gradient-to-r from-amber-600 to-amber-400 transition-all duration-300"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+      )}
     </div>
   );
 }

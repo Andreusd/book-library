@@ -55,6 +55,7 @@ export default function PdfPageView({
   onDeleteAnnotation,
   pageSide = 'single', // 'single' | 'left' | 'right'
   showBookTexture = true,
+  onDimensionsLoaded = null,
 }) {
   const { t } = useI18n();
   const canvasRef = useRef(null);
@@ -111,6 +112,9 @@ export default function PdfPageView({
       const vpWidth = Math.floor(viewport.width);
       const vpHeight = Math.floor(viewport.height);
       setPageDims({ width: vpWidth, height: vpHeight });
+      if (onDimensionsLoaded) {
+        onDimensionsLoaded(pageNum, { width: vpWidth, height: vpHeight });
+      }
 
       const context = canvas.getContext('2d');
       const dpr = window.devicePixelRatio || 1;

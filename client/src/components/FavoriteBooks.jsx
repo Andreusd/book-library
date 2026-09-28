@@ -6,6 +6,7 @@ import { useI18n } from '../i18n';
 export default function FavoriteBooks({ 
   books = [], 
   onSelectBook, 
+  onOpenDetails,
   onContextMenu, 
   onToggleFavorite,
   onViewAll,
@@ -117,6 +118,7 @@ export default function FavoriteBooks({
               book={book}
               isFavorite={true}
               onSelectBook={onSelectBook}
+              onOpenDetails={onOpenDetails}
               onContextMenu={onContextMenu}
               onToggleFavorite={onToggleFavorite}
               onSelectTag={onSelectTag}
