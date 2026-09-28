@@ -2607,7 +2607,7 @@ export default function EpubViewer({
                       </div>
                     </label>
 
-                    {/* Toggle Auto-Hide Header */}
+                    {/* Toggle Keep Header Pinned */}
                     <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${
                       theme === 'dark' ? 'hover:bg-neutral-800/60' : theme === 'sepia' ? 'hover:bg-[#efe0c2]/60' : 'hover:bg-neutral-100'
                     }`}>
@@ -2615,18 +2615,18 @@ export default function EpubViewer({
                         <span className={`text-xs font-semibold block transition-colors ${
                           theme === 'dark' ? 'text-neutral-100 group-hover:text-amber-300' : theme === 'sepia' ? 'text-[#292014] group-hover:text-amber-700' : 'text-neutral-900 group-hover:text-amber-600'
                         }`}>
-                          {t('autoHideHeader')}
+                          {t('keepHeaderPinned')}
                         </span>
                         <span className={`text-[11px] leading-snug block mt-0.5 ${
                           theme === 'dark' ? 'text-neutral-300' : theme === 'sepia' ? 'text-[#7c6a53]' : 'text-neutral-500'
                         }`}>
-                          {t('autoHideHeaderDesc')}
+                          {t('keepHeaderPinnedDesc')}
                         </span>
                       </div>
                       <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
                         <input 
                           type="checkbox"
-                          checked={!headerPinned}
+                          checked={headerPinned}
                           onChange={toggleHeaderPinned}
                           className="sr-only peer"
                         />

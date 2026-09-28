@@ -4,6 +4,7 @@ import {
   Globe, AlertTriangle, CheckCircle2 
 } from 'lucide-react';
 import { useI18n } from '../i18n';
+import LanguageSelector from './LanguageSelector';
 
 export default function LibrarySelector({
   libraries = [],
@@ -11,7 +12,7 @@ export default function LibrarySelector({
   onOpenSettings,
   onAddNewLibrary
 }) {
-  const { t, lang, setLang } = useI18n();
+  const { t } = useI18n();
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col selection:bg-amber-500/30 selection:text-amber-200">
@@ -32,16 +33,9 @@ export default function LibrarySelector({
         </div>
 
         {/* Header Right Actions */}
-        <div className="flex items-center gap-2">
-          {/* Language Switcher */}
-          <button
-            onClick={() => setLang(lang === 'en' ? 'pt' : 'en')}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800 text-neutral-300 hover:text-amber-400 hover:border-amber-500/30 transition text-xs cursor-pointer font-medium"
-            title="Switch Language / Alternar Idioma"
-          >
-            <Globe className="w-3.5 h-3.5 text-neutral-400" />
-            <span className="uppercase">{lang}</span>
-          </button>
+        <div className="flex items-center gap-2.5">
+          {/* Language Switcher with US and BR Flags */}
+          <LanguageSelector />
 
           {/* Settings / Manage Button */}
           <button

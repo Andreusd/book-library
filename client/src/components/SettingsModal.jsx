@@ -4,6 +4,7 @@ import {
   X, Plus, Trash2, Edit3, Check, Globe, ShieldCheck, ArrowRight, Sliders
 } from 'lucide-react';
 import { useI18n } from '../i18n';
+import { FlagUS, FlagBR, FlagES, FlagFR } from './FlagIcons';
 
 export default function SettingsModal({ 
   isOpen, 
@@ -324,38 +325,30 @@ export default function SettingsModal({
               <Globe className="w-3.5 h-3.5 text-amber-400" />
               <span>{t('languageLabel')}</span>
             </label>
-            <div className="grid grid-cols-2 gap-2.5">
-              <button
-                type="button"
-                onClick={() => setLang('pt')}
-                className={`flex items-center justify-between p-3 rounded-xl border text-xs font-medium transition cursor-pointer ${
-                  lang === 'pt'
-                    ? 'bg-amber-500/15 border-amber-500 text-amber-300 ring-1 ring-amber-500/40'
-                    : 'bg-neutral-950/60 border-neutral-800 text-neutral-400 hover:bg-neutral-800/80 hover:text-neutral-200'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="text-base leading-none">🇧🇷</span>
-                  <span>Português (Brasil)</span>
-                </div>
-                {lang === 'pt' && <Check className="w-3.5 h-3.5 text-amber-400" />}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setLang('en')}
-                className={`flex items-center justify-between p-3 rounded-xl border text-xs font-medium transition cursor-pointer ${
-                  lang === 'en'
-                    ? 'bg-amber-500/15 border-amber-500 text-amber-300 ring-1 ring-amber-500/40'
-                    : 'bg-neutral-950/60 border-neutral-800 text-neutral-400 hover:bg-neutral-800/80 hover:text-neutral-200'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="text-base leading-none">🇺🇸</span>
-                  <span>English (US)</span>
-                </div>
-                {lang === 'en' && <Check className="w-3.5 h-3.5 text-amber-400" />}
-              </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {[
+                { code: 'en', label: 'English (US)', Flag: FlagUS },
+                { code: 'pt', label: 'Português (Brasil)', Flag: FlagBR },
+                { code: 'es', label: 'Español (España)', Flag: FlagES },
+                { code: 'fr', label: 'Français (France)', Flag: FlagFR },
+              ].map(({ code, label, Flag }) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => setLang(code)}
+                  className={`flex items-center justify-between p-3 rounded-xl border text-xs font-medium transition cursor-pointer ${
+                    lang === code
+                      ? 'bg-amber-500/15 border-amber-500 text-amber-300 ring-1 ring-amber-500/40'
+                      : 'bg-neutral-950/60 border-neutral-800 text-neutral-400 hover:bg-neutral-800/80 hover:text-neutral-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Flag className="w-5 h-3.5 shadow-xs" />
+                    <span>{label}</span>
+                  </div>
+                  {lang === code && <Check className="w-3.5 h-3.5 text-amber-400" />}
+                </button>
+              ))}
             </div>
           </div>
 
