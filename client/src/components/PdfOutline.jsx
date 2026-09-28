@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  ListTree, ChevronRight, ChevronDown, Search, 
-  X, ExternalLink, Bookmark 
+  ListTree, ChevronRight, ChevronDown, ChevronsDownUp, ChevronsUpDown,
+  Search, X, ExternalLink, Bookmark 
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 
@@ -11,19 +11,26 @@ function OutlineNode({
   onItemClick, 
   expandedMap, 
   toggleExpand, 
-  filterQuery 
+  filterQuery,
+  activeChapter 
 }) {
   const hasChildren = item.items && item.items.length > 0;
   const isExpanded = expandedMap[item._id] ?? (depth === 0);
+  const isActive = activeChapter && (
+    (item.title && item.title.trim().toLowerCase() === activeChapter.trim().toLowerCase()) ||
+    (item.label && item.label.trim().toLowerCase() === activeChapter.trim().toLowerCase())
+  );
 
   const handleClick = (e) => {
     e.stopPropagation();
-    onItemClick(item);
+    if (onItemClick) {
+      onItemClick(item);
+    }
   };
 
   const handleToggle = (e) => {
     e.stopPropagation();
-    toggleExpand(item._id);
+    toggleExpand(item._id, isExpanded);
   };
 
   return (
@@ -32,7 +39,10 @@ function OutlineNode({
         onClick={handleClick}
         className={`
           group flex items-center gap-1.5 py-1.5 px-2 rounded-lg cursor-pointer transition-colors
-          hover:bg-neutral-800 text-neutral-300 hover:text-white
+          ${isActive 
+            ? 'bg-amber-500/15 text-amber-300 font-medium' 
+            : 'hover:bg-neutral-800 text-neutral-300 hover:text-white'
+          }
         `}
         style={{ paddingLeft: `${Math.max(8, depth * 14 + 8)}px` }}
         title={item.title}
@@ -42,22 +52,28 @@ function OutlineNode({
           <button
             type="button"
             onClick={handleToggle}
-            className="p-0.5 rounded hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 transition shrink-0"
+            className="p-0.5 rounded hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 transition shrink-0 cursor-pointer"
+            title={isExpanded ? 'Collapse' : 'Expand'}
+            aria-label={isExpanded ? 'Collapse' : 'Expand'}
           >
             {isExpanded ? (
-              <ChevronDown className="w-3.5 h-3.5" />
+              <ChevronDown className="w-3.5 h-3.5 text-neutral-400 group-hover:text-amber-400 transition-colors" />
             ) : (
-              <ChevronRight className="w-3.5 h-3.5" />
+              <ChevronRight className="w-3.5 h-3.5 text-neutral-400 group-hover:text-amber-400 transition-colors" />
             )}
           </button>
         ) : (
           <span className="w-4 shrink-0 flex items-center justify-center">
-            <span className="w-1 h-1 rounded-full bg-neutral-600 group-hover:bg-amber-400 transition-colors" />
+            <span className={`w-1 h-1 rounded-full transition-colors ${
+              isActive ? 'bg-amber-400' : 'bg-neutral-600 group-hover:bg-amber-400'
+            }`} />
           </span>
         )}
 
         {/* Title */}
-        <span className="truncate flex-1 font-normal group-hover:text-amber-300 transition-colors">
+        <span className={`truncate flex-1 font-normal transition-colors ${
+          isActive ? 'text-amber-300 font-medium' : 'group-hover:text-amber-300'
+        }`}>
           {item.title || 'Untitled Chapter'}
         </span>
 
@@ -79,6 +95,7 @@ function OutlineNode({
               expandedMap={expandedMap}
               toggleExpand={toggleExpand}
               filterQuery={filterQuery}
+              activeChapter={activeChapter}
             />
           ))}
         </div>
@@ -88,31 +105,84 @@ function OutlineNode({
 }
 
 export default function PdfOutline({ 
-  outline, 
+  outline,
+  items,
+  toc,
   isOpen, 
   onClose, 
-  onItemClick 
+  onItemClick,
+  activeChapter,
+  totalChapters,
+  percentage,
+  footer
 }) {
   const { t } = useI18n();
   const [filterQuery, setFilterQuery] = useState('');
   const [expandedMap, setExpandedMap] = useState({});
 
-  // Assign deterministic unique keys to tree items
+  const rawNodes = outline || items || toc || [];
+
+  // Assign deterministic unique keys and normalize tree items
   const indexedOutline = useMemo(() => {
     let counter = 0;
     const assignIds = (nodes, prefix = 'n') => {
       if (!Array.isArray(nodes)) return [];
       return nodes.map((node, i) => {
         const id = `${prefix}_${i}_${counter++}`;
+        const rawChildren = node.items || node.subitems || [];
+        const rawTitle = node.title || node.label || 'Untitled Chapter';
         return {
           ...node,
           _id: id,
-          items: node.items ? assignIds(node.items, id) : []
+          title: typeof rawTitle === 'string' ? rawTitle.trim() : (rawTitle ? String(rawTitle).trim() : 'Untitled Chapter'),
+          items: assignIds(rawChildren, id)
         };
       });
     };
-    return assignIds(outline || []);
-  }, [outline]);
+    return assignIds(rawNodes);
+  }, [rawNodes]);
+
+  // Check if there are any expandable nodes in the entire tree
+  const hasExpandableItems = useMemo(() => {
+    const checkNodes = (nodes) => {
+      for (const node of nodes) {
+        if (node.items && node.items.length > 0) return true;
+        if (node.items && checkNodes(node.items)) return true;
+      }
+      return false;
+    };
+    return checkNodes(indexedOutline);
+  }, [indexedOutline]);
+
+  // Collapse all expandable nodes
+  const collapseAll = () => {
+    const newExpanded = {};
+    const markAllCollapsed = (nodes) => {
+      for (const node of nodes) {
+        if (node.items && node.items.length > 0) {
+          newExpanded[node._id] = false;
+          markAllCollapsed(node.items);
+        }
+      }
+    };
+    markAllCollapsed(indexedOutline);
+    setExpandedMap(newExpanded);
+  };
+
+  // Expand all expandable nodes
+  const expandAll = () => {
+    const newExpanded = {};
+    const markAllExpanded = (nodes) => {
+      for (const node of nodes) {
+        if (node.items && node.items.length > 0) {
+          newExpanded[node._id] = true;
+          markAllExpanded(node.items);
+        }
+      }
+    };
+    markAllExpanded(indexedOutline);
+    setExpandedMap(newExpanded);
+  };
 
   // Filter tree items if user enters a search query
   const filteredOutline = useMemo(() => {
@@ -140,20 +210,22 @@ export default function PdfOutline({
     if (!filterQuery.trim()) return expandedMap;
 
     const autoExpanded = {};
-    const expandAll = (nodes) => {
+    const markAncestorsExpanded = (nodes) => {
       for (const node of nodes) {
-        autoExpanded[node._id] = true;
-        if (node.items) expandAll(node.items);
+        if (node.items && node.items.length > 0) {
+          autoExpanded[node._id] = true;
+          markAncestorsExpanded(node.items);
+        }
       }
     };
-    expandAll(filteredOutline);
+    markAncestorsExpanded(filteredOutline);
     return autoExpanded;
   }, [filterQuery, filteredOutline, expandedMap]);
 
-  const toggleExpand = (id) => {
+  const toggleExpand = (id, currentlyExpanded) => {
     setExpandedMap(prev => ({
       ...prev,
-      [id]: !(prev[id] ?? true)
+      [id]: !currentlyExpanded
     }));
   };
 
@@ -161,32 +233,57 @@ export default function PdfOutline({
 
   return (
     <>
-      {/* Mobile Backdrop */}
+      {/* Backdrop - NO blur, completely transparent click-catcher so background stays unblurred and bright */}
       <div 
         onClick={onClose}
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 md:hidden"
+        className="fixed inset-0 z-30 bg-transparent"
       />
 
-      {/* Slide-out Sidebar Drawer */}
+      {/* Slide-out Sidebar Drawer - floating overlay on top of the book */}
       <aside className={`
-        fixed top-14 bottom-1 left-0 z-40 w-72 sm:w-80 bg-neutral-900 border-r border-neutral-800 flex flex-col shadow-2xl transition-all duration-300 ease-in-out
-        md:static md:h-full md:z-10
+        fixed top-14 bottom-0 left-0 z-40 w-72 sm:w-80 bg-neutral-900 border-r border-neutral-800 flex flex-col shadow-2xl shadow-black/80 transition-all duration-300 ease-in-out animate-slide-in-left
       `}>
         {/* Drawer Header */}
-        <div className="h-12 px-4 border-b border-neutral-800 flex items-center justify-between shrink-0 bg-neutral-900/50">
+        <div className="h-12 px-3 sm:px-4 border-b border-neutral-800 flex items-center justify-between shrink-0 bg-neutral-900/50">
           <div className="flex items-center gap-2 min-w-0">
             <ListTree className="w-4 h-4 text-amber-400 shrink-0" />
             <h2 className="text-xs font-bold text-neutral-100 uppercase tracking-wider truncate">
               {t('tableOfContents')}
             </h2>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-lg text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 transition"
-            title={t('hideIndex')}
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            {hasExpandableItems && (
+              <>
+                <button
+                  type="button"
+                  onClick={collapseAll}
+                  className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 transition cursor-pointer"
+                  title={t('collapseAll')}
+                  aria-label={t('collapseAll')}
+                >
+                  <ChevronsDownUp className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={expandAll}
+                  className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 transition cursor-pointer"
+                  title={t('expandAll')}
+                  aria-label={t('expandAll')}
+                >
+                  <ChevronsUpDown className="w-4 h-4" />
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800 transition cursor-pointer"
+              title={t('hideIndex')}
+              aria-label={t('hideIndex')}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Chapter Search Filter */}
@@ -202,8 +299,9 @@ export default function PdfOutline({
             />
             {filterQuery && (
               <button
+                type="button"
                 onClick={() => setFilterQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 cursor-pointer"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -212,7 +310,7 @@ export default function PdfOutline({
         </div>
 
         {/* Outline Hierarchy List */}
-        <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+        <div className="flex-1 overflow-y-auto p-2 space-y-0.5 custom-scrollbar">
           {filteredOutline.length > 0 ? (
             filteredOutline.map((item) => (
               <OutlineNode
@@ -223,6 +321,7 @@ export default function PdfOutline({
                 expandedMap={effectiveExpandedMap}
                 toggleExpand={toggleExpand}
                 filterQuery={filterQuery}
+                activeChapter={activeChapter}
               />
             ))
           ) : (
@@ -232,7 +331,25 @@ export default function PdfOutline({
             </div>
           )}
         </div>
+
+        {/* Optional Footer Summary (e.g. chapters count & reading percentage) */}
+        {footer ? (
+          <div className="p-3 border-t border-neutral-800/80 shrink-0 bg-neutral-900/30">
+            {footer}
+          </div>
+        ) : (totalChapters !== undefined || percentage !== undefined) ? (
+          <div className="h-9 px-4 border-t border-neutral-800/80 flex items-center justify-between text-[11px] text-neutral-400 font-mono shrink-0 bg-neutral-900/30">
+            {totalChapters !== undefined && (
+              <span>{totalChapters} {t('chaptersCount')}</span>
+            )}
+            {percentage !== undefined && (
+              <span className="text-amber-400 font-semibold">{percentage}% {t('completed')}</span>
+            )}
+          </div>
+        ) : null}
       </aside>
     </>
   );
 }
+
+export const TableOfContentsDrawer = PdfOutline;

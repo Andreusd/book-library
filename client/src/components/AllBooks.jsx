@@ -9,6 +9,7 @@ export default function AllBooks({
   onSelectBook,
   onContextMenu,
   onToggleFavorite,
+  onSelectTag,
   showFileExtension
 }) {
   const { t } = useI18n();
@@ -118,6 +119,7 @@ export default function AllBooks({
               onSelectBook={onSelectBook}
               onContextMenu={onContextMenu}
               onToggleFavorite={onToggleFavorite}
+              onSelectTag={onSelectTag}
               showFileExtension={showFileExtension}
             />
           </div>

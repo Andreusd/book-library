@@ -16,6 +16,8 @@ from .covers import CoverManager
 from .progress import ProgressTracker
 from .annotations import AnnotationsManager
 from .favorites import FavoritesManager
+from .lookup import LookupManager
+from .tags import TagsManager
 
 # Base paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -27,6 +29,8 @@ cover_mgr = CoverManager()
 tracker = ProgressTracker()
 annotations_mgr = AnnotationsManager()
 favorites_mgr = FavoritesManager()
+lookup_mgr = LookupManager()
+tags_mgr = TagsManager()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -120,6 +124,25 @@ class AnnotationPayload(BaseModel):
 class UpdateAnnotationPayload(BaseModel):
     comment: Optional[str] = None
     color: Optional[str] = None
+
+class TranslatePayload(BaseModel):
+    text: str
+    target_lang: Optional[str] = "pt"
+    source_lang: Optional[str] = "auto"
+
+class CreateTagPayload(BaseModel):
+    name: str
+    color: Optional[str] = "amber"
+
+class UpdateTagPayload(BaseModel):
+    name: Optional[str] = None
+    color: Optional[str] = None
+
+class SetBookTagsPayload(BaseModel):
+    tag_ids: List[str]
+
+class ToggleBookTagPayload(BaseModel):
+    tag_id: str
 
 @app.get("/api/libraries")
 def list_libraries(library_id: Optional[str] = Query(None)):
@@ -335,19 +358,28 @@ def set_folder_icon(payload: SetShelfIconPayload):
 def list_books(
     shelf: Optional[str] = Query(None, description="Filter by folder or shelf name"),
     folder: Optional[str] = Query(None, description="Filter by folder name"),
+    tag: Optional[str] = Query(None, description="Filter by tag ID"),
     library_id: Optional[str] = Query(None, description="Filter by library ID"),
     query: Optional[str] = Query(None, description="Search query across titles"),
     sort: Optional[str] = Query("title_asc", description="Sort order: title_asc, title_desc, size_desc, recent")
 ):
-    """Returns books enriched with reading progress, favorite status, and cover URLs, strictly isolated by library."""
+    """Returns books enriched with reading progress, favorite status, tags, and cover URLs, strictly isolated by library."""
     shelf_val = shelf if isinstance(shelf, str) else None
     folder_val = folder if isinstance(folder, str) else None
+    tag_val = tag if isinstance(tag, str) else None
     query_val = query if isinstance(query, str) else None
     sort_val = sort if isinstance(sort, str) else "title_asc"
     lib_val = library_id if isinstance(library_id, str) else None
 
     active_filter = folder_val or shelf_val
-    if active_filter == "favorites":
+    if active_filter and active_filter.startswith("tag:"):
+        tag_val = active_filter[4:]
+        active_filter = None
+
+    if tag_val:
+        tagged_ids = set(tags_mgr.get_book_ids_for_tag(tag_val))
+        books = [b for b in scanner.get_books(library_id=lib_val) if b["id"] in tagged_ids]
+    elif active_filter == "favorites":
         books = [b for b in scanner.get_books(library_id=lib_val) if favorites_mgr.is_favorite(b["id"])]
     elif active_filter == "continue-reading":
         all_prog = tracker.get_all()
@@ -362,7 +394,7 @@ def list_books(
         books = scanner.get_books(folder_filter=active_filter, library_id=lib_val)
     all_progress = tracker.get_all()
 
-    # Enrich each book with reading progress, favorite status, and cover URL
+    # Enrich each book with reading progress, favorite status, tags, and cover URL
     for b in books:
         prog = all_progress.get(b["id"])
         if prog:
@@ -377,11 +409,18 @@ def list_books(
         b["progress"] = prog if prog else {"page": 1, "total_pages": 0, "percent": 0}
         b["cover_url"] = f"/api/cover/{b['id']}"
         b["is_favorite"] = favorites_mgr.is_favorite(b["id"])
+        b["tags"] = tags_mgr.get_book_tags(b["id"])
 
     # Filter by search query if provided
     if query_val:
         q = query_val.lower().strip()
-        books = [b for b in books if q in b["title"].lower() or q in b.get("folder_display", "").lower() or q in b.get("shelf_display", "").lower()]
+        books = [
+            b for b in books 
+            if q in b["title"].lower() 
+            or q in b.get("folder_display", "").lower() 
+            or q in b.get("shelf_display", "").lower()
+            or any(q in t.get("name", "").lower() for t in b.get("tags", []))
+        ]
 
     # Sort
     if sort_val == "title_asc":
@@ -440,6 +479,7 @@ def continue_reading(library_id: Optional[str] = Query(None)):
             b_copy["progress"] = prog
             b_copy["cover_url"] = f"/api/cover/{b['id']}"
             b_copy["is_favorite"] = favorites_mgr.is_favorite(b["id"])
+            b_copy["tags"] = tags_mgr.get_book_tags(b["id"])
             results.append(b_copy)
             if len(results) >= 10:
                 break
@@ -528,6 +568,7 @@ def get_book(book_id: str):
     b_copy["progress"] = prog if prog else {"page": 1, "total_pages": 0, "percent": 0}
     b_copy["cover_url"] = f"/api/cover/{book_id}"
     b_copy["is_favorite"] = favorites_mgr.is_favorite(book_id)
+    b_copy["tags"] = tags_mgr.get_book_tags(book_id)
     return b_copy
 
 @app.get("/api/cover/{book_id}")
@@ -581,6 +622,7 @@ def get_favorites(library_id: Optional[str] = Query(None)):
             b_copy["progress"] = prog if prog else {"page": 1, "total_pages": 0, "percent": 0}
             b_copy["cover_url"] = f"/api/cover/{b['id']}"
             b_copy["is_favorite"] = True
+            b_copy["tags"] = tags_mgr.get_book_tags(b["id"])
             books.append(b_copy)
     return {
         "favorite_ids": [b["id"] for b in books],
@@ -597,6 +639,72 @@ def toggle_favorite(payload: ToggleFavoritePayload):
         "book_id": payload.book_id,
         "is_favorite": is_fav,
         "favorite_ids": favorites_mgr.get_favorite_ids()
+    }
+
+# --- Virtual Tags & Custom Collections API ---
+
+@app.get("/api/tags")
+def list_tags(library_id: Optional[str] = Query(None)):
+    """Returns all virtual tags with book counts (scoped to library if provided)."""
+    lib_val = library_id if isinstance(library_id, str) else None
+    if lib_val:
+        lib_books = scanner.get_books(library_id=lib_val)
+        book_ids = {b["id"] for b in lib_books}
+        return {"tags": tags_mgr.get_tags(book_ids_in_scope=book_ids)}
+    return {"tags": tags_mgr.get_tags()}
+
+@app.post("/api/tags")
+def create_tag(payload: CreateTagPayload):
+    """Creates a new virtual tag."""
+    clean = payload.name.strip()
+    if not clean:
+        raise HTTPException(status_code=400, detail="Tag name cannot be empty")
+    tag = tags_mgr.create_tag(clean, payload.color or "amber")
+    return {"status": "ok", "tag": tag, "tags": tags_mgr.get_tags()}
+
+@app.put("/api/tags/{tag_id}")
+def update_tag(tag_id: str, payload: UpdateTagPayload):
+    """Updates an existing tag's name or color."""
+    tag = tags_mgr.update_tag(tag_id, name=payload.name, color=payload.color)
+    if not tag:
+        raise HTTPException(status_code=404, detail="Tag not found")
+    return {"status": "ok", "tag": tag, "tags": tags_mgr.get_tags()}
+
+@app.delete("/api/tags/{tag_id}")
+def delete_tag(tag_id: str):
+    """Deletes a virtual tag and untags all books."""
+    success = tags_mgr.delete_tag(tag_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Tag not found")
+    return {"status": "ok", "tags": tags_mgr.get_tags()}
+
+@app.get("/api/books/{book_id}/tags")
+def get_book_tags(book_id: str):
+    """Returns the tags assigned to a book."""
+    return {"tags": tags_mgr.get_book_tags(book_id)}
+
+@app.post("/api/books/{book_id}/tags")
+def set_book_tags(book_id: str, payload: SetBookTagsPayload):
+    """Sets the tags for a book."""
+    b = scanner.find_book(book_id)
+    if not b:
+        raise HTTPException(status_code=404, detail="Book not found")
+    tags = tags_mgr.set_book_tags(book_id, payload.tag_ids)
+    return {"status": "ok", "book_id": book_id, "tags": tags}
+
+@app.post("/api/books/{book_id}/tags/toggle")
+def toggle_book_tag(book_id: str, payload: ToggleBookTagPayload):
+    """Toggles a tag on a book."""
+    b = scanner.find_book(book_id)
+    if not b:
+        raise HTTPException(status_code=404, detail="Book not found")
+    is_assigned = tags_mgr.toggle_book_tag(book_id, payload.tag_id)
+    return {
+        "status": "ok",
+        "book_id": book_id,
+        "tag_id": payload.tag_id,
+        "is_assigned": is_assigned,
+        "tags": tags_mgr.get_book_tags(book_id)
     }
 
 @app.get("/api/annotations/{book_id}")
@@ -630,6 +738,42 @@ def delete_annotation(book_id: str, annotation_id: str):
     if not success:
         raise HTTPException(status_code=404, detail="Annotation not found")
     return {"status": "ok"}
+
+@app.get("/api/lookup/define")
+def define_word(
+    word: str = Query(..., description="Word to define"),
+    lang: Optional[str] = Query("en", description="Target language code for definitions")
+):
+    """Returns definitions, parts of speech, and examples for a word."""
+    if not word.strip():
+        raise HTTPException(status_code=400, detail="Word parameter cannot be empty")
+    return lookup_mgr.define_word(word.strip(), lang=lang or "en")
+
+@app.post("/api/lookup/translate")
+def translate_text(payload: TranslatePayload):
+    """Translates text to target language."""
+    if not payload.text.strip():
+        raise HTTPException(status_code=400, detail="Text cannot be empty")
+    return lookup_mgr.translate_text(
+        payload.text.strip(),
+        target_lang=payload.target_lang or "pt",
+        source_lang=payload.source_lang or "auto"
+    )
+
+@app.get("/api/lookup/translate")
+def translate_text_get(
+    text: str = Query(..., description="Text to translate"),
+    target: Optional[str] = Query("pt", description="Target language code"),
+    source: Optional[str] = Query("auto", description="Source language code")
+):
+    """Translates text to target language (convenience GET endpoint)."""
+    if not text.strip():
+        raise HTTPException(status_code=400, detail="Text parameter cannot be empty")
+    return lookup_mgr.translate_text(
+        text.strip(),
+        target_lang=target or "pt",
+        source_lang=source or "auto"
+    )
 
 # If client production build exists, mount static assets and index.html fallback
 if os.path.exists(CLIENT_DIST):

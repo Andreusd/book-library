@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import HighlightOverlay from './HighlightOverlay';
+import { PdfTextHighlighter } from './PdfTextHighlighter';
 import { useI18n } from '../i18n';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
@@ -47,6 +48,8 @@ export default function PdfPageView({
   scale,
   invertColors,
   linkService,
+  findController = null,
+  eventBus = null,
   annotations = [],
   onUpdateComment,
   onDeleteAnnotation,
@@ -59,6 +62,7 @@ export default function PdfPageView({
   const annotationLayerRef = useRef(null);
   const renderTaskRef = useRef(null);
   const textLayerInstanceRef = useRef(null);
+  const textHighlighterRef = useRef(null);
   const annotationLayerInstanceRef = useRef(null);
   const [pageDims, setPageDims] = useState({ width: 0, height: 0 });
   const [rendering, setRendering] = useState(false);
@@ -79,6 +83,13 @@ export default function PdfPageView({
         textLayerInstanceRef.current.cancel();
       } catch (e) {}
       textLayerInstanceRef.current = null;
+    }
+
+    if (textHighlighterRef.current) {
+      try {
+        textHighlighterRef.current.disable();
+      } catch (e) {}
+      textHighlighterRef.current = null;
     }
 
     if (textLayerRef.current) {
@@ -133,7 +144,7 @@ export default function PdfPageView({
       renderTaskRef.current = null;
       setRendering(false);
 
-      // Render Text Layer for text selection & copy
+      // Render Text Layer for text selection & in-book search highlighting
       if (textLayerRef.current) {
         try {
           const textContent = await page.getTextContent();
@@ -145,6 +156,19 @@ export default function PdfPageView({
           });
           textLayerInstanceRef.current = textLayer;
           await textLayer.render();
+          if (!active) return;
+
+          // Attach text highlighter for in-book search
+          if (findController && eventBus) {
+            const highlighter = new PdfTextHighlighter({
+              findController,
+              eventBus,
+              pageIndex: pageNum - 1,
+            });
+            highlighter.setTextMapping(textLayer.textDivs, textLayer.textContentItemsStr);
+            highlighter.enable();
+            textHighlighterRef.current = highlighter;
+          }
         } catch (err) {
           if (err?.name !== 'RenderingCancelledException') {
             console.error(`Page ${pageNum} TextLayer error:`, err);
@@ -187,6 +211,12 @@ export default function PdfPageView({
         } catch (e) {}
         renderTaskRef.current = null;
       }
+      if (textHighlighterRef.current) {
+        try {
+          textHighlighterRef.current.disable();
+        } catch (e) {}
+        textHighlighterRef.current = null;
+      }
       if (textLayerInstanceRef.current) {
         try {
           textLayerInstanceRef.current.cancel();
@@ -194,7 +224,7 @@ export default function PdfPageView({
         textLayerInstanceRef.current = null;
       }
     };
-  }, [pdfDoc, pageNum, scale, linkService]);
+  }, [pdfDoc, pageNum, scale, linkService, findController, eventBus]);
 
   const getSideClasses = () => {
     if (pageSide === 'left') {

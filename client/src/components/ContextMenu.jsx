@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { 
   BookOpen, Heart, RotateCcw, CheckCircle2, 
-  Copy, Check 
+  Copy, Check, Tag 
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 
@@ -13,7 +13,8 @@ export default function ContextMenu({
   onClose, 
   onOpenReader, 
   onMarkStatus,
-  onToggleFavorite
+  onToggleFavorite,
+  onManageTags
 }) {
   const menuRef = useRef(null);
   const [copied, setCopied] = useState(false);
@@ -50,7 +51,7 @@ export default function ContextMenu({
 
   // Adjust coordinates to ensure the menu stays within viewport boundaries
   const menuWidth = 230;
-  const menuHeight = 225;
+  const menuHeight = 265;
   const posX = Math.min(Math.max(10, x), window.innerWidth - menuWidth - 10);
   const posY = Math.min(Math.max(10, y), window.innerHeight - menuHeight - 10);
 
@@ -120,6 +121,17 @@ export default function ContextMenu({
       >
         <Heart className={`w-4 h-4 shrink-0 ${isFav ? 'fill-rose-500 text-rose-500' : 'text-neutral-400'}`} />
         <span>{isFav ? t('removeFromFavorites') : t('addToFavorites')}</span>
+      </button>
+
+      <button
+        onClick={() => {
+          if (onManageTags) onManageTags(book);
+          onClose();
+        }}
+        className="w-full px-3 py-1.5 flex items-center gap-2.5 hover:bg-neutral-800 text-neutral-300 hover:text-neutral-100 text-left transition"
+      >
+        <Tag className="w-4 h-4 text-amber-400 shrink-0" />
+        <span>{t('manageTags')}</span>
       </button>
 
       <div className="my-1 border-t border-neutral-800" />

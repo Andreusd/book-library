@@ -1,12 +1,14 @@
 import React, { useRef, useState } from 'react';
 import { Bookmark, ChevronLeft, ChevronRight, LayoutGrid, Layers } from 'lucide-react';
 import { useI18n } from '../i18n';
+import { getTagColorConfig } from '../utils/tagColors';
 
 export default function ContinueReading({ 
   books = [], 
   onSelectBook, 
   onContextMenu, 
   onViewAll, 
+  onSelectTag,
   showFileExtension 
 }) {
   const { t } = useI18n();
@@ -164,6 +166,24 @@ export default function ContinueReading({
                     <span className="text-[10px] font-medium text-emerald-500/90 uppercase tracking-wider truncate">
                       {book.shelf_display}
                     </span>
+                    {book.tags && book.tags.slice(0, 1).map((tg) => {
+                      const cfg = getTagColorConfig(tg.color);
+                      return (
+                        <span
+                          key={tg.id}
+                          onClick={(e) => {
+                            if (onSelectTag) {
+                              e.stopPropagation();
+                              onSelectTag(tg);
+                            }
+                          }}
+                          className={`text-[8px] px-1 py-0.2 rounded font-medium border ${cfg.badge} truncate max-w-[80px] hover:brightness-125 transition cursor-pointer`}
+                          title={tg.name}
+                        >
+                          {tg.name}
+                        </span>
+                      );
+                    })}
                   </div>
                   <h3 className="text-xs font-semibold text-neutral-200 group-hover:text-emerald-400 transition-colors line-clamp-2 leading-tight mt-0.5">
                     {book.title}

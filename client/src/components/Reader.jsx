@@ -5,14 +5,19 @@ import {
   ArrowLeft, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, 
   Maximize2, Minimize2, Moon, Sun, ListTree,
   MessageSquare, Heart, Settings, SlidersHorizontal, X,
-  PanelTopClose, PanelTopOpen, RotateCcw, StretchHorizontal, BookOpen
+  PanelTopClose, PanelTopOpen, RotateCcw, StretchHorizontal, BookOpen,
+  Search, Headphones
 } from 'lucide-react';
 import PdfOutline from './PdfOutline';
 import PdfPageView, { getDualPageSpread, getNextSpreadPage, getPrevSpreadPage } from './PdfPageView';
 import TextSelectionMenu from './TextSelectionMenu';
 import CommentsDrawer from './CommentsDrawer';
+import BookSearchBar from './BookSearchBar';
+import TtsPlayerBar from './TtsPlayerBar';
+import { extractPdfPageText } from '../utils/textToSpeech';
 import EpubViewer from './EpubViewer';
 import { useI18n } from '../i18n';
+import { EventBus, PDFFindController, FindState } from 'pdfjs-dist/web/pdf_viewer.mjs';
 import 'pdfjs-dist/web/pdf_viewer.css';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
@@ -25,6 +30,8 @@ class SimpleLinkService {
   constructor() {
     this.pdfDoc = null;
     this.onNavigate = null;
+    this._page = 1;
+    this.rotation = 0;
   }
 
   setDocument(pdfDoc) {
@@ -33,6 +40,21 @@ class SimpleLinkService {
 
   setNavigate(onNavigate) {
     this.onNavigate = onNavigate;
+  }
+
+  get page() {
+    return this._page;
+  }
+
+  set page(val) {
+    this._page = val;
+    if (this.onNavigate && typeof val === 'number') {
+      this.onNavigate(val);
+    }
+  }
+
+  get pagesCount() {
+    return this.pdfDoc ? this.pdfDoc.numPages : 0;
   }
 
   getDestinationHash(dest) {
@@ -288,12 +310,32 @@ export default function Reader({
   });
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
 
+  // Search state
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [matchesCount, setMatchesCount] = useState({ current: 0, total: 0 });
+  const [isSearching, setIsSearching] = useState(false);
+  const [caseSensitive, setCaseSensitive] = useState(false);
+  const [entireWord, setEntireWord] = useState(false);
+
+  // Text-to-Speech (Read Aloud) state
+  const [ttsOpen, setTtsOpen] = useState(false);
+  const [ttsText, setTtsText] = useState('');
+  const [ttsMode, setTtsMode] = useState('page'); // 'page' | 'selection'
+  const [ttsPageNumber, setTtsPageNumber] = useState(currentPage);
+
   const isHeaderVisibleRef = useRef(true);
   const hideTimerRef = useRef(null);
   const isMouseOverHeaderRef = useRef(false);
   const readerSettingsOpenRef = useRef(readerSettingsOpen);
   const commentsDrawerOpenRef = useRef(commentsDrawerOpen);
   const outlineOpenRef = useRef(outlineOpen);
+  const searchOpenRef = useRef(false);
+  const ttsOpenRef = useRef(false);
+
+  useEffect(() => {
+    ttsOpenRef.current = ttsOpen;
+  }, [ttsOpen]);
 
   useEffect(() => {
     isHeaderVisibleRef.current = isHeaderVisible;
@@ -310,6 +352,10 @@ export default function Reader({
   useEffect(() => {
     outlineOpenRef.current = outlineOpen;
   }, [outlineOpen]);
+
+  useEffect(() => {
+    searchOpenRef.current = searchOpen;
+  }, [searchOpen]);
 
   const clearHideTimer = useCallback(() => {
     if (hideTimerRef.current) {
@@ -332,7 +378,8 @@ export default function Reader({
         isMouseOverHeaderRef.current ||
         readerSettingsOpenRef.current ||
         commentsDrawerOpenRef.current ||
-        outlineOpenRef.current
+        outlineOpenRef.current ||
+        searchOpenRef.current
       ) {
         return;
       }
@@ -382,7 +429,8 @@ export default function Reader({
           !isMouseOverHeaderRef.current &&
           !readerSettingsOpenRef.current &&
           !commentsDrawerOpenRef.current &&
-          !outlineOpenRef.current
+          !outlineOpenRef.current &&
+          !searchOpenRef.current
         ) {
           startHideTimer(3000, false);
         }
@@ -405,11 +453,21 @@ export default function Reader({
     };
   }, [headerEnabled, showHeader, startHideTimer, clearHideTimer]);
 
-  const isHeaderShowing = headerEnabled || isHeaderVisible || readerSettingsOpen || commentsDrawerOpen || outlineOpen;
+  const isHeaderShowing = headerEnabled || isHeaderVisible || readerSettingsOpen || commentsDrawerOpen || outlineOpen || searchOpen;
 
 
   const containerRef = useRef(null);
   const linkServiceRef = useRef(new SimpleLinkService());
+  const eventBusRef = useRef(null);
+  const findControllerRef = useRef(null);
+
+  if (!eventBusRef.current) {
+    eventBusRef.current = new EventBus();
+    findControllerRef.current = new PDFFindController({
+      linkService: linkServiceRef.current,
+      eventBus: eventBusRef.current,
+    });
+  }
   const onProgressUpdateRef = useRef(onProgressUpdate);
   const scaleRef = useRef(scale);
   const invertColorsRef = useRef(invertColors);
@@ -571,10 +629,168 @@ export default function Reader({
   }, [handleLinkNavigate]);
 
   useEffect(() => {
+    linkServiceRef.current._page = currentPage;
+  }, [currentPage]);
+
+  useEffect(() => {
     if (pdfDoc) {
       linkServiceRef.current.setDocument(pdfDoc);
+      if (findControllerRef.current) {
+        findControllerRef.current.setDocument(pdfDoc);
+      }
     }
   }, [pdfDoc]);
+
+  // Handle EventBus find events
+  useEffect(() => {
+    const eventBus = eventBusRef.current;
+    if (!eventBus) return;
+
+    const handleMatchesCount = ({ matchesCount: count }) => {
+      if (count) {
+        setMatchesCount({
+          current: count.current || 0,
+          total: count.total || 0,
+        });
+      }
+    };
+
+    const handleFindControlState = ({ state, matchesCount: count }) => {
+      if (state === FindState.PENDING) {
+        setIsSearching(true);
+      } else {
+        setIsSearching(false);
+      }
+      if (count) {
+        setMatchesCount({
+          current: count.current || 0,
+          total: count.total || 0,
+        });
+      }
+    };
+
+    eventBus.on('updatefindmatchescount', handleMatchesCount);
+    eventBus.on('updatefindcontrolstate', handleFindControlState);
+
+    return () => {
+      eventBus.off('updatefindmatchescount', handleMatchesCount);
+      eventBus.off('updatefindcontrolstate', handleFindControlState);
+    };
+  }, []);
+
+  const executePdfSearch = useCallback((query, { findPrevious = false, again = false, caseSensitiveVal, entireWordVal } = {}) => {
+    if (!eventBusRef.current) return;
+    const cs = caseSensitiveVal !== undefined ? caseSensitiveVal : caseSensitive;
+    const ew = entireWordVal !== undefined ? entireWordVal : entireWord;
+
+    if (!query || query.trim() === '') {
+      eventBusRef.current.dispatch('findbarclose', {});
+      setMatchesCount({ current: 0, total: 0 });
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    eventBusRef.current.dispatch('find', {
+      type: again ? 'again' : '',
+      query: query.trim(),
+      caseSensitive: cs,
+      entireWord: ew,
+      highlightAll: true,
+      findPrevious,
+    });
+  }, [caseSensitive, entireWord]);
+
+  const handleFindNext = useCallback(() => {
+    if (!searchQuery) return;
+    executePdfSearch(searchQuery, { again: true, findPrevious: false });
+  }, [searchQuery, executePdfSearch]);
+
+  const handleFindPrev = useCallback(() => {
+    if (!searchQuery) return;
+    executePdfSearch(searchQuery, { again: true, findPrevious: true });
+  }, [searchQuery, executePdfSearch]);
+
+  const handleSearchQueryChange = useCallback((newQuery) => {
+    setSearchQuery(newQuery);
+    executePdfSearch(newQuery, { again: false });
+  }, [executePdfSearch]);
+
+  const handleToggleCaseSensitive = useCallback(() => {
+    setCaseSensitive(prev => {
+      const next = !prev;
+      if (searchQuery) {
+        executePdfSearch(searchQuery, { again: false, caseSensitiveVal: next });
+      }
+      return next;
+    });
+  }, [searchQuery, executePdfSearch]);
+
+  const handleToggleEntireWord = useCallback(() => {
+    setEntireWord(prev => {
+      const next = !prev;
+      if (searchQuery) {
+        executePdfSearch(searchQuery, { again: false, entireWordVal: next });
+      }
+      return next;
+    });
+  }, [searchQuery, executePdfSearch]);
+
+  const handleCloseSearch = useCallback(() => {
+    setSearchOpen(false);
+    if (eventBusRef.current) {
+      eventBusRef.current.dispatch('findbarclose', {});
+    }
+    setMatchesCount({ current: 0, total: 0 });
+    setIsSearching(false);
+  }, []);
+
+  // Text-to-Speech handlers
+  const startReadingPage = useCallback(async (targetPage, forcedMode = 'page') => {
+    if (!pdfDoc) return;
+    const pageToRead = targetPage || currentPage;
+    setTtsMode(forcedMode);
+    setTtsPageNumber(pageToRead);
+
+    let fullText = '';
+    if (isDualPage && spread) {
+      const leftText = spread.left ? await extractPdfPageText(pdfDoc, spread.left) : '';
+      const rightText = spread.right ? await extractPdfPageText(pdfDoc, spread.right) : '';
+      fullText = [leftText, rightText].filter(Boolean).join('\n\n');
+    } else {
+      fullText = await extractPdfPageText(pdfDoc, pageToRead);
+    }
+
+    if (fullText && fullText.trim()) {
+      setTtsText(fullText.trim());
+      setTtsOpen(true);
+    } else {
+      alert(t('noTextFoundToRead'));
+    }
+  }, [pdfDoc, currentPage, isDualPage, spread, t]);
+
+  const toggleTts = useCallback(() => {
+    if (ttsOpen) {
+      setTtsOpen(false);
+    } else {
+      startReadingPage(currentPage);
+    }
+  }, [ttsOpen, startReadingPage, currentPage]);
+
+  const handleReadSelection = useCallback((selectedText) => {
+    if (!selectedText || !selectedText.trim()) return;
+    setTtsMode('selection');
+    setTtsPageNumber(currentPage);
+    setTtsText(selectedText.trim());
+    setTtsOpen(true);
+  }, [currentPage]);
+
+  // When currentPage changes while TTS is actively reading in page mode, read new page
+  useEffect(() => {
+    if (ttsOpenRef.current && ttsMode === 'page' && pdfDoc) {
+      startReadingPage(currentPage, 'page');
+    }
+  }, [currentPage]);
 
   // Load PDF Document
   useEffect(() => {
@@ -956,7 +1172,22 @@ export default function Reader({
             container.scrollBy({ top: -120, behavior: 'smooth' });
           }
         }
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+        e.preventDefault();
+        setSearchOpen(true);
+        showHeader();
+      } else if (e.altKey && (e.key === 'r' || e.key === 'R')) {
+        e.preventDefault();
+        toggleTts();
       } else if (e.key === 'Escape') {
+        if (ttsOpenRef.current) {
+          setTtsOpen(false);
+          return;
+        }
+        if (searchOpenRef.current) {
+          handleCloseSearch();
+          return;
+        }
         onClose();
       } else if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+' || e.key === 'Add')) {
         e.preventDefault();
@@ -976,7 +1207,7 @@ export default function Reader({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [goToNextPage, goToPrevPage, onClose, upDownFlipEnabled]);
+  }, [goToNextPage, goToPrevPage, onClose, upDownFlipEnabled, showHeader, handleCloseSearch, toggleTts]);
 
   // Native wheel listener for smooth scrolling, edge-flipping, and Ctrl+Wheel PDF zoom
   useEffect(() => {
@@ -1265,6 +1496,35 @@ export default function Reader({
             )}
           </button>
 
+          {/* In-Book Full-Text Search Toggle */}
+          <button 
+            onClick={() => {
+              if (searchOpen) {
+                handleCloseSearch();
+              } else {
+                setSearchOpen(true);
+                showHeader();
+              }
+            }}
+            className={`h-7 w-7 flex items-center justify-center rounded-lg transition shrink-0 cursor-pointer ${
+              searchOpen ? btnActiveClass : btnClass
+            }`}
+            title={searchOpen ? t('searchClose') : t('searchInBook')}
+          >
+            <Search className="w-4 h-4" />
+          </button>
+
+          {/* Read Aloud (Text-to-Speech) Toggle */}
+          <button 
+            onClick={toggleTts}
+            className={`h-7 w-7 flex items-center justify-center rounded-lg transition shrink-0 cursor-pointer ${
+              ttsOpen ? btnActiveClass : btnClass
+            }`}
+            title={ttsOpen ? t('stopSpeech') : t('readAloudTitle')}
+          >
+            <Headphones className="w-4 h-4" />
+          </button>
+
           {/* Invert Dark / Light */}
           <button 
             onClick={() => setInvertColors(!invertColors)}
@@ -1503,7 +1763,7 @@ export default function Reader({
       </header>
 
       {/* Main Reader Stage */}
-      <div className={`relative flex-1 flex overflow-hidden ${invertColors ? 'bg-black' : 'bg-white'}`}>
+      <div className={`relative flex-1 flex overflow-hidden ${invertColors ? 'bg-black' : 'bg-white'} ${!headerEnabled ? 'pt-14' : ''}`}>
         {/* Toggleable Left Index / Table of Contents Drawer */}
         {hasOutline && (
           <PdfOutline
@@ -1511,6 +1771,7 @@ export default function Reader({
             isOpen={outlineOpen}
             onClose={() => setOutlineOpen(false)}
             onItemClick={handleOutlineClick}
+            percentage={progressPercent}
           />
         )}
 
@@ -1539,6 +1800,8 @@ export default function Reader({
                         scale={scale}
                         invertColors={invertColors}
                         linkService={linkServiceRef.current}
+                        findController={findControllerRef.current}
+                        eventBus={eventBusRef.current}
                         annotations={annotations.filter(a => a.page === spread.left)}
                         onUpdateComment={handleUpdateComment}
                         onDeleteAnnotation={handleDeleteAnnotation}
@@ -1553,6 +1816,8 @@ export default function Reader({
                         scale={scale}
                         invertColors={invertColors}
                         linkService={linkServiceRef.current}
+                        findController={findControllerRef.current}
+                        eventBus={eventBusRef.current}
                         annotations={annotations.filter(a => a.page === spread.right)}
                         onUpdateComment={handleUpdateComment}
                         onDeleteAnnotation={handleDeleteAnnotation}
@@ -1568,6 +1833,8 @@ export default function Reader({
                     scale={scale}
                     invertColors={invertColors}
                     linkService={linkServiceRef.current}
+                    findController={findControllerRef.current}
+                    eventBus={eventBusRef.current}
                     annotations={annotations.filter(a => a.page === currentPage)}
                     onUpdateComment={handleUpdateComment}
                     onDeleteAnnotation={handleDeleteAnnotation}
@@ -1621,6 +1888,38 @@ export default function Reader({
           onUpdateComment={handleUpdateComment}
           onDeleteAnnotation={handleDeleteAnnotation}
         />
+
+        {/* Floating In-Book Search Bar */}
+        <BookSearchBar
+          isOpen={searchOpen}
+          onClose={handleCloseSearch}
+          query={searchQuery}
+          onQueryChange={handleSearchQueryChange}
+          onNext={handleFindNext}
+          onPrev={handleFindPrev}
+          currentIndex={matchesCount.current}
+          totalMatches={matchesCount.total}
+          isSearching={isSearching}
+          caseSensitive={caseSensitive}
+          onToggleCaseSensitive={handleToggleCaseSensitive}
+          entireWord={entireWord}
+          onToggleEntireWord={handleToggleEntireWord}
+          theme={invertColors ? 'dark' : 'light'}
+        />
+
+        {/* Text-to-Speech (Read Aloud) Player Bar */}
+        <TtsPlayerBar
+          isOpen={ttsOpen}
+          onClose={() => setTtsOpen(false)}
+          text={ttsText}
+          mode={ttsMode}
+          pageNumber={ttsPageNumber}
+          totalPages={totalPages}
+          onNextPage={goToNextPage}
+          onPrevPage={goToPrevPage}
+          theme={invertColors ? 'dark' : 'light'}
+          bookTitle={book?.title || ''}
+        />
       </div>
 
       {/* Floating Context Menu for Text Selection */}
@@ -1631,6 +1930,7 @@ export default function Reader({
           selectedText={selectionMenu.text}
           onHighlight={handleCreateHighlight}
           onClose={() => setSelectionMenu({ isOpen: false, x: 0, y: 0, text: '', rects: [], page: 1 })}
+          onReadAloud={handleReadSelection}
         />
       )}
 

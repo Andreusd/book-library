@@ -5,11 +5,15 @@ import {
   Maximize2, Minimize2, Moon, Sun, ListTree,
   Heart, X, BookOpen,
   PanelTopClose, PanelTopOpen, Palette,
-  MessageSquare
+  MessageSquare, Search, Headphones
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 import CommentsDrawer from './CommentsDrawer';
 import TextSelectionMenu from './TextSelectionMenu';
+import BookSearchBar from './BookSearchBar';
+import TtsPlayerBar from './TtsPlayerBar';
+import { extractEpubVisibleText } from '../utils/textToSpeech';
+import PdfOutline from './PdfOutline';
 
 const COLOR_HEX_MAP = {
   yellow: '#facc15',
@@ -104,6 +108,19 @@ const applyThemeToDoc = (doc, themeName) => {
   } catch (e) {}
 };
 
+function getSearchRegex(query, { caseSensitive, entireWord }) {
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let pattern = escaped;
+  if (entireWord) {
+    try {
+      return new RegExp(`(?<![\\p{L}\\p{N}])${pattern}(?![\\p{L}\\p{N}])`, `gu${caseSensitive ? '' : 'i'}`);
+    } catch (e) {
+      pattern = `\\b${pattern}\\b`;
+    }
+  }
+  return new RegExp(pattern, `g${caseSensitive ? '' : 'i'}`);
+}
+
 export default function EpubViewer({
   book,
   onClose,
@@ -135,7 +152,6 @@ export default function EpubViewer({
   const [error, setError] = useState(null);
   const [toc, setToc] = useState([]);
   const [tocOpen, setTocOpen] = useState(false);
-  const [tocSearch, setTocSearch] = useState('');
   const [annotations, setAnnotations] = useState([]);
   const [commentsDrawerOpen, setCommentsDrawerOpen] = useState(false);
   const [renditionReady, setRenditionReady] = useState(false);
@@ -227,7 +243,7 @@ export default function EpubViewer({
     const targetPage = parseInt(pageInput, 10);
     if (isNaN(targetPage) || !renditionRef.current) return;
 
-    if (bookRef.current?.locations && typeof bookRef.current.locations.length === 'function' && bookRef.current.locations.length() > 0) {
+    if (isLocationsReadyRef.current && bookRef.current?.locations && bookRef.current.locations.total > 0 && typeof bookRef.current.locations.length === 'function' && bookRef.current.locations.length() > 0) {
       const total = bookRef.current.locations.length();
       const clamped = Math.min(Math.max(1, targetPage), total);
       try {
@@ -245,13 +261,27 @@ export default function EpubViewer({
     if (pageInfo.total > 0) {
       const clamped = Math.min(Math.max(1, targetPage), pageInfo.total);
       const pct = (clamped - 1) / (pageInfo.total || 1);
-      try {
-        const targetCfi = bookRef.current?.locations?.cfiFromPercentage(pct);
-        if (targetCfi) {
-          renditionRef.current.display(targetCfi);
+
+      if (isLocationsReadyRef.current && bookRef.current?.locations && bookRef.current.locations.total > 0) {
+        try {
+          const targetCfi = bookRef.current.locations.cfiFromPercentage(pct);
+          if (targetCfi) {
+            renditionRef.current.display(targetCfi);
+            setPageInput(String(clamped));
+            return;
+          }
+        } catch (e) {}
+      }
+
+      // Fallback: jump to spine item based on percentage
+      const spineItems = bookRef.current?.spine?.items || [];
+      if (spineItems.length > 0) {
+        const targetSpineIdx = Math.min(spineItems.length - 1, Math.round(pct * (spineItems.length - 1)));
+        if (spineItems[targetSpineIdx]) {
+          renditionRef.current.display(spineItems[targetSpineIdx].href || spineItems[targetSpineIdx].cfiBase);
           setPageInput(String(clamped));
         }
-      } catch (e) {}
+      }
     }
   };
 
@@ -268,6 +298,19 @@ export default function EpubViewer({
   const handleTouchEndRef = useRef(null);
   const handleNativeWheelRef = useRef(null);
   const attachListenersToIframeRef = useRef(null);
+
+  // Safety refs to prevent premature locations usage and state race conditions
+  const isLocationsReadyRef = useRef(false);
+  const locationInfoRef = useRef(locationInfo);
+  const pageInfoRef = useRef(pageInfo);
+
+  useEffect(() => {
+    locationInfoRef.current = locationInfo;
+  }, [locationInfo]);
+
+  useEffect(() => {
+    pageInfoRef.current = pageInfo;
+  }, [pageInfo]);
 
   // Preferences: Font Size
   const [fontSize, setFontSize] = useState(() => {
@@ -329,6 +372,35 @@ export default function EpubViewer({
   });
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
 
+  // Search state
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [currentSearchIdx, setCurrentSearchIdx] = useState(-1);
+  const [isSearching, setIsSearching] = useState(false);
+  const [caseSensitive, setCaseSensitive] = useState(false);
+  const [entireWord, setEntireWord] = useState(false);
+
+  // Text-to-Speech (Read Aloud) state
+  const [ttsOpen, setTtsOpen] = useState(false);
+  const [ttsText, setTtsText] = useState('');
+  const [ttsMode, setTtsMode] = useState('page'); // 'page' | 'selection'
+  const [ttsPageNumber, setTtsPageNumber] = useState(1);
+
+  const activeSearchIdRef = useRef(0);
+  const activeSearchCfiRef = useRef(null);
+  const searchOpenRef = useRef(false);
+  const searchTimeoutRef = useRef(null);
+  const ttsOpenRef = useRef(false);
+
+  useEffect(() => {
+    searchOpenRef.current = searchOpen;
+  }, [searchOpen]);
+
+  useEffect(() => {
+    ttsOpenRef.current = ttsOpen;
+  }, [ttsOpen]);
+
   const isHeaderVisibleRef = useRef(true);
   const hideTimerRef = useRef(null);
   const isMouseOverHeaderRef = useRef(false);
@@ -367,7 +439,9 @@ export default function EpubViewer({
       if (
         isMouseOverHeaderRef.current ||
         tocOpenRef.current ||
-        commentsDrawerOpenRef.current
+        commentsDrawerOpenRef.current ||
+        searchOpenRef.current ||
+        ttsOpenRef.current
       ) {
         return;
       }
@@ -416,7 +490,9 @@ export default function EpubViewer({
           isHeaderVisibleRef.current &&
           !isMouseOverHeaderRef.current &&
           !tocOpenRef.current &&
-          !commentsDrawerOpenRef.current
+          !commentsDrawerOpenRef.current &&
+          !searchOpenRef.current &&
+          !ttsOpenRef.current
         ) {
           startHideTimer(3000, false);
         }
@@ -438,6 +514,278 @@ export default function EpubViewer({
       clearHideTimer();
     };
   }, [headerPinned, showHeader, startHideTimer, clearHideTimer]);
+
+  // EPUB Search handlers
+  const jumpToEpubMatch = useCallback(async (match) => {
+    if (!match || !match.cfi || !renditionRef.current) return;
+
+    if (activeSearchCfiRef.current && renditionRef.current) {
+      try {
+        renditionRef.current.annotations.remove(activeSearchCfiRef.current, 'highlight');
+      } catch (e) {}
+    }
+
+    activeSearchCfiRef.current = match.cfi;
+
+    try {
+      await renditionRef.current.display(match.cfi);
+      renditionRef.current.annotations.add(
+        'highlight',
+        match.cfi,
+        { isSearchMatch: true },
+        null,
+        'epub-search-match-selected',
+        { fill: '#f59e0b', 'fill-opacity': '0.6', 'mix-blend-mode': 'multiply' }
+      );
+    } catch (e) {
+      console.warn('Error jumping to EPUB match:', e);
+    }
+  }, []);
+
+  const handleCloseSearch = useCallback(() => {
+    setSearchOpen(false);
+    activeSearchIdRef.current++;
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = null;
+    }
+    setIsSearching(false);
+    setSearchResults([]);
+    setCurrentSearchIdx(-1);
+    if (activeSearchCfiRef.current && renditionRef.current) {
+      try {
+        renditionRef.current.annotations.remove(activeSearchCfiRef.current, 'highlight');
+      } catch (e) {}
+      activeSearchCfiRef.current = null;
+    }
+  }, []);
+
+  const executeEpubSearch = useCallback(async (query, { caseSensitiveVal, entireWordVal } = {}) => {
+    const cs = caseSensitiveVal !== undefined ? caseSensitiveVal : caseSensitive;
+    const ew = entireWordVal !== undefined ? entireWordVal : entireWord;
+
+    const searchId = ++activeSearchIdRef.current;
+
+    // Clear previous highlights
+    if (activeSearchCfiRef.current && renditionRef.current) {
+      try {
+        renditionRef.current.annotations.remove(activeSearchCfiRef.current, 'highlight');
+      } catch (e) {}
+      activeSearchCfiRef.current = null;
+    }
+
+    if (!query || query.trim() === '' || !bookRef.current) {
+      setSearchResults([]);
+      setCurrentSearchIdx(-1);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    setSearchResults([]);
+    setCurrentSearchIdx(-1);
+
+    const spine = bookRef.current.spine;
+    if (!spine || !spine.items || spine.items.length === 0) {
+      setIsSearching(false);
+      return;
+    }
+
+    const regex = getSearchRegex(query.trim(), { caseSensitive: cs, entireWord: ew });
+    const matches = [];
+
+    try {
+      for (let i = 0; i < spine.items.length; i++) {
+        if (activeSearchIdRef.current !== searchId) return;
+
+        const section = spine.items[i];
+        const wasLoaded = !!section.document;
+
+        if (!wasLoaded) {
+          try {
+            await section.load(bookRef.current.load.bind(bookRef.current));
+          } catch (loadErr) {
+            console.warn('Could not load section for search:', section.href, loadErr);
+            continue;
+          }
+        }
+
+        if (activeSearchIdRef.current !== searchId) {
+          if (!wasLoaded) section.unload();
+          return;
+        }
+
+        if (section.document) {
+          const treeWalker = document.createTreeWalker(section.document, NodeFilter.SHOW_TEXT, null, false);
+          let textNode;
+          const limit = 120;
+
+          while ((textNode = treeWalker.nextNode())) {
+            const textContent = textNode.textContent;
+            if (!textContent) continue;
+
+            regex.lastIndex = 0;
+            let match;
+            while ((match = regex.exec(textContent)) !== null) {
+              const startPos = match.index;
+              const matchLen = match[0].length;
+              if (matchLen === 0) {
+                regex.lastIndex++;
+                continue;
+              }
+
+              try {
+                const range = section.document.createRange();
+                range.setStart(textNode, startPos);
+                range.setEnd(textNode, startPos + matchLen);
+                const cfi = section.cfiFromRange(range);
+
+                let excerpt = '';
+                if (textContent.length <= limit) {
+                  excerpt = textContent.trim();
+                } else {
+                  const s = Math.max(0, startPos - Math.floor(limit / 2));
+                  const e = Math.min(textContent.length, startPos + matchLen + Math.floor(limit / 2));
+                  excerpt = (s > 0 ? '...' : '') + textContent.substring(s, e).trim() + (e < textContent.length ? '...' : '');
+                }
+
+                matches.push({
+                  cfi,
+                  excerpt,
+                  sectionIndex: i,
+                });
+              } catch (rangeErr) {
+                // Ignore range creation errors on detached nodes
+              }
+            }
+          }
+        }
+
+        if (!wasLoaded) {
+          section.unload();
+        }
+      }
+
+      if (activeSearchIdRef.current === searchId) {
+        setSearchResults(matches);
+        setIsSearching(false);
+        if (matches.length > 0) {
+          setCurrentSearchIdx(0);
+          jumpToEpubMatch(matches[0]);
+        }
+      }
+    } catch (err) {
+      console.error('EPUB search error:', err);
+      if (activeSearchIdRef.current === searchId) {
+        setIsSearching(false);
+      }
+    }
+  }, [caseSensitive, entireWord, jumpToEpubMatch]);
+
+  const handleFindNext = useCallback(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = null;
+      executeEpubSearch(searchQuery);
+      return;
+    }
+    if (searchResults.length === 0) return;
+    const nextIdx = (currentSearchIdx + 1) % searchResults.length;
+    setCurrentSearchIdx(nextIdx);
+    jumpToEpubMatch(searchResults[nextIdx]);
+  }, [searchResults, currentSearchIdx, jumpToEpubMatch, searchQuery, executeEpubSearch]);
+
+  const handleFindPrev = useCallback(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = null;
+      executeEpubSearch(searchQuery);
+      return;
+    }
+    if (searchResults.length === 0) return;
+    const prevIdx = (currentSearchIdx - 1 + searchResults.length) % searchResults.length;
+    setCurrentSearchIdx(prevIdx);
+    jumpToEpubMatch(searchResults[prevIdx]);
+  }, [searchResults, currentSearchIdx, jumpToEpubMatch, searchQuery, executeEpubSearch]);
+
+  const handleSearchQueryChange = useCallback((newQuery) => {
+    setSearchQuery(newQuery);
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    if (!newQuery || newQuery.trim() === '') {
+      handleCloseSearch();
+      return;
+    }
+    searchTimeoutRef.current = setTimeout(() => {
+      executeEpubSearch(newQuery);
+    }, 250);
+  }, [executeEpubSearch, handleCloseSearch]);
+
+  const handleToggleCaseSensitive = useCallback(() => {
+    setCaseSensitive(prev => {
+      const next = !prev;
+      if (searchQuery.trim()) {
+        executeEpubSearch(searchQuery, { caseSensitiveVal: next });
+      }
+      return next;
+    });
+  }, [searchQuery, executeEpubSearch]);
+
+  const handleToggleEntireWord = useCallback(() => {
+    setEntireWord(prev => {
+      const next = !prev;
+      if (searchQuery.trim()) {
+        executeEpubSearch(searchQuery, { entireWordVal: next });
+      }
+      return next;
+    });
+  }, [searchQuery, executeEpubSearch]);
+
+  // Text-to-Speech handlers
+  const startReadingCurrentView = useCallback((forcedMode = 'page') => {
+    if (!renditionRef.current) return;
+    const text = extractEpubVisibleText(renditionRef.current);
+    setTtsMode(forcedMode);
+    setTtsPageNumber(pageInfo.current || 1);
+
+    if (text && text.trim()) {
+      setTtsText(text.trim());
+      setTtsOpen(true);
+    } else {
+      alert(t('noTextFoundToRead'));
+    }
+  }, [pageInfo.current, t]);
+
+  const toggleTts = useCallback(() => {
+    if (ttsOpen) {
+      setTtsOpen(false);
+    } else {
+      startReadingCurrentView('page');
+    }
+  }, [ttsOpen, startReadingCurrentView]);
+
+  const handleReadSelection = useCallback((selectedText) => {
+    if (!selectedText || !selectedText.trim()) return;
+    setTtsMode('selection');
+    setTtsPageNumber(pageInfo.current || 1);
+    setTtsText(selectedText.trim());
+    setTtsOpen(true);
+  }, [pageInfo.current]);
+
+  // When location changes while TTS is actively reading in page mode, update text to read the new view
+  useEffect(() => {
+    if (ttsOpenRef.current && ttsMode === 'page' && renditionRef.current) {
+      const timer = setTimeout(() => {
+        const text = extractEpubVisibleText(renditionRef.current);
+        if (text && text.trim()) {
+          setTtsText(text.trim());
+          setTtsPageNumber(pageInfo.current || 1);
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [locationInfo.cfi]);
 
   const handleIframeMouseMove = useCallback((e, contents) => {
     if (headerPinned) return;
@@ -528,10 +876,26 @@ export default function EpubViewer({
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
     saveTimeoutRef.current = setTimeout(() => {
-      const curPage = (typeof page === 'number' && page > 0)
-        ? page
-        : Math.max(1, Math.round((percent / 100) * (total || 100)));
+      // Guard against saving corrupted 0% progress when CFI indicates reading in progress
+      if (percent <= 0 && cfi) {
+        const match = cfi.match(/\/6\/(\d+)!/);
+        if (match) {
+          const spineIndex = Math.max(0, Math.floor(parseInt(match[1], 10) / 2) - 1);
+          if (spineIndex > 0) {
+            console.warn('Blocked attempt to save glitched 0% progress for spine index:', spineIndex);
+            return;
+          }
+        }
+      }
+
       const totalPages = (typeof total === 'number' && total > 0) ? total : 100;
+      let curPage = (typeof page === 'number' && page > 0)
+        ? page
+        : Math.max(1, Math.round((percent / 100) * totalPages));
+
+      if (percent > 1 && curPage <= 1) {
+        curPage = Math.max(1, Math.round((percent / 100) * totalPages));
+      }
 
       const payload = {
         book_id: book.id,
@@ -814,14 +1178,30 @@ export default function EpubViewer({
     const cfi = locationInfo.cfi;
     const percent = locationInfo.percentage;
     if (cfi) {
+      // Guard against saving glitched 0%
+      if (percent <= 0) {
+        const match = cfi.match(/\/6\/(\d+)!/);
+        if (match) {
+          const spineIndex = Math.max(0, Math.floor(parseInt(match[1], 10) / 2) - 1);
+          if (spineIndex > 0) {
+            onClose();
+            return;
+          }
+        }
+      }
+      const totalPages = pageInfo.total > 0 ? pageInfo.total : 100;
+      let curPage = pageInfo.current > 0 ? pageInfo.current : Math.max(1, Math.round((percent / 100) * totalPages));
+      if (percent > 1 && curPage <= 1) {
+        curPage = Math.max(1, Math.round((percent / 100) * totalPages));
+      }
       try {
         fetch('/api/progress', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             book_id: book.id,
-            page: Math.max(1, Math.round((percent / 100) * 100)),
-            total_pages: 100,
+            page: curPage,
+            total_pages: totalPages,
             percent: percent,
             cfi: cfi,
             invert_colors: theme === 'dark'
@@ -831,7 +1211,7 @@ export default function EpubViewer({
       } catch (e) {}
     }
     onClose();
-  }, [book.id, locationInfo.cfi, locationInfo.percentage, theme, onClose]);
+  }, [book.id, locationInfo.cfi, locationInfo.percentage, pageInfo.total, pageInfo.current, theme, onClose]);
 
   // Load Annotations from Backend
   const loadAnnotations = useCallback(() => {
@@ -1125,6 +1505,10 @@ export default function EpubViewer({
               .hl-annotation:hover, .epubjs-hl:hover, [ref="hl-annotation"]:hover {
                 fill-opacity: 0.55 !important;
               }
+              .epub-search-match-selected {
+                fill: #f59e0b !important;
+                fill-opacity: 0.65 !important;
+              }
             `);
           } catch (e) {}
         });
@@ -1185,25 +1569,29 @@ export default function EpubViewer({
             const cached = localStorage.getItem(`book_locations_${book.id}`);
             if (cached) {
               epubBook.locations.load(cached);
+              if (epubBook.locations && epubBook.locations.total > 0) {
+                isLocationsReadyRef.current = true;
+              }
               return;
             }
           } catch (e) {}
 
+          // Accelerate background generation pause to 10ms instead of 100ms default
+          if (epubBook.locations) {
+            epubBook.locations.pause = 10;
+          }
+
           return epubBook.locations.generate(1600);
         }).then(() => {
           if (isCancelled) return;
-          try {
-            if (epubBook.locations && epubBook.locations.length() > 0) {
-              localStorage.setItem(`book_locations_${book.id}`, epubBook.locations.save());
-            }
-          } catch (e) {}
-
           const totalLocs = (epubBook.locations && typeof epubBook.locations.length === 'function')
             ? epubBook.locations.length()
             : 0;
 
-          if (totalLocs > 0) {
+          if (totalLocs > 0 && epubBook.locations?.total > 0) {
+            isLocationsReadyRef.current = true;
             try {
+              localStorage.setItem(`book_locations_${book.id}`, epubBook.locations.save());
               localStorage.setItem(`book_total_pages_${book.id}`, String(totalLocs));
             } catch (e) {}
           }
@@ -1221,6 +1609,8 @@ export default function EpubViewer({
           }
 
           const currentCfi = rendition.currentLocation()?.start?.cfi || startCfi;
+          const pct = getAccuratePercentage(rendition.currentLocation(), currentCfi);
+
           let curPage = 1;
           if (currentCfi && totalLocs > 0) {
             try {
@@ -1231,7 +1621,11 @@ export default function EpubViewer({
             } catch (e) {}
           }
 
-          if (totalLocs > 0) {
+          if (pct > 1 && curPage <= 1 && totalLocs > 0) {
+            curPage = Math.max(1, Math.min(totalLocs, Math.round((pct / 100) * totalLocs)));
+          }
+
+          if (totalLocs > 0 && isLocationsReadyRef.current) {
             setPageInfo({ current: curPage, total: totalLocs });
             setPageInput(String(curPage));
             try {
@@ -1239,13 +1633,9 @@ export default function EpubViewer({
             } catch (e) {}
           }
 
-          if (rendition.currentLocation()?.start?.cfi) {
-            const cfi = rendition.currentLocation().start.cfi;
-            const pct = Math.round(epubBook.locations.percentageFromCfi(cfi) * 100);
-            if (pct > 0) {
-              setLocationInfo(prev => ({ ...prev, percentage: pct }));
-              saveProgressDebounced(cfi, pct, curPage, totalLocs);
-            }
+          if (currentCfi && pct > 0) {
+            setLocationInfo(prev => ({ ...prev, percentage: pct }));
+            saveProgressDebounced(currentCfi, pct, curPage, totalLocs);
           }
         }).catch(e => {
           console.warn('Locations generation notice:', e);
@@ -1295,46 +1685,63 @@ export default function EpubViewer({
 
         // Helper to calculate reading percentage reliably
         const getAccuratePercentage = (location, cfi) => {
-          // 1. If epubBook has generated locations and can resolve the CFI, use it
-          if (epubBook.locations && typeof epubBook.locations.length === 'function' && epubBook.locations.length() > 0) {
+          // Extract spine item index as the physical, structural anchor
+          const spineItems = epubBook.spine?.items || [];
+          const totalSpine = spineItems.length;
+          let spineIndex = location?.start?.index;
+
+          if (spineIndex === undefined && cfi) {
+            const match = cfi.match(/\/6\/(\d+)!/);
+            if (match) {
+              const childNum = parseInt(match[1], 10);
+              spineIndex = Math.max(0, Math.floor(childNum / 2) - 1);
+            }
+          }
+
+          // Compute spine-based percentage (bulletproof, zero delay, works in all EPUBs)
+          let spinePercent = null;
+          if (totalSpine > 0 && spineIndex !== undefined && spineIndex >= 0) {
+            const displayed = location?.start?.displayed;
+            let intraFraction = 0;
+            if (displayed && displayed.total > 1 && displayed.page > 0) {
+              intraFraction = (displayed.page - 1) / displayed.total;
+            }
+            const fraction = (spineIndex + intraFraction) / totalSpine;
+            spinePercent = Math.min(100, Math.max(0, Math.round(fraction * 100)));
+          }
+
+          // 1. If epubBook has fully generated locations and can resolve the CFI, try it
+          if (isLocationsReadyRef.current && epubBook.locations && epubBook.locations.total > 0 && typeof epubBook.locations.length === 'function' && epubBook.locations.length() > 0) {
             try {
               const locPct = epubBook.locations.percentageFromCfi(cfi);
               if (typeof locPct === 'number' && !isNaN(locPct) && locPct >= 0) {
-                return Math.min(100, Math.max(0, Math.round(locPct * 100)));
+                const computedPct = Math.min(100, Math.max(0, Math.round(locPct * 100)));
+                // Sanity check: If computedPct is 0, but spineIndex > 0 (or spinePercent > 0),
+                // locations failed to locate this CFI. Do NOT accept 0%! Fall through to spinePercent.
+                if (computedPct === 0 && (spineIndex > 0 || (spinePercent !== null && spinePercent > 0))) {
+                  // Fall through
+                } else if (spinePercent !== null && Math.abs(computedPct - spinePercent) > 25) {
+                  // Wild deviation from physically grounded spine position: trust spine
+                } else {
+                  return computedPct;
+                }
               }
             } catch (e) {}
           }
 
-          // 2. If location has native percentage
+          // 2. Spine-based calculation
+          if (spinePercent !== null) {
+            return spinePercent;
+          }
+
+          // 3. If location has native percentage
           if (location?.start?.percentage !== undefined && typeof location.start.percentage === 'number' && !isNaN(location.start.percentage) && location.start.percentage > 0) {
             return Math.min(100, Math.max(0, Math.round(location.start.percentage * 100)));
           }
 
-          // 3. Spine-based calculation (immediate, accurate, zero delay)
-          const spineItems = epubBook.spine?.items || [];
-          const totalSpine = spineItems.length;
-
-          if (totalSpine > 0) {
-            let spineIndex = location?.start?.index;
-
-            // If spine index is missing, extract it from CFI /6/(\d+)!
-            if (spineIndex === undefined && cfi) {
-              const match = cfi.match(/\/6\/(\d+)!/);
-              if (match) {
-                const childNum = parseInt(match[1], 10);
-                spineIndex = Math.max(0, Math.floor(childNum / 2) - 1);
-              }
-            }
-
-            if (spineIndex !== undefined && spineIndex >= 0) {
-              const displayed = location?.start?.displayed;
-              let intraFraction = 0;
-              if (displayed && displayed.total > 1 && displayed.page > 0) {
-                intraFraction = (displayed.page - 1) / displayed.total;
-              }
-              const fraction = (spineIndex + intraFraction) / totalSpine;
-              return Math.min(100, Math.max(0, Math.round(fraction * 100)));
-            }
+          // 4. Fallback to existing active percentage
+          if (locationInfoRef.current?.percentage > 0) {
+            return locationInfoRef.current.percentage;
           }
 
           if (initialPercentRef.current > 0) {
@@ -1375,11 +1782,20 @@ export default function EpubViewer({
             chapter: chapterName
           });
 
-          // Calculate current page & total pages if locations available
+          // Extract spine index for page calculations
+          let spineIndex = location.start.index;
+          if (spineIndex === undefined && cfi) {
+            const match = cfi.match(/\/6\/(\d+)!/);
+            if (match) {
+              spineIndex = Math.max(0, Math.floor(parseInt(match[1], 10) / 2) - 1);
+            }
+          }
+
+          // Calculate current page & total pages
           let curPage = null;
           let totalPages = null;
 
-          if (epubBook.locations && typeof epubBook.locations.length === 'function' && epubBook.locations.length() > 0) {
+          if (isLocationsReadyRef.current && epubBook.locations && epubBook.locations.total > 0 && typeof epubBook.locations.length === 'function' && epubBook.locations.length() > 0) {
             totalPages = epubBook.locations.length();
             try {
               const loc = epubBook.locations.locationFromCfi(cfi);
@@ -1389,26 +1805,37 @@ export default function EpubViewer({
             } catch (e) {}
           }
 
-          if (curPage === null && totalPages && totalPages > 0) {
-            curPage = Math.max(1, Math.round((pct / 100) * totalPages));
+          const totalSpine = epubBook.spine?.items?.length || 0;
+          const fallbackTotal = (pageInfoRef.current?.total > 0)
+            ? pageInfoRef.current.total
+            : (getInitialTotalPages() || totalSpine || 100);
+
+          if (totalPages === null || totalPages <= 0) {
+            totalPages = fallbackTotal;
           }
 
-          if (curPage !== null) {
-            setPageInfo(prev => ({
-              current: curPage,
-              total: totalPages || prev.total || 0
-            }));
-            setPageInput(String(curPage));
-            try {
-              localStorage.setItem(`book_page_${book.id}`, String(curPage));
-              if (totalPages) localStorage.setItem(`book_total_pages_${book.id}`, String(totalPages));
-            } catch (e) {}
+          // If curPage could not be resolved from locations, or if curPage <= 1 while progress > 1% (or spine > 0),
+          // calculate curPage proportionally from percentage
+          if (curPage === null || (curPage <= 1 && (pct > 1 || (spineIndex && spineIndex > 0)))) {
+            curPage = Math.max(1, Math.min(totalPages, Math.round((pct / 100) * totalPages)));
           }
+
+          setPageInfo({
+            current: curPage,
+            total: totalPages
+          });
+          setPageInput(String(curPage));
 
           // Synchronously persist location so it is never lost on refresh / closing tab
           try {
             localStorage.setItem(`book_cfi_${book.id}`, cfi);
-            localStorage.setItem(`book_percent_${book.id}`, String(pct));
+            if (pct > 0 || (spineIndex === 0 && pct === 0)) {
+              localStorage.setItem(`book_percent_${book.id}`, String(pct));
+              localStorage.setItem(`book_page_${book.id}`, String(curPage));
+              if (totalPages > 0) {
+                localStorage.setItem(`book_total_pages_${book.id}`, String(totalPages));
+              }
+            }
           } catch (e) {}
 
           // Prevent initial relocation on mount from overwriting saved progress before locations are generated
@@ -1426,14 +1853,25 @@ export default function EpubViewer({
 
         // Iframe key listeners for smooth reading controls
         rendition.on('keydown', (e) => {
-          if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+          if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+            e.preventDefault();
+            setSearchOpen(true);
+            showHeader();
+          } else if (e.altKey && (e.key === 'r' || e.key === 'R')) {
+            e.preventDefault();
+            toggleTts();
+          } else if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
             e.preventDefault();
             rendition.next();
           } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
             e.preventDefault();
             rendition.prev();
           } else if (e.key === 'Escape') {
-            if (commentsDrawerOpen) {
+            if (ttsOpenRef.current) {
+              setTtsOpen(false);
+            } else if (searchOpenRef.current) {
+              handleCloseSearch();
+            } else if (commentsDrawerOpen) {
               setCommentsDrawerOpen(false);
             } else if (tocOpen) {
               setTocOpen(false);
@@ -1472,6 +1910,19 @@ export default function EpubViewer({
     const handleKeyDown = (e) => {
       if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
 
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
+        e.preventDefault();
+        setSearchOpen(true);
+        showHeader();
+        return;
+      }
+
+      if (e.altKey && (e.key === 'r' || e.key === 'R')) {
+        e.preventDefault();
+        toggleTts();
+        return;
+      }
+
       if (e.key === 'ArrowRight' || e.key === 'PageDown') {
         e.preventDefault();
         flipNext();
@@ -1479,7 +1930,11 @@ export default function EpubViewer({
         e.preventDefault();
         flipPrev();
       } else if (e.key === 'Escape') {
-        if (selectionMenu.isOpen) {
+        if (ttsOpenRef.current) {
+          setTtsOpen(false);
+        } else if (searchOpenRef.current) {
+          handleCloseSearch();
+        } else if (selectionMenu.isOpen) {
           setSelectionMenu({ isOpen: false, x: 0, y: 0, text: '', cfi: null });
         } else if (commentsDrawerOpen) {
           setCommentsDrawerOpen(false);
@@ -1497,7 +1952,7 @@ export default function EpubViewer({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, commentsDrawerOpen, tocOpen, selectionMenu.isOpen, handleClose, flipNext, flipPrev]);
+  }, [onClose, commentsDrawerOpen, tocOpen, selectionMenu.isOpen, handleClose, flipNext, flipPrev, showHeader, handleCloseSearch, toggleTts]);
 
   // Handle Theme Change
   const applyTheme = (newTheme) => {
@@ -1578,7 +2033,9 @@ export default function EpubViewer({
   const handleSelectChapter = (href) => {
     if (renditionRef.current && href) {
       renditionRef.current.display(href);
-      setTocOpen(false);
+      if (window.innerWidth < 768) {
+        setTocOpen(false);
+      }
     }
   };
 
@@ -1587,47 +2044,6 @@ export default function EpubViewer({
     const nextFav = !favState;
     setFavState(nextFav);
     if (onToggleFavorite) onToggleFavorite(book);
-  };
-
-  // Filter TOC items by search
-  const filterTocItems = (items, query) => {
-    if (!query) return items;
-    const lower = query.toLowerCase();
-    const result = [];
-    for (const item of items) {
-      const matchSelf = item.label && item.label.toLowerCase().includes(lower);
-      const matchingSub = item.subitems ? filterTocItems(item.subitems, query) : [];
-      if (matchSelf || matchingSub.length > 0) {
-        result.push({
-          ...item,
-          subitems: matchingSub
-        });
-      }
-    }
-    return result;
-  };
-
-  const filteredToc = filterTocItems(toc, tocSearch);
-
-  // Recursive TOC Tree Renderer
-  const renderTocList = (items, depth = 0) => {
-    if (!items || !items.length) return null;
-    return (
-      <ul className={`space-y-0.5 ${depth > 0 ? 'ml-3 border-l border-neutral-800/80 pl-2' : ''}`}>
-        {items.map((item, idx) => (
-          <li key={item.id || `${item.href}-${idx}`}>
-            <button
-              onClick={() => handleSelectChapter(item.href)}
-              className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs hover:bg-neutral-800 text-neutral-300 hover:text-amber-400 transition-colors truncate block group cursor-pointer"
-              title={item.label}
-            >
-              <span className="truncate">{item.label ? item.label.trim() : `Chapter ${idx + 1}`}</span>
-            </button>
-            {item.subitems && item.subitems.length > 0 && renderTocList(item.subitems, depth + 1)}
-          </li>
-        ))}
-      </ul>
-    );
   };
 
   // Background styling according to theme
@@ -1640,7 +2056,7 @@ export default function EpubViewer({
   const headerTheme = {
     dark: {
       bar: 'bg-black border-neutral-900 text-neutral-200',
-      shadow: 'shadow-xl shadow-black/80',
+      shadow: '',
       title: 'text-neutral-100',
       subtitle: 'text-neutral-400',
       chapter: 'text-neutral-300',
@@ -1660,7 +2076,7 @@ export default function EpubViewer({
     },
     sepia: {
       bar: 'bg-[#fbf0d9] border-[#e5d5b5] text-[#433422]',
-      shadow: 'shadow-md shadow-stone-900/10',
+      shadow: '',
       title: 'text-[#292014]',
       subtitle: 'text-[#7c6a53]',
       chapter: 'text-[#5a4833]',
@@ -1680,7 +2096,7 @@ export default function EpubViewer({
     },
     light: {
       bar: 'bg-white border-neutral-200 text-neutral-700',
-      shadow: 'shadow-md shadow-neutral-900/5',
+      shadow: '',
       title: 'text-neutral-900',
       subtitle: 'text-neutral-500',
       chapter: 'text-neutral-700',
@@ -1700,7 +2116,7 @@ export default function EpubViewer({
     }
   };
   const ht = headerTheme[theme] || headerTheme.dark;
-  const isHeaderShowing = headerPinned || isHeaderVisible || tocOpen || commentsDrawerOpen;
+  const isHeaderShowing = headerPinned || isHeaderVisible || tocOpen || commentsDrawerOpen || searchOpen;
 
   return (
     <div 
@@ -1714,14 +2130,14 @@ export default function EpubViewer({
         }}
         onMouseLeave={() => {
           isMouseOverHeaderRef.current = false;
-          if (!headerPinned && !tocOpen && !commentsDrawerOpen) {
+          if (!headerPinned && !tocOpen && !commentsDrawerOpen && !searchOpen) {
             startHideTimer(3000, true);
           }
         }}
         className={`fixed top-0 inset-x-0 z-40 h-14 border-b px-4 flex items-center justify-between select-none transition-all duration-300 ease-in-out ${
           ht.bar
         } ${
-          isHeaderShowing ? `translate-y-0 opacity-100 pointer-events-auto ${ht.shadow}` : '-translate-y-full opacity-0 pointer-events-none'
+          isHeaderShowing ? 'translate-y-0 opacity-100 pointer-events-auto' : '-translate-y-full opacity-0 pointer-events-none'
         }`}
       >
         {/* Left: Back, TOC & Book Title */}
@@ -1888,6 +2304,39 @@ export default function EpubViewer({
             </button>
           </div>
 
+          {/* In-Book Full-Text Search Toggle */}
+          <button
+            onClick={() => {
+              if (searchOpen) {
+                handleCloseSearch();
+              } else {
+                setSearchOpen(true);
+                showHeader();
+              }
+            }}
+            className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+              searchOpen 
+                ? ht.iconBtnActive 
+                : ht.iconBtn
+            }`}
+            title={searchOpen ? t('searchClose') : t('searchInBook')}
+          >
+            <Search className="w-4 h-4" />
+          </button>
+
+          {/* Read Aloud (Text-to-Speech) Toggle */}
+          <button
+            onClick={toggleTts}
+            className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+              ttsOpen 
+                ? ht.iconBtnActive 
+                : ht.iconBtn
+            }`}
+            title={ttsOpen ? t('stopSpeech') : t('readAloudTitle')}
+          >
+            <Headphones className="w-4 h-4" />
+          </button>
+
           {/* Favorite Toggle */}
           <button
             onClick={handleFavToggle}
@@ -1955,6 +2404,17 @@ export default function EpubViewer({
 
       {/* Main EPUB Reader Stage + Side Drawers */}
       <div className="relative flex-1 flex w-full h-full overflow-hidden min-h-0 pt-14 pb-4">
+        {/* Toggleable Left Table of Contents Drawer */}
+        <PdfOutline
+          outline={toc}
+          isOpen={tocOpen}
+          onClose={() => setTocOpen(false)}
+          onItemClick={(item) => handleSelectChapter(item.href || item.url)}
+          activeChapter={locationInfo.chapter}
+          totalChapters={toc ? toc.length : 0}
+          percentage={locationInfo.percentage}
+        />
+
         <main className="relative flex-1 h-full flex items-center justify-center group/stage overscroll-none touch-pan-x min-w-0 overflow-hidden select-none">
           
           {/* Loading Spinner */}
@@ -2033,6 +2493,38 @@ export default function EpubViewer({
           onUpdateComment={handleUpdateComment}
           onDeleteAnnotation={handleDeleteAnnotation}
         />
+
+        {/* Floating In-Book Search Bar */}
+        <BookSearchBar
+          isOpen={searchOpen}
+          onClose={handleCloseSearch}
+          query={searchQuery}
+          onQueryChange={handleSearchQueryChange}
+          onNext={handleFindNext}
+          onPrev={handleFindPrev}
+          currentIndex={currentSearchIdx >= 0 ? currentSearchIdx + 1 : 0}
+          totalMatches={searchResults.length}
+          isSearching={isSearching}
+          caseSensitive={caseSensitive}
+          onToggleCaseSensitive={handleToggleCaseSensitive}
+          entireWord={entireWord}
+          onToggleEntireWord={handleToggleEntireWord}
+          theme={theme}
+        />
+
+        {/* Text-to-Speech (Read Aloud) Player Bar */}
+        <TtsPlayerBar
+          isOpen={ttsOpen}
+          onClose={() => setTtsOpen(false)}
+          text={ttsText}
+          mode={ttsMode}
+          pageNumber={pageInfo.current || 1}
+          totalPages={pageInfo.total}
+          onNextPage={flipNext}
+          onPrevPage={flipPrev}
+          theme={theme}
+          bookTitle={book?.title || ''}
+        />
       </div>
 
       {/* Floating Context Menu for Text Selection */}
@@ -2043,6 +2535,7 @@ export default function EpubViewer({
           selectedText={selectionMenu.text}
           onHighlight={handleCreateHighlight}
           onClose={() => setSelectionMenu({ isOpen: false, x: 0, y: 0, text: '', cfi: null })}
+          onReadAloud={handleReadSelection}
         />
       )}
 
@@ -2055,61 +2548,6 @@ export default function EpubViewer({
           style={{ width: `${locationInfo.percentage}%` }}
         />
       </footer>
-
-      {/* Table of Contents Drawer */}
-      {tocOpen && (
-        <div className="fixed inset-0 z-50 flex">
-          {/* Backdrop */}
-          <div 
-            onClick={() => setTocOpen(false)}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" 
-          />
-
-          {/* Drawer Panel */}
-          <div className="relative z-10 w-full max-w-sm h-full bg-neutral-950 border-r border-neutral-800 p-4 flex flex-col shadow-2xl animate-in slide-in-from-left duration-200">
-            <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
-              <div className="flex items-center gap-2">
-                <ListTree className="w-4 h-4 text-amber-500" />
-                <h2 className="text-sm font-semibold text-neutral-100">{t('tableOfContents')}</h2>
-              </div>
-              <button
-                onClick={() => setTocOpen(false)}
-                className="p-1 rounded-lg text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800 transition cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Filter Input */}
-            <div className="my-3">
-              <input
-                type="text"
-                value={tocSearch}
-                onChange={(e) => setTocSearch(e.target.value)}
-                placeholder={t('filterIndexPlaceholder')}
-                className="w-full px-3 py-1.5 text-xs bg-neutral-900 border border-neutral-800 rounded-lg text-neutral-200 focus:outline-none focus:border-amber-500"
-              />
-            </div>
-
-            {/* Chapters List */}
-            <div className="flex-1 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
-              {filteredToc.length > 0 ? (
-                renderTocList(filteredToc)
-              ) : (
-                <div className="p-4 text-center text-xs text-neutral-500">
-                  {tocSearch ? t('noIndexItemsFound') : t('noIndexAvailable')}
-                </div>
-              )}
-            </div>
-
-            {/* Footer Summary */}
-            <div className="pt-3 border-t border-neutral-800/80 flex items-center justify-between text-[11px] text-neutral-400 font-mono">
-              <span>{toc.length} chapters</span>
-              <span className="text-amber-400">{locationInfo.percentage}% completed</span>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

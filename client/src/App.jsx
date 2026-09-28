@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Search, SlidersHorizontal, Menu, X, BookOpen, 
   ArrowUpDown, FolderOpen, RefreshCw, PanelLeftClose, PanelLeftOpen,
-  Settings, Heart, Bookmark, Home, Maximize2, Minimize2, Library, Folder
+  Settings, Heart, Bookmark, Home, Maximize2, Minimize2, Library, Folder, Tag
 } from 'lucide-react';
 
 import Sidebar from './components/Sidebar';
@@ -20,6 +20,8 @@ import ShelfRenameModal from './components/ShelfRenameModal';
 import ShelfIconModal from './components/ShelfIconModal';
 import ShelfIcon from './components/ShelfIcon';
 import SettingsModal from './components/SettingsModal';
+import TagManagerModal from './components/TagManagerModal';
+import { getTagColorConfig } from './utils/tagColors';
 import { useI18n } from './i18n';
 
 // Helper to extract view & route information from URL
@@ -58,6 +60,9 @@ function parseRoute() {
   }
   if ((segments[0] === 'folder' || segments[0] === 'shelf') && segments[1]) {
     return { view: 'folder', libraryId: null, shelfId: segments[1], bookId: null };
+  }
+  if (segments[0] === 'tag' && segments[1]) {
+    return { view: 'tag', libraryId: null, shelfId: `tag:${segments[1]}`, bookId: null };
   }
 
   // 3. Library-scoped routes:
@@ -99,6 +104,11 @@ function parseRoute() {
     return { view: 'folder', libraryId: libId, shelfId: rest[1], bookId: null };
   }
 
+  // /:libraryId/tag/:tagId
+  if (rest[0] === 'tag' && rest[1]) {
+    return { view: 'tag', libraryId: libId, shelfId: `tag:${rest[1]}`, bookId: null };
+  }
+
   return { view: 'home', libraryId: libId, shelfId: null, bookId: null };
 }
 
@@ -109,6 +119,7 @@ function getPathForShelf(shelfId, libraryId) {
   if (shelfId === 'continue-reading') return `${base}/continue-reading`;
   if (shelfId === 'favorites') return `${base}/favorites`;
   if (shelfId === 'folders' || shelfId === 'shelves') return `${base}/folders`;
+  if (shelfId.startsWith('tag:')) return `${base}/tag/${encodeURIComponent(shelfId.slice(4))}`;
   return `${base}/folder/${encodeURIComponent(shelfId)}`;
 }
 const getPathForFolder = getPathForShelf;
@@ -130,6 +141,8 @@ export default function App() {
   const [continueReading, setContinueReading] = useState([]);
   const [favorites, setFavorites] = useState([]);
   const [favoriteIds, setFavoriteIds] = useState(new Set());
+  const [tags, setTags] = useState([]);
+  const [tagModal, setTagModal] = useState({ isOpen: false, book: null });
   const [loading, setLoading] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showFileExtension, setShowFileExtension] = useState(() => {
@@ -302,6 +315,28 @@ export default function App() {
       .catch(err => console.error('Failed to load favorites:', err));
   }, [activeLibraryId]);
 
+  // Load Virtual Tags
+  const loadTags = useCallback((libId) => {
+    const targetLib = libId !== undefined ? libId : activeLibraryId;
+    const url = targetLib 
+      ? `/api/tags?library_id=${encodeURIComponent(targetLib)}` 
+      : '/api/tags';
+    fetch(url)
+      .then(res => res.json())
+      .then(data => {
+        setTags(data.tags || []);
+      })
+      .catch(err => console.error('Failed to load tags:', err));
+  }, [activeLibraryId]);
+
+  // Handle Book Tags Updated from Modal
+  const handleBookTagsUpdated = useCallback((bookId, updatedTags) => {
+    setBooks(prev => prev.map(b => b.id === bookId ? { ...b, tags: updatedTags } : b));
+    setContinueReading(prev => prev.map(b => b.id === bookId ? { ...b, tags: updatedTags } : b));
+    setFavorites(prev => prev.map(b => b.id === bookId ? { ...b, tags: updatedTags } : b));
+    setActiveBook(prev => (prev && prev.id === bookId ? { ...prev, tags: updatedTags } : prev));
+  }, []);
+
   // Load Books
   const loadBooks = useCallback((libId, targetShelf) => {
     const targetLib = libId !== undefined ? libId : activeLibraryId;
@@ -314,7 +349,11 @@ export default function App() {
     const shelfToUse = targetShelf !== undefined ? targetShelf : selectedShelf;
     const params = new URLSearchParams();
     params.append('library_id', targetLib);
-    if (shelfToUse && shelfToUse !== 'folders') params.append('shelf', shelfToUse);
+    if (shelfToUse && shelfToUse.startsWith('tag:')) {
+      params.append('tag', shelfToUse.slice(4));
+    } else if (shelfToUse && shelfToUse !== 'folders') {
+      params.append('shelf', shelfToUse);
+    }
     if (debouncedQuery && shelfToUse !== 'folders') params.append('query', debouncedQuery);
     if (sortBy) params.append('sort', sortBy);
 
@@ -343,7 +382,8 @@ export default function App() {
     loadBooks(libraryId, null);
     loadContinueReading(libraryId);
     loadFavorites(libraryId);
-  }, [loadShelves, loadBooks, loadContinueReading, loadFavorites]);
+    loadTags(libraryId);
+  }, [loadShelves, loadBooks, loadContinueReading, loadFavorites, loadTags]);
 
   // Return to All Libraries selection screen
   const selectAllLibraries = useCallback(() => {
@@ -355,7 +395,8 @@ export default function App() {
       window.history.pushState(null, '', '/');
     }
     loadLibraries();
-  }, [loadLibraries]);
+    loadTags('');
+  }, [loadLibraries, loadTags]);
 
   // Switch Active Library
   const switchLibrary = useCallback((libraryId) => {
@@ -476,6 +517,7 @@ export default function App() {
           setActiveBook(null);
           loadContinueReading(route.libraryId || activeLibraryId);
           loadFavorites(route.libraryId || activeLibraryId);
+          loadTags(route.libraryId || activeLibraryId);
         }
         setSelectedShelf(route.shelfId);
         setSearchQuery('');
@@ -484,7 +526,7 @@ export default function App() {
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [activeBook, selectedShelf, activeLibraryId, loadLibraries, loadContinueReading, loadFavorites]);
+  }, [activeBook, selectedShelf, activeLibraryId, loadLibraries, loadContinueReading, loadFavorites, loadTags]);
 
   // Load book directly from route on initial page load / reload
   useEffect(() => {
@@ -524,7 +566,8 @@ export default function App() {
     loadShelves();
     loadContinueReading();
     loadFavorites();
-  }, [activeLibraryId, loadShelves, loadContinueReading, loadFavorites]);
+    loadTags();
+  }, [activeLibraryId, loadShelves, loadContinueReading, loadFavorites, loadTags]);
 
   useEffect(() => {
     loadBooks();
@@ -649,8 +692,11 @@ export default function App() {
     .catch(err => console.error('Failed to save shelf icon:', err));
   };
 
-  // Find active shelf metadata
+  // Find active shelf or tag metadata
   const currentShelfObj = shelves.find(s => s.id === selectedShelf);
+  const isTagFilter = selectedShelf && selectedShelf.startsWith('tag:');
+  const activeTagId = isTagFilter ? selectedShelf.slice(4) : null;
+  const currentTagObj = isTagFilter ? tags.find(t => t.id === activeTagId) : null;
   const activeLibraryObj = libraries.find(l => l.id === activeLibraryId);
 
   // Dynamic Browser Tab Title
@@ -663,6 +709,8 @@ export default function App() {
       document.title = `${t('favorites')} - ${activeLibraryObj?.name || t('appTitle')}`;
     } else if (selectedShelf === 'folders') {
       document.title = `${t('folders')} - ${activeLibraryObj?.name || t('appTitle')}`;
+    } else if (isTagFilter && currentTagObj) {
+      document.title = `${currentTagObj.name} - ${activeLibraryObj?.name || t('appTitle')}`;
     } else if (currentShelfObj) {
       document.title = `${currentShelfObj.name} - ${activeLibraryObj?.name || t('appTitle')}`;
     } else if (activeLibraryObj) {
@@ -670,7 +718,7 @@ export default function App() {
     } else {
       document.title = `${t('selectLibraryTitle')} - ${t('appTitle')}`;
     }
-  }, [activeBook, selectedShelf, currentShelfObj, activeLibraryObj, t]);
+  }, [activeBook, selectedShelf, currentShelfObj, isTagFilter, currentTagObj, activeLibraryObj, t]);
 
   // When no active library is selected (e.g. root /), display Library Selection screen
   if (!activeLibraryId) {
@@ -722,6 +770,8 @@ export default function App() {
         onSwitchLibrary={switchLibrary}
         onSelectAllLibraries={selectAllLibraries}
         onOpenSettings={() => setSettingsOpen(true)}
+        tags={tags}
+        onOpenTagManager={() => setTagModal({ isOpen: true, book: null })}
       />
 
       {/* Main Content Area */}
@@ -784,6 +834,15 @@ export default function App() {
                         <>
                           <Folder className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />
                           <span>{t('folders')}</span>
+                        </>
+                      ) : isTagFilter ? (
+                        <>
+                          {currentTagObj ? (
+                            <span className={`w-2.5 h-2.5 rounded-full ${getTagColorConfig(currentTagObj.color).dot} shrink-0`} />
+                          ) : (
+                            <Tag className="w-4 h-4 text-amber-500 shrink-0" />
+                          )}
+                          <span>{currentTagObj ? currentTagObj.name : t('tagFilter')}</span>
                         </>
                       ) : (
                         <>
@@ -867,6 +926,7 @@ export default function App() {
               onSelectBook={(book) => openReader(book)} 
               onContextMenu={handleContextMenu}
               onViewAll={() => navigateToShelf('continue-reading')}
+              onSelectTag={(tg) => navigateToShelf(`tag:${tg.id}`)}
               showFileExtension={showFileExtension}
             />
           )}
@@ -879,6 +939,7 @@ export default function App() {
               onContextMenu={handleContextMenu}
               onToggleFavorite={handleToggleFavorite}
               onViewAll={() => navigateToShelf('favorites')}
+              onSelectTag={(tg) => navigateToShelf(`tag:${tg.id}`)}
               showFileExtension={showFileExtension}
             />
           )}
@@ -898,16 +959,23 @@ export default function App() {
           {(selectedShelf || debouncedQuery) && (
             <div className="flex items-center justify-between mb-6 pb-2 border-b border-neutral-800">
               <div>
-                <h2 className="text-lg sm:text-xl font-bold text-neutral-100 tracking-tight">
+                <h2 className="text-lg sm:text-xl font-bold text-neutral-100 tracking-tight flex items-center gap-2">
                   {selectedShelf === 'continue-reading'
                     ? t('continueReading')
                     : selectedShelf === 'favorites' 
                       ? t('favorites') 
                       : selectedShelf === 'folders'
                         ? t('folders')
-                        : currentShelfObj 
-                          ? currentShelfObj.name 
-                          : t('allBooksLibrary')}
+                        : isTagFilter && currentTagObj
+                          ? (
+                            <>
+                              <span className={`w-3 h-3 rounded-full ${getTagColorConfig(currentTagObj.color).dot} shrink-0`} />
+                              <span>{currentTagObj.name}</span>
+                            </>
+                          )
+                          : currentShelfObj 
+                            ? currentShelfObj.name 
+                            : t('allBooksLibrary')}
                 </h2>
                 <p className="text-xs text-neutral-400 mt-0.5">
                   {debouncedQuery 
@@ -919,7 +987,9 @@ export default function App() {
                       })
                     : selectedShelf === 'folders'
                       ? t('foldersCount', { count: shelves.length })
-                      : t('booksInShelf', { count: books.length })}
+                      : isTagFilter
+                        ? t('booksTaggedCount', { count: books.length })
+                        : t('booksInShelf', { count: books.length })}
                 </p>
               </div>
             </div>
@@ -979,6 +1049,7 @@ export default function App() {
                 onSelectBook={(selected) => openReader(selected)}
                 onContextMenu={handleContextMenu}
                 onToggleFavorite={handleToggleFavorite}
+                onSelectTag={(tg) => navigateToShelf(`tag:${tg.id}`)}
                 showFileExtension={showFileExtension}
               />
             ) : (
@@ -991,6 +1062,7 @@ export default function App() {
                     onSelectBook={(selected) => openReader(selected)}
                     onContextMenu={handleContextMenu}
                     onToggleFavorite={handleToggleFavorite}
+                    onSelectTag={(tg) => navigateToShelf(`tag:${tg.id}`)}
                     showFileExtension={showFileExtension}
                   />
                 ))}
@@ -1066,6 +1138,7 @@ export default function App() {
           onOpenReader={(book) => openReader(book)}
           onMarkStatus={handleMarkStatus}
           onToggleFavorite={handleToggleFavorite}
+          onManageTags={(book) => setTagModal({ isOpen: true, book })}
         />
       )}
 
@@ -1098,6 +1171,16 @@ export default function App() {
         onSave={handleSaveShelfIcon}
       />
 
+      {/* Virtual Tag Manager Modal */}
+      <TagManagerModal
+        isOpen={tagModal.isOpen}
+        onClose={() => setTagModal({ isOpen: false, book: null })}
+        book={tagModal.book}
+        tags={tags}
+        onTagsUpdated={() => loadTags(activeLibraryId)}
+        onBookTagsUpdated={handleBookTagsUpdated}
+      />
+
       {/* Library Settings Modal */}
       <SettingsModal
         isOpen={settingsOpen}
@@ -1113,6 +1196,7 @@ export default function App() {
             loadBooks(activeLibraryId);
             loadContinueReading(activeLibraryId);
             loadFavorites(activeLibraryId);
+            loadTags(activeLibraryId);
           }
         }}
       />

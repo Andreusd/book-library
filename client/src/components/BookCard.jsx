@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BookOpen, CheckCircle, Heart } from 'lucide-react';
 import { useI18n } from '../i18n';
+import { getTagColorConfig } from '../utils/tagColors';
 
 export default function BookCard({ 
   book, 
@@ -8,6 +9,7 @@ export default function BookCard({
   onSelectBook, 
   onContextMenu, 
   onToggleFavorite,
+  onSelectTag,
   showFileExtension
 }) {
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -172,6 +174,39 @@ export default function BookCard({
             {book.author}
           </p>
         )}
+
+        {/* Virtual Tags Badges */}
+        {book.tags && book.tags.length > 0 && (
+          <div className="flex items-center gap-1 flex-wrap mt-1.5">
+            {book.tags.slice(0, 2).map((tg) => {
+              const cfg = getTagColorConfig(tg.color);
+              return (
+                <span
+                  key={tg.id}
+                  onClick={(e) => {
+                    if (onSelectTag) {
+                      e.stopPropagation();
+                      onSelectTag(tg);
+                    }
+                  }}
+                  className={`text-[9px] px-1.5 py-0.5 rounded-md font-medium border ${cfg.badge} truncate max-w-[90px] hover:brightness-125 transition cursor-pointer`}
+                  title={tg.name}
+                >
+                  {tg.name}
+                </span>
+              );
+            })}
+            {book.tags.length > 2 && (
+              <span 
+                className="text-[9px] px-1 py-0.5 rounded-md font-mono text-neutral-400 bg-neutral-900 border border-neutral-800"
+                title={book.tags.slice(2).map(tg => tg.name).join(', ')}
+              >
+                +{book.tags.length - 2}
+              </span>
+            )}
+          </div>
+        )}
+
         <div className="flex items-center justify-between mt-1 text-[11px] text-neutral-500">
           <span className="truncate max-w-[70%]">{book.shelf_display || book.folder_display}</span>
           <span className="shrink-0">{book.size_formatted}</span>

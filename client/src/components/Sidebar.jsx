@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { 
   Library, Search, Folder, Heart, Bookmark, Home, 
-  ChevronDown, Check, Plus, Settings
+  ChevronDown, Check, Plus, Settings, Tag
 } from 'lucide-react';
 import ShelfIcon from './ShelfIcon';
 import { useI18n } from '../i18n';
+import { getTagColorConfig } from '../utils/tagColors';
 
 export default function Sidebar({ 
   shelves, 
@@ -20,7 +21,9 @@ export default function Sidebar({
   activeLibraryId = '',
   onSwitchLibrary,
   onSelectAllLibraries,
-  onOpenSettings
+  onOpenSettings,
+  tags = [],
+  onOpenTagManager
 }) {
   const [shelfFilter, setShelfFilter] = useState('');
   const [libraryDropdownOpen, setLibraryDropdownOpen] = useState(false);
@@ -30,6 +33,10 @@ export default function Sidebar({
 
   const filteredShelves = shelves.filter(s => 
     s.name.toLowerCase().includes(shelfFilter.toLowerCase())
+  );
+
+  const filteredTags = tags.filter(t =>
+    t.name.toLowerCase().includes(shelfFilter.toLowerCase())
   );
 
   return (
@@ -325,6 +332,59 @@ export default function Sidebar({
                       ${isSelected ? 'bg-amber-500/20 text-amber-300' : 'bg-neutral-800 text-neutral-400'}
                     `}>
                       {s.book_count}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+
+            {/* Virtual Tags & Collections Section */}
+            <div className="pt-4 pb-1 px-3 flex items-center justify-between">
+              <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider">
+                {t('tagsAndCollections')} ({filteredTags.length})
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenTagManager) onOpenTagManager();
+                }}
+                className="p-1 rounded text-neutral-400 hover:text-amber-400 hover:bg-neutral-800 transition cursor-pointer"
+                title={t('manageTags')}
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Individual Tags */}
+            {filteredTags.map((tg) => {
+              const tagShelfKey = `tag:${tg.id}`;
+              const isSelected = selectedShelf === tagShelfKey;
+              const cfg = getTagColorConfig(tg.color);
+
+              return (
+                <button
+                  key={tg.id}
+                  onClick={() => {
+                    onSelectShelf(tagShelfKey);
+                  }}
+                  className={`
+                    w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer
+                    ${isSelected 
+                      ? `${cfg.activeBg} border` 
+                      : 'text-neutral-300 hover:bg-neutral-800 hover:text-white'}
+                  `}
+                  title={tg.name}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className={`w-2 h-2 rounded-full ${cfg.dot} shrink-0`} />
+                    <span className="truncate text-left">{tg.name}</span>
+                  </div>
+                  <div className="flex items-center shrink-0 ml-2">
+                    <span className={`
+                      text-[11px] px-1.5 py-0.2 rounded font-mono
+                      ${isSelected ? cfg.badge : 'bg-neutral-800 text-neutral-400'}
+                    `}>
+                      {tg.book_count || 0}
                     </span>
                   </div>
                 </button>
