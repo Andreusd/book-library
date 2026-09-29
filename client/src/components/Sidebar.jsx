@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Library, Search, Folder, Heart, Bookmark, Home,
-  ChevronDown, Check, Plus, Settings, Tag, User, BookOpen
+  ChevronDown, Check, Plus, Tag, User, BookOpen
 } from 'lucide-react';
 import ShelfIcon from './ShelfIcon';
 import { useI18n } from '../i18n';

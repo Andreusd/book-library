@@ -37,7 +37,7 @@ export default function Reader(props) {
     : (() => {
         try {
           return localStorage.getItem('show_file_extension') !== 'false';
-        } catch (e) {
+        } catch {
           return true;
         }
       })();

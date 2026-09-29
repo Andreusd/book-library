@@ -53,6 +53,23 @@ def set_scanner_override(scanner: Optional[LibraryScanner]):
     global _scanner_instance
     _scanner_instance = scanner
 
+def set_cover_mgr_override(cover_mgr: Optional[CoverManager]):
+    global _cover_mgr_instance
+    _cover_mgr_instance = cover_mgr
+
+def set_lookup_mgr_override(lookup_mgr: Optional[LookupManager]):
+    global _lookup_mgr_instance
+    _lookup_mgr_instance = lookup_mgr
+
 def set_user_mgr_override(user_mgr: Optional[UserManager]):
     global _user_mgr_instance
     _user_mgr_instance = user_mgr
+
+def reset_overrides():
+    """Resets all dependency singletons back to None so they reinitialize normally."""
+    global _scanner_instance, _cover_mgr_instance, _lookup_mgr_instance, _user_mgr_instance
+    _scanner_instance = None
+    _cover_mgr_instance = None
+    _lookup_mgr_instance = None
+    _user_mgr_instance = None
+

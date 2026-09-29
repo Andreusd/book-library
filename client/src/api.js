@@ -7,7 +7,7 @@ export const USER_STORAGE_KEY = 'book_library_user';
 export function getCurrentUser() {
   try {
     return (localStorage.getItem(USER_STORAGE_KEY) || '').trim();
-  } catch (e) {
+  } catch {
     return '';
   }
 }
@@ -59,7 +59,7 @@ async function apiJson(url, init = {}) {
       if (errBody && (errBody.detail || errBody.error)) {
         errMsg = errBody.detail || errBody.error;
       }
-    } catch (e) {}
+    } catch {}
     throw new Error(errMsg);
   }
   return res.json();

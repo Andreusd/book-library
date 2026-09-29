@@ -2,17 +2,7 @@ import React from 'react';
 import { BookOpen } from 'lucide-react';
 import ShelfIcon from './ShelfIcon';
 import { useI18n } from '../i18n';
-
-export function getFolderCovers(folder, books = []) {
-  if (folder.sample_covers && folder.sample_covers.length > 0) {
-    return folder.sample_covers;
-  }
-  if (books && books.length > 0) {
-    const matching = books.filter(b => b.shelf === folder.id || b.folder === folder.id);
-    return matching.slice(0, 4).map(b => b.cover_url);
-  }
-  return [];
-}
+import { getFolderCovers } from '../utils/folderUtils';
 
 export default function FolderCard({
   folder,

@@ -25,7 +25,7 @@ export default function BookCard({
     : (() => {
         try {
           return localStorage.getItem('show_file_extension') !== 'false';
-        } catch (e) {
+        } catch {
           return true;
         }
       })();

@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Folder, ChevronLeft, ChevronRight, LayoutGrid, Layers } from 'lucide-react';
-import FolderCard, { getFolderCovers } from './FolderCard';
+import FolderCard from './FolderCard';
+import { getFolderCovers } from '../utils/folderUtils';
 import { useI18n } from '../i18n';
 
 export default function LibraryFolders({

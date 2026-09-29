@@ -16,14 +16,14 @@ export default function SettingsModal({
   const { t, lang, setLang } = useI18n();
   const [libraries, setLibraries] = useState([]);
   const [activeLibraryId, setActiveLibraryId] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
 
   // Local fallback for showFileExtension
   const [localShowFileExtension, setLocalShowFileExtension] = useState(() => {
     try {
       const saved = localStorage.getItem('show_file_extension');
       return saved !== null ? saved === 'true' : true;
-    } catch (e) {
+    } catch {
       return true;
     }
   });
@@ -35,7 +35,7 @@ export default function SettingsModal({
     setLocalShowFileExtension(val);
     try {
       localStorage.setItem('show_file_extension', String(val));
-    } catch (err) {}
+    } catch {}
     if (onToggleFileExtension) {
       onToggleFileExtension(val);
     }
@@ -60,7 +60,7 @@ export default function SettingsModal({
   const [editName, setEditName] = useState('');
   const [editPath, setEditPath] = useState('');
   const [editValidation, setEditValidation] = useState(null);
-  const [editValidating, setEditValidating] = useState(false);
+  const [_editValidating, setEditValidating] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
 
   // Deleting library state
@@ -85,15 +85,35 @@ export default function SettingsModal({
       });
   };
 
-  useEffect(() => {
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
     if (isOpen) {
-      loadLibraries();
       setShowAddForm(false);
       setEditingLibId(null);
       setAddName('');
       setAddPath('');
       setAddValidation(null);
     }
+  }
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    fetch('/api/libraries')
+      .then(res => res.json())
+      .then(data => {
+        if (!active) return;
+        setLibraries(data.libraries || []);
+        setActiveLibraryId(data.active_library_id || '');
+        setLoading(false);
+      })
+      .catch(err => {
+        if (!active) return;
+        console.error('Failed to load libraries:', err);
+        setLoading(false);
+      });
+    return () => { active = false; };
   }, [isOpen]);
 
   useEffect(() => {

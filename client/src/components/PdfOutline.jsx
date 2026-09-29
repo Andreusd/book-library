@@ -11,7 +11,6 @@ function OutlineNode({
   onItemClick, 
   expandedMap, 
   toggleExpand, 
-  filterQuery,
   activeChapter 
 }) {
   const hasChildren = item.items && item.items.length > 0;
@@ -94,7 +93,6 @@ function OutlineNode({
               onItemClick={onItemClick}
               expandedMap={expandedMap}
               toggleExpand={toggleExpand}
-              filterQuery={filterQuery}
               activeChapter={activeChapter}
             />
           ))}
@@ -120,11 +118,10 @@ export default function PdfOutline({
   const [filterQuery, setFilterQuery] = useState('');
   const [expandedMap, setExpandedMap] = useState({});
 
-  const rawNodes = outline || items || toc || [];
-
   // Assign deterministic unique keys and normalize tree items
   const indexedOutline = useMemo(() => {
     let counter = 0;
+    const rawNodes = outline || items || toc || [];
     const assignIds = (nodes, prefix = 'n') => {
       if (!Array.isArray(nodes)) return [];
       return nodes.map((node, i) => {
@@ -140,7 +137,7 @@ export default function PdfOutline({
       });
     };
     return assignIds(rawNodes);
-  }, [rawNodes]);
+  }, [outline, items, toc]);
 
   // Check if there are any expandable nodes in the entire tree
   const hasExpandableItems = useMemo(() => {
@@ -320,7 +317,6 @@ export default function PdfOutline({
                 onItemClick={onItemClick}
                 expandedMap={effectiveExpandedMap}
                 toggleExpand={toggleExpand}
-                filterQuery={filterQuery}
                 activeChapter={activeChapter}
               />
             ))

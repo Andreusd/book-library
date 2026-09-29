@@ -1,15 +1,7 @@
 import React from 'react';
 import { BookOpen, Tag } from 'lucide-react';
 import { useI18n } from '../i18n';
-import { getTagColorConfig } from '../utils/tagColors';
-
-export function getTagCovers(tag, books = []) {
-  if (books && books.length > 0) {
-    const matching = books.filter(b => b.tags && b.tags.some(t => t.id === tag.id));
-    return matching.slice(0, 4).map(b => b.cover_url);
-  }
-  return [];
-}
+import { getTagColorConfig, getTagCovers } from '../utils/tagColors';
 
 export default function TagCard({
   tag,

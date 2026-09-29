@@ -57,7 +57,7 @@ const applyThemeToDoc = (doc, themeName) => {
   try {
     const existingEpubStyles = doc.querySelectorAll('#epubjs-inserted-css-dark, #epubjs-inserted-css-light, #epubjs-inserted-css-sepia, #epubjs-inserted-css-default');
     existingEpubStyles.forEach(el => el.remove());
-  } catch (e) {}
+  } catch {}
 
   // Create or update our dedicated custom theme style element at the end of head
   let styleTag = doc.getElementById('epub-custom-theme-style');
@@ -107,7 +107,7 @@ const applyThemeToDoc = (doc, themeName) => {
       doc.body.classList.remove('dark', 'light', 'sepia');
       doc.body.classList.add(themeName);
     }
-  } catch (e) {}
+  } catch {}
 };
 
 function getSearchRegex(query, { caseSensitive, entireWord }) {
@@ -116,11 +116,84 @@ function getSearchRegex(query, { caseSensitive, entireWord }) {
   if (entireWord) {
     try {
       return new RegExp(`(?<![\\p{L}\\p{N}])${pattern}(?![\\p{L}\\p{N}])`, `gu${caseSensitive ? '' : 'i'}`);
-    } catch (e) {
+    } catch {
       pattern = `\\b${pattern}\\b`;
     }
   }
   return new RegExp(pattern, `g${caseSensitive ? '' : 'i'}`);
+}
+
+// Helper to find chapter label in nested TOC
+function findChapterLabel(items, href) {
+  if (!items || !href) return '';
+  const cleanHref = href.split('#')[0];
+  for (const item of items) {
+    const itemClean = (item.href || '').split('#')[0];
+    if (itemClean === cleanHref || item.href === href) {
+      return item.label ? item.label.trim() : '';
+    }
+    if (item.subitems && item.subitems.length) {
+      const sub = findChapterLabel(item.subitems, href);
+      if (sub) return sub;
+    }
+  }
+  return '';
+}
+
+function getInitialCfi(book) {
+  if (book?.progress?.cfi && typeof book.progress.cfi === 'string' && book.progress.cfi.trim() !== '') {
+    return book.progress.cfi.trim();
+  }
+  try {
+    const local = localStorage.getItem(`book_cfi_${book?.id}`);
+    if (local && typeof local === 'string' && local.trim() !== '') {
+      return local.trim();
+    }
+  } catch {}
+  return null;
+}
+
+function getInitialPercent(book) {
+  if (book?.progress?.percent !== undefined && book?.progress?.percent !== null) {
+    const p = parseFloat(book.progress.percent);
+    if (!isNaN(p) && p >= 0 && p <= 100) return p;
+  }
+  try {
+    const local = localStorage.getItem(`book_percent_${book?.id}`);
+    if (local !== null) {
+      const p = parseFloat(local);
+      if (!isNaN(p) && p >= 0 && p <= 100) return p;
+    }
+  } catch {}
+  return 0;
+}
+
+function getInitialPage(book) {
+  if (book?.progress?.page && typeof book.progress.page === 'number' && book.progress.page > 0) {
+    return book.progress.page;
+  }
+  try {
+    const local = localStorage.getItem(`book_page_${book?.id}`);
+    if (local !== null) {
+      const val = parseInt(local, 10);
+      if (!isNaN(val) && val > 0) return val;
+    }
+  } catch {}
+  return 1;
+}
+
+function getInitialTotalPages(book) {
+  if (book?.progress?.total_pages && typeof book.progress.total_pages === 'number' && book.progress.total_pages > 0) {
+    return book.progress.total_pages;
+  }
+  try {
+    const local = localStorage.getItem(`book_total_pages_${book?.id}`);
+    if (local !== null) {
+      const val = parseInt(local, 10);
+      if (!isNaN(val) && val > 0) return val;
+    }
+  } catch {}
+  return 0;
 }
 
 export default function EpubViewer({
@@ -140,13 +213,17 @@ export default function EpubViewer({
     : (() => {
         try {
           return localStorage.getItem('show_file_extension') !== 'false';
-        } catch (e) {
+        } catch {
           return true;
         }
       })();
 
   const viewerRef = useRef(null);
   const bookRef = useRef(null);
+  const bookPropRef = useRef(book);
+  useEffect(() => {
+    bookPropRef.current = book;
+  }, [book]);
   const renditionRef = useRef(null);
   const tocRef = useRef([]);
   const saveTimeoutRef = useRef(null);
@@ -167,80 +244,40 @@ export default function EpubViewer({
     cfi: null
   });
   
-  // Helpers to get initial CFI and percent from props or localStorage
-  const getInitialCfi = () => {
-    if (book.progress?.cfi && typeof book.progress.cfi === 'string' && book.progress.cfi.trim() !== '') {
-      return book.progress.cfi.trim();
-    }
-    try {
-      const local = localStorage.getItem(`book_cfi_${book.id}`);
-      if (local && typeof local === 'string' && local.trim() !== '') {
-        return local.trim();
-      }
-    } catch (e) {}
-    return null;
-  };
+  const [prevBookId, setPrevBookId] = useState(book.id);
+  if (book.id !== prevBookId) {
+    setPrevBookId(book.id);
+    setLoading(true);
+    setError(null);
+  }
 
-  const getInitialPercent = () => {
-    if (book.progress?.percent !== undefined && book.progress.percent !== null) {
-      const p = parseFloat(book.progress.percent);
-      if (!isNaN(p) && p >= 0 && p <= 100) return p;
+  const [prevIsFavorite, setPrevIsFavorite] = useState(isFavorite);
+  if (isFavorite !== prevIsFavorite) {
+    setPrevIsFavorite(isFavorite);
+    if (isFavorite !== undefined) {
+      setFavState(isFavorite);
     }
-    try {
-      const local = localStorage.getItem(`book_percent_${book.id}`);
-      if (local !== null) {
-        const p = parseFloat(local);
-        if (!isNaN(p) && p >= 0 && p <= 100) return p;
-      }
-    } catch (e) {}
-    return 0;
-  };
+  }
 
-  const getInitialPage = () => {
-    if (book.progress?.page && typeof book.progress.page === 'number' && book.progress.page > 0) {
-      return book.progress.page;
-    }
-    try {
-      const local = localStorage.getItem(`book_page_${book.id}`);
-      if (local !== null) {
-        const val = parseInt(local, 10);
-        if (!isNaN(val) && val > 0) return val;
-      }
-    } catch (e) {}
-    return 1;
-  };
-
-  const getInitialTotalPages = () => {
-    if (book.progress?.total_pages && typeof book.progress.total_pages === 'number' && book.progress.total_pages > 0) {
-      return book.progress.total_pages;
-    }
-    try {
-      const local = localStorage.getItem(`book_total_pages_${book.id}`);
-      if (local !== null) {
-        const val = parseInt(local, 10);
-        if (!isNaN(val) && val > 0) return val;
-      }
-    } catch (e) {}
-    return 0;
-  };
-
-  const initialCfiRef = useRef(getInitialCfi());
-  const initialPercentRef = useRef(getInitialPercent());
+  const initialCfi = getInitialCfi(book);
+  const initialPercent = getInitialPercent(book);
+  const initialCfiRef = useRef(initialCfi);
+  const initialPercentRef = useRef(initialPercent);
   const isInitialRelocationRef = useRef(true);
 
   // Reading location & chapter
-  const [locationInfo, setLocationInfo] = useState({
-    cfi: initialCfiRef.current,
-    percentage: Math.round(initialPercentRef.current),
+  const [locationInfo, setLocationInfo] = useState(() => ({
+    cfi: initialCfi,
+    percentage: Math.round(initialPercent),
     chapter: ''
-  });
+  }));
 
   // Reading page information
   const [pageInfo, setPageInfo] = useState(() => ({
-    current: getInitialPage(),
-    total: getInitialTotalPages()
+    page: getInitialPage(book),
+    total: getInitialTotalPages(book)
   }));
-  const [pageInput, setPageInput] = useState(() => String(getInitialPage()));
+  const [pageInput, setPageInput] = useState(() => String(getInitialPage(book)));
 
   const handlePageSubmit = (e) => {
     if (e && e.preventDefault) e.preventDefault();
@@ -274,7 +311,7 @@ export default function EpubViewer({
             setPageInput(String(clamped));
             return;
           }
-        } catch (e) {}
+        } catch {}
       }
 
       // Fallback: jump to spine item based on percentage
@@ -324,7 +361,7 @@ export default function EpubViewer({
         const val = parseInt(saved, 10);
         if (!isNaN(val) && val >= 70 && val <= 250) return val;
       }
-    } catch (e) {}
+    } catch {}
     return 100;
   });
 
@@ -336,13 +373,13 @@ export default function EpubViewer({
       const appMode = localStorage.getItem('app_mode');
       if (appMode === 'light') return 'light';
       if (appMode === 'dark') return 'dark';
-    } catch (e) {}
+    } catch {}
     try {
       const saved = localStorage.getItem(`book_theme_${book.id}`);
       if (saved && ['dark', 'light', 'sepia'].includes(saved)) return saved;
       const savedInvert = localStorage.getItem(`book_invert_${book.id}`);
       if (savedInvert === 'true') return 'dark';
-    } catch (e) {}
+    } catch {}
     if (book.progress?.invert_colors) return 'dark';
     return 'dark'; // default dark mode matching Digital Library aesthetics
   });
@@ -359,7 +396,7 @@ export default function EpubViewer({
           applyThemeToDoc(contents.document, theme);
         }
       });
-    } catch (e) {}
+    } catch {}
 
     try {
       const iframes = viewerRef.current?.querySelectorAll('iframe') || [];
@@ -369,7 +406,7 @@ export default function EpubViewer({
           applyThemeToDoc(doc, theme);
         }
       });
-    } catch (e) {}
+    } catch {}
   }, [theme]);
 
   // Header Auto-hide & Fullscreen
@@ -377,7 +414,7 @@ export default function EpubViewer({
     try {
       const saved = localStorage.getItem('reader_header_pinned');
       return saved !== null ? saved === 'true' : false;
-    } catch (e) {
+    } catch {
       return false;
     }
   });
@@ -396,7 +433,7 @@ export default function EpubViewer({
   const [ttsOpen, setTtsOpen] = useState(false);
   const [ttsText, setTtsText] = useState('');
   const [ttsMode, setTtsMode] = useState('page'); // 'page' | 'selection'
-  const [ttsPageNumber, setTtsPageNumber] = useState(1);
+  const [_ttsPageNumber, setTtsPageNumber] = useState(1);
 
   const activeSearchIdRef = useRef(0);
   const activeSearchCfiRef = useRef(null);
@@ -422,7 +459,7 @@ export default function EpubViewer({
   const [showBottomProgress, setShowBottomProgress] = useState(() => {
     try {
       return localStorage.getItem('reader_bottom_progress') !== 'false';
-    } catch (e) {
+    } catch {
       return true;
     }
   });
@@ -432,7 +469,7 @@ export default function EpubViewer({
       const next = !prev;
       try {
         localStorage.setItem('reader_bottom_progress', String(next));
-      } catch (e) {}
+      } catch {}
       return next;
     });
   }, []);
@@ -440,7 +477,7 @@ export default function EpubViewer({
   const [trackpadSwipeEnabled, setTrackpadSwipeEnabled] = useState(() => {
     try {
       return localStorage.getItem('reader_trackpad_swipe') !== 'false';
-    } catch (e) {
+    } catch {
       return true;
     }
   });
@@ -454,7 +491,7 @@ export default function EpubViewer({
       const next = !prev;
       try {
         localStorage.setItem('reader_trackpad_swipe', String(next));
-      } catch (e) {}
+      } catch {}
       return next;
     });
   }, []);
@@ -462,7 +499,7 @@ export default function EpubViewer({
   const [floatingButtonsEnabled, setFloatingButtonsEnabled] = useState(() => {
     try {
       return localStorage.getItem('reader_floating_buttons') !== 'false';
-    } catch (e) {
+    } catch {
       return true;
     }
   });
@@ -472,7 +509,7 @@ export default function EpubViewer({
       const next = !prev;
       try {
         localStorage.setItem('reader_floating_buttons', String(next));
-      } catch (e) {}
+      } catch {}
       return next;
     });
   }, []);
@@ -480,7 +517,7 @@ export default function EpubViewer({
   const [upDownFlipEnabled, setUpDownFlipEnabled] = useState(() => {
     try {
       return localStorage.getItem('reader_up_down_flip') === 'true'; // false by default
-    } catch (e) {
+    } catch {
       return false;
     }
   });
@@ -494,7 +531,7 @@ export default function EpubViewer({
       const next = !prev;
       try {
         localStorage.setItem('reader_up_down_flip', String(next));
-      } catch (e) {}
+      } catch {}
       return next;
     });
   }, []);
@@ -555,7 +592,7 @@ export default function EpubViewer({
       const next = !prev;
       try {
         localStorage.setItem('reader_header_pinned', String(next));
-      } catch (e) {}
+      } catch {}
       if (next) {
         clearHideTimer();
         setIsHeaderVisible(true);
@@ -622,7 +659,7 @@ export default function EpubViewer({
     if (activeSearchCfiRef.current && renditionRef.current) {
       try {
         renditionRef.current.annotations.remove(activeSearchCfiRef.current, 'highlight');
-      } catch (e) {}
+      } catch {}
     }
 
     activeSearchCfiRef.current = match.cfi;
@@ -637,7 +674,7 @@ export default function EpubViewer({
         'epub-search-match-selected',
         { fill: '#f59e0b', 'fill-opacity': '0.6', 'mix-blend-mode': 'multiply' }
       );
-    } catch (e) {
+    } catch {
       console.warn('Error jumping to EPUB match:', e);
     }
   }, []);
@@ -655,7 +692,7 @@ export default function EpubViewer({
     if (activeSearchCfiRef.current && renditionRef.current) {
       try {
         renditionRef.current.annotations.remove(activeSearchCfiRef.current, 'highlight');
-      } catch (e) {}
+      } catch {}
       activeSearchCfiRef.current = null;
     }
   }, []);
@@ -670,7 +707,7 @@ export default function EpubViewer({
     if (activeSearchCfiRef.current && renditionRef.current) {
       try {
         renditionRef.current.annotations.remove(activeSearchCfiRef.current, 'highlight');
-      } catch (e) {}
+      } catch {}
       activeSearchCfiRef.current = null;
     }
 
@@ -754,7 +791,7 @@ export default function EpubViewer({
                   excerpt,
                   sectionIndex: i,
                 });
-              } catch (rangeErr) {
+              } catch {
                 // Ignore range creation errors on detached nodes
               }
             }
@@ -847,7 +884,7 @@ export default function EpubViewer({
     if (!renditionRef.current) return;
     const text = extractEpubVisibleText(renditionRef.current);
     setTtsMode(forcedMode);
-    setTtsPageNumber(pageInfo.current || 1);
+    setTtsPageNumber(pageInfo.page || 1);
 
     if (text && text.trim()) {
       setTtsText(text.trim());
@@ -855,7 +892,7 @@ export default function EpubViewer({
     } else {
       alert(t('noTextFoundToRead'));
     }
-  }, [pageInfo.current, t]);
+  }, [pageInfo.page, t]);
 
   const toggleTts = useCallback(() => {
     if (ttsOpen) {
@@ -868,10 +905,10 @@ export default function EpubViewer({
   const handleReadSelection = useCallback((selectedText) => {
     if (!selectedText || !selectedText.trim()) return;
     setTtsMode('selection');
-    setTtsPageNumber(pageInfo.current || 1);
+    setTtsPageNumber(pageInfo.page || 1);
     setTtsText(selectedText.trim());
     setTtsOpen(true);
-  }, [pageInfo.current]);
+  }, [pageInfo.page]);
 
   // When location changes while TTS is actively reading in page mode, update text to read the new view
   useEffect(() => {
@@ -880,12 +917,12 @@ export default function EpubViewer({
         const text = extractEpubVisibleText(renditionRef.current);
         if (text && text.trim()) {
           setTtsText(text.trim());
-          setTtsPageNumber(pageInfo.current || 1);
+          setTtsPageNumber(pageInfo.page || 1);
         }
       }, 150);
       return () => clearTimeout(timer);
     }
-  }, [locationInfo.cfi]);
+  }, [locationInfo.cfi, ttsMode, pageInfo.page]);
 
   const handleIframeMouseMove = useCallback((e, contents) => {
     if (headerPinned) return;
@@ -916,12 +953,7 @@ export default function EpubViewer({
 
   const { isFullscreen, toggleFullscreen } = useFullscreen();
 
-  // Keep favorite state synchronized with prop
-  useEffect(() => {
-    if (isFavorite !== undefined) {
-      setFavState(isFavorite);
-    }
-  }, [isFavorite]);
+
 
   // Fullscreen & window resize handler
   useEffect(() => {
@@ -1013,6 +1045,11 @@ export default function EpubViewer({
     }, 1000);
   }, [book.id, theme, onProgressUpdate]);
 
+  const saveProgressDebouncedRef = useRef(saveProgressDebounced);
+  useEffect(() => {
+    saveProgressDebouncedRef.current = saveProgressDebounced;
+  }, [saveProgressDebounced]);
+
   // Page flip handlers with debounce lock to prevent double-page skips
   const flipNext = useCallback(() => {
     if (isNavigatingRef.current || !renditionRef.current) return;
@@ -1030,7 +1067,7 @@ export default function EpubViewer({
           isNavigatingRef.current = false;
         }, 250);
       }
-    } catch (e) {
+    } catch {
       isNavigatingRef.current = false;
     }
   }, []);
@@ -1051,7 +1088,7 @@ export default function EpubViewer({
           isNavigatingRef.current = false;
         }, 250);
       }
-    } catch (e) {
+    } catch {
       isNavigatingRef.current = false;
     }
   }, []);
@@ -1173,7 +1210,7 @@ export default function EpubViewer({
       if (targetDoc.body) {
         targetDoc.body.style.overscrollBehavior = 'none';
       }
-    } catch (e) {}
+    } catch {}
 
     const onWheel = (e) => {
       handleNativeWheelRef.current?.(e);
@@ -1228,7 +1265,7 @@ export default function EpubViewer({
         if (contents?.cfiBase) {
           cfiRange = new EpubCFI(range, contents.cfiBase).toString();
         }
-      } catch (err) {}
+      } catch {}
 
       setSelectionMenu(prev => ({
         isOpen: true,
@@ -1286,7 +1323,7 @@ export default function EpubViewer({
         }
       }
       const totalPages = pageInfo.total > 0 ? pageInfo.total : 100;
-      let curPage = pageInfo.current > 0 ? pageInfo.current : Math.max(1, Math.round((percent / 100) * totalPages));
+      let curPage = pageInfo.page > 0 ? pageInfo.page : Math.max(1, Math.round((percent / 100) * totalPages));
       if (percent > 1 && curPage <= 1) {
         curPage = Math.max(1, Math.round((percent / 100) * totalPages));
       }
@@ -1304,10 +1341,10 @@ export default function EpubViewer({
           }),
           keepalive: true
         }).catch(() => {});
-      } catch (e) {}
+      } catch {}
     }
     onClose();
-  }, [book.id, locationInfo.cfi, locationInfo.percentage, pageInfo.total, pageInfo.current, theme, onClose]);
+  }, [book.id, locationInfo.cfi, locationInfo.percentage, pageInfo.total, pageInfo.page, theme, onClose]);
 
   // Load Annotations from Backend
   const loadAnnotations = useCallback(() => {
@@ -1390,7 +1427,7 @@ export default function EpubViewer({
               'hl-annotation',
               { fill: colorHex, 'fill-opacity': '0.35', 'mix-blend-mode': 'normal' }
             );
-          } catch (e) {
+          } catch {
             console.warn('Failed to add rendition annotation:', e);
           }
         }
@@ -1402,7 +1439,7 @@ export default function EpubViewer({
       const activeWindow = viewerRef.current?.querySelector('iframe')?.contentWindow;
       activeWindow?.getSelection()?.removeAllRanges();
       window.getSelection()?.removeAllRanges();
-    } catch (e) {}
+    } catch {}
 
     setSelectionMenu({ isOpen: false, x: 0, y: 0, text: '', cfi: null });
   };
@@ -1435,7 +1472,7 @@ export default function EpubViewer({
         if (ann && ann.cfi && renditionRef.current) {
           try {
             renditionRef.current.annotations.remove(ann.cfi, 'highlight');
-          } catch (e) {}
+          } catch {}
         }
         setAnnotations(prev => prev.filter(a => a.id !== annotationId));
       }
@@ -1453,29 +1490,12 @@ export default function EpubViewer({
     }
   };
 
-  // Helper to find chapter label in nested TOC
-  const findChapterLabel = useCallback((items, href) => {
-    if (!items || !href) return '';
-    const cleanHref = href.split('#')[0];
-    for (const item of items) {
-      const itemClean = (item.href || '').split('#')[0];
-      if (itemClean === cleanHref || item.href === href) {
-        return item.label ? item.label.trim() : '';
-      }
-      if (item.subitems && item.subitems.length) {
-        const sub = findChapterLabel(item.subitems, href);
-        if (sub) return sub;
-      }
-    }
-    return '';
-  }, []);
+
 
   // Initialize EPUB.js Book and Rendition
   useEffect(() => {
     let isCancelled = false;
     let domObserver = null;
-    setLoading(true);
-    setError(null);
 
     async function initEpub() {
       try {
@@ -1585,7 +1605,7 @@ export default function EpubViewer({
 
         // Apply active theme & font size
         rendition.themes.select(themeRef.current);
-        rendition.themes.fontSize(`${fontSize}%`);
+        rendition.themes.fontSize(`${fontSizeRef.current}%`);
 
         // Register content hooks BEFORE initial display so swipe gestures, wheel scroll, and interaction listeners are attached to the very first chapter
         rendition.hooks.content.register((contents) => {
@@ -1606,7 +1626,7 @@ export default function EpubViewer({
                 fill-opacity: 0.65 !important;
               }
             `);
-          } catch (e) {}
+          } catch {}
         });
 
         // Initial display
@@ -1621,7 +1641,7 @@ export default function EpubViewer({
           console.warn('Initial CFI display failed, falling back to beginning:', displayErr);
           try {
             await rendition.display();
-          } catch (e) {}
+          } catch {}
         }
 
         // Immediately ensure theme styles and listeners are attached to all rendered iframes
@@ -1635,7 +1655,7 @@ export default function EpubViewer({
             const win = iframe.contentWindow;
             if (doc && win) attachListenersToIframeRef.current?.(doc, win);
           });
-        } catch (e) {}
+        } catch {}
 
         // MutationObserver to catch any iframes dynamically inserted or replaced by EPUB.js
         if (viewerRef.current) {
@@ -1648,7 +1668,7 @@ export default function EpubViewer({
                 if (doc && win) {
                   attachListenersToIframeRef.current?.(doc, win);
                 }
-              } catch (e) {}
+              } catch {}
             });
           });
           domObserver.observe(viewerRef.current, { childList: true, subtree: true });
@@ -1670,7 +1690,7 @@ export default function EpubViewer({
               }
               return;
             }
-          } catch (e) {}
+          } catch {}
 
           // Accelerate background generation pause to 10ms instead of 100ms default
           if (epubBook.locations) {
@@ -1689,7 +1709,7 @@ export default function EpubViewer({
             try {
               localStorage.setItem(`book_locations_${book.id}`, epubBook.locations.save());
               localStorage.setItem(`book_total_pages_${book.id}`, String(totalLocs));
-            } catch (e) {}
+            } catch {}
           }
 
           // If no initial CFI but saved percentage > 0, jump to that percentage
@@ -1699,7 +1719,7 @@ export default function EpubViewer({
               if (targetCfi) {
                 rendition.display(targetCfi);
               }
-            } catch (e) {
+            } catch {
               console.warn('Locations percent jump notice:', e);
             }
           }
@@ -1714,7 +1734,7 @@ export default function EpubViewer({
               if (typeof loc === 'number' && !isNaN(loc) && loc >= 0) {
                 curPage = Math.min(totalLocs, loc + 1);
               }
-            } catch (e) {}
+            } catch {}
           }
 
           if (pct > 1 && curPage <= 1 && totalLocs > 0) {
@@ -1722,16 +1742,16 @@ export default function EpubViewer({
           }
 
           if (totalLocs > 0 && isLocationsReadyRef.current) {
-            setPageInfo({ current: curPage, total: totalLocs });
+            setPageInfo({ page: curPage, total: totalLocs });
             setPageInput(String(curPage));
             try {
               localStorage.setItem(`book_page_${book.id}`, String(curPage));
-            } catch (e) {}
+            } catch {}
           }
 
           if (currentCfi && pct > 0) {
             setLocationInfo(prev => ({ ...prev, percentage: pct }));
-            saveProgressDebounced(currentCfi, pct, curPage, totalLocs);
+            saveProgressDebouncedRef.current(currentCfi, pct, curPage, totalLocs);
           }
         }).catch(e => {
           console.warn('Locations generation notice:', e);
@@ -1822,7 +1842,7 @@ export default function EpubViewer({
                   return computedPct;
                 }
               }
-            } catch (e) {}
+            } catch {}
           }
 
           // 2. Spine-based calculation
@@ -1866,7 +1886,7 @@ export default function EpubViewer({
               const win = iframe.contentWindow;
               if (doc && win) attachListenersToIframeRef.current?.(doc, win);
             });
-          } catch (e) {}
+          } catch {}
           const cfi = location.start.cfi;
           const pct = getAccuratePercentage(location, cfi);
 
@@ -1898,13 +1918,13 @@ export default function EpubViewer({
               if (typeof loc === 'number' && !isNaN(loc) && loc >= 0) {
                 curPage = Math.min(totalPages, loc + 1);
               }
-            } catch (e) {}
+            } catch {}
           }
 
           const totalSpine = epubBook.spine?.items?.length || 0;
           const fallbackTotal = (pageInfoRef.current?.total > 0)
             ? pageInfoRef.current.total
-            : (getInitialTotalPages() || totalSpine || 100);
+            : (getInitialTotalPages(bookPropRef.current) || totalSpine || 100);
 
           if (totalPages === null || totalPages <= 0) {
             totalPages = fallbackTotal;
@@ -1917,7 +1937,7 @@ export default function EpubViewer({
           }
 
           setPageInfo({
-            current: curPage,
+            page: curPage,
             total: totalPages
           });
           setPageInput(String(curPage));
@@ -1932,51 +1952,24 @@ export default function EpubViewer({
                 localStorage.setItem(`book_total_pages_${book.id}`, String(totalPages));
               }
             }
-          } catch (e) {}
+          } catch {}
 
           // Prevent initial relocation on mount from overwriting saved progress before locations are generated
           if (isInitialRelocationRef.current) {
             isInitialRelocationRef.current = false;
             // If the book had 0% or no percent saved, save the real computed percent now
-            if (pct > 0 && (!book.progress?.percent || book.progress.percent === 0)) {
-              saveProgressDebounced(cfi, pct, curPage, totalPages);
+            if (pct > 0 && (!bookPropRef.current?.progress?.percent || bookPropRef.current.progress.percent === 0)) {
+              saveProgressDebouncedRef.current(cfi, pct, curPage, totalPages);
             }
             return;
           }
 
-          saveProgressDebounced(cfi, pct, curPage, totalPages);
+          saveProgressDebouncedRef.current(cfi, pct, curPage, totalPages);
         });
 
         // Iframe key listeners for smooth reading controls
         rendition.on('keydown', (e) => {
-          if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
-            e.preventDefault();
-            setSearchOpen(true);
-            showHeader();
-          } else if (e.altKey && (e.key === 'r' || e.key === 'R')) {
-            e.preventDefault();
-            toggleTts();
-          } else if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ' || (upDownFlipEnabledRef.current && e.key === 'ArrowDown')) {
-            e.preventDefault();
-            rendition.next();
-          } else if (e.key === 'ArrowLeft' || e.key === 'PageUp' || (upDownFlipEnabledRef.current && e.key === 'ArrowUp')) {
-            e.preventDefault();
-            rendition.prev();
-          } else if (e.key === 'Escape') {
-            if (readerSettingsOpenRef.current) {
-              setReaderSettingsOpen(false);
-            } else if (ttsOpenRef.current) {
-              setTtsOpen(false);
-            } else if (searchOpenRef.current) {
-              handleCloseSearch();
-            } else if (commentsDrawerOpen) {
-              setCommentsDrawerOpen(false);
-            } else if (tocOpen) {
-              setTocOpen(false);
-            } else {
-              handleClose();
-            }
-          }
+          handleKeyDownRef.current?.(e);
         });
 
       } catch (err) {
@@ -1999,9 +1992,71 @@ export default function EpubViewer({
       try {
         if (renditionRef.current) renditionRef.current.destroy();
         if (bookRef.current) bookRef.current.destroy();
-      } catch (e) {}
+      } catch {}
     };
   }, [book.id]);
+
+  // Handle Theme Change
+  const applyTheme = useCallback((newTheme) => {
+    themeRef.current = newTheme;
+    setTheme(newTheme);
+    try {
+      localStorage.setItem(`book_theme_${book.id}`, newTheme);
+      localStorage.setItem(`book_invert_${book.id}`, String(newTheme === 'dark'));
+    } catch {}
+
+    if (newTheme === 'dark' || newTheme === 'light') {
+      try {
+        localStorage.setItem('app_mode', newTheme);
+        document.documentElement.setAttribute('data-mode', newTheme);
+      } catch {}
+      if (onModeChange) {
+        onModeChange(newTheme);
+      }
+      window.dispatchEvent(new CustomEvent('app_mode_change', { detail: { mode: newTheme } }));
+    }
+
+    if (renditionRef.current) {
+      try {
+        renditionRef.current.themes.select(newTheme);
+      } catch {}
+    }
+
+    try {
+      const contentsList = renditionRef.current?.getContents() || [];
+      contentsList.forEach(contents => {
+        if (contents?.document) {
+          applyThemeToDoc(contents.document, newTheme);
+        }
+      });
+    } catch {}
+
+    try {
+      const iframes = viewerRef.current?.querySelectorAll('iframe') || [];
+      iframes.forEach(iframe => {
+        const doc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (doc) {
+          applyThemeToDoc(doc, newTheme);
+        }
+      });
+    } catch {}
+
+    // Save night mode preference to server
+    fetch('/api/book/night-mode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        book_id: book.id,
+        invert_colors: newTheme === 'dark'
+      })
+    }).catch(e => console.error('Failed to save night mode:', e));
+  }, [book.id, onModeChange]);
+
+  const cycleTheme = useCallback(() => {
+    const themes = ['dark', 'light', 'sepia'];
+    const nextIdx = (themes.indexOf(themeRef.current || theme) + 1) % themes.length;
+    applyTheme(themes[nextIdx]);
+  }, [applyTheme, theme]);
 
   // Window-level keyboard navigation
   useEffect(() => {
@@ -2050,71 +2105,12 @@ export default function EpubViewer({
       }
     };
 
+    handleKeyDownRef.current = handleKeyDown;
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, commentsDrawerOpen, tocOpen, selectionMenu.isOpen, handleClose, flipNext, flipPrev, showHeader, handleCloseSearch, toggleTts]);
+  }, [onClose, commentsDrawerOpen, tocOpen, selectionMenu.isOpen, handleClose, flipNext, flipPrev, showHeader, handleCloseSearch, toggleTts, toggleFullscreen, cycleTheme]);
 
-  // Handle Theme Change
-  const applyTheme = (newTheme) => {
-    themeRef.current = newTheme;
-    setTheme(newTheme);
-    try {
-      localStorage.setItem(`book_theme_${book.id}`, newTheme);
-      localStorage.setItem(`book_invert_${book.id}`, String(newTheme === 'dark'));
-    } catch (e) {}
 
-    if (newTheme === 'dark' || newTheme === 'light') {
-      try {
-        localStorage.setItem('app_mode', newTheme);
-        document.documentElement.setAttribute('data-mode', newTheme);
-      } catch (e) {}
-      if (onModeChange) {
-        onModeChange(newTheme);
-      }
-      window.dispatchEvent(new CustomEvent('app_mode_change', { detail: { mode: newTheme } }));
-    }
-
-    if (renditionRef.current) {
-      try {
-        renditionRef.current.themes.select(newTheme);
-      } catch (e) {}
-    }
-
-    try {
-      const contentsList = renditionRef.current?.getContents() || [];
-      contentsList.forEach(contents => {
-        if (contents?.document) {
-          applyThemeToDoc(contents.document, newTheme);
-        }
-      });
-    } catch (e) {}
-
-    try {
-      const iframes = viewerRef.current?.querySelectorAll('iframe') || [];
-      iframes.forEach(iframe => {
-        const doc = iframe.contentDocument || iframe.contentWindow?.document;
-        if (doc) {
-          applyThemeToDoc(doc, newTheme);
-        }
-      });
-    } catch (e) {}
-
-    // Save night mode preference to server
-    fetch('/api/book/night-mode', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        book_id: book.id,
-        invert_colors: newTheme === 'dark'
-      })
-    }).catch(e => console.error('Failed to save night mode:', e));
-  };
-
-  const cycleTheme = () => {
-    const themes = ['dark', 'light', 'sepia'];
-    const nextIdx = (themes.indexOf(theme) + 1) % themes.length;
-    applyTheme(themes[nextIdx]);
-  };
 
   // Handle Font Size Changes
   const changeFontSize = (delta) => {
@@ -2122,7 +2118,7 @@ export default function EpubViewer({
       const next = Math.max(70, Math.min(220, prev + delta));
       try {
         localStorage.setItem(`book_font_size_${book.id}`, String(next));
-      } catch (e) {}
+      } catch {}
       if (renditionRef.current) {
         renditionRef.current.themes.fontSize(`${next}%`);
       }
@@ -2134,7 +2130,7 @@ export default function EpubViewer({
     setFontSize(100);
     try {
       localStorage.setItem(`book_font_size_${book.id}`, '100');
-    } catch (e) {}
+    } catch {}
     if (renditionRef.current) {
       renditionRef.current.themes.fontSize('100%');
     }
@@ -2296,7 +2292,7 @@ export default function EpubViewer({
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-2 z-10">
           <button
             onClick={flipPrev}
-            disabled={pageInfo.total > 0 && pageInfo.current <= 1}
+            disabled={pageInfo.total > 0 && pageInfo.page <= 1}
             className={`h-7 w-7 flex items-center justify-center rounded-lg disabled:opacity-30 transition cursor-pointer ${ht.btn}`}
             title={t('prevPageTitle')}
           >
@@ -2321,7 +2317,7 @@ export default function EpubViewer({
 
           <button 
             onClick={flipNext}
-            disabled={pageInfo.total > 0 && pageInfo.current >= pageInfo.total}
+            disabled={pageInfo.total > 0 && pageInfo.page >= pageInfo.total}
             className={`h-7 w-7 flex items-center justify-center rounded-lg disabled:opacity-30 transition cursor-pointer ${ht.btn}`}
             title={t('nextPageTitle')}
           >
@@ -2818,7 +2814,7 @@ export default function EpubViewer({
           onClose={() => setTtsOpen(false)}
           text={ttsText}
           mode={ttsMode}
-          pageNumber={pageInfo.current || 1}
+          pageNumber={pageInfo.page || 1}
           totalPages={pageInfo.total}
           onNextPage={flipNext}
           onPrevPage={flipPrev}

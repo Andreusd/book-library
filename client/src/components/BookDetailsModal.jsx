@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  X, BookOpen, Heart, CheckCircle2, RotateCcw, 
-  Tag, Copy, Check, FileText, Calendar, Clock, 
-  Folder, Book, AlertCircle, Layers, Bookmark, MessageSquare
+  X, BookOpen, Heart, 
+  Tag, Copy, Check, FileText, Clock, 
+  Folder, Layers, MessageSquare
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 import { getTagColorConfig } from '../utils/tagColors';
-import ShelfIcon from './ShelfIcon';
 
 export default function BookDetailsModal({
   isOpen,
@@ -18,36 +17,36 @@ export default function BookDetailsModal({
   onMarkStatus,
   onManageTags,
   onSelectTag,
-  showFileExtension
+  _showFileExtension
 }) {
   const { t } = useI18n();
+  const [prevBook, setPrevBook] = useState(book);
   const [details, setDetails] = useState(book);
-  const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    if (!isOpen || !book?.id) {
-      setDetails(book);
-      return;
-    }
-
+  if (book !== prevBook) {
+    setPrevBook(book);
     setDetails(book);
-    setLoading(true);
+  }
 
+  useEffect(() => {
+    if (!isOpen || !book?.id) return;
+
+    let active = true;
     fetch(`/api/book/${book.id}`)
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch book details');
         return res.json();
       })
       .then(data => {
-        setDetails(data);
-        setLoading(false);
+        if (active) setDetails(data);
       })
       .catch(err => {
         console.error('Error fetching book details:', err);
-        setLoading(false);
       });
-  }, [isOpen, book]);
+
+    return () => { active = false; };
+  }, [isOpen, book?.id]);
 
   // Handle escape key
   useEffect(() => {
@@ -63,7 +62,6 @@ export default function BookDetailsModal({
 
   const isFav = isFavorite !== undefined ? isFavorite : Boolean(details.is_favorite);
   const isEpub = details.format === 'epub' || details.filename?.toLowerCase().endsWith('.epub');
-  const isPdf = !isEpub;
   const progress = details.progress || { page: 1, total_pages: details.total_pages || 1, percent: 0 };
   const calcPercent = (progress.total_pages > 1 && progress.page > 0 && !progress.cfi)
     ? Math.round((progress.page / progress.total_pages) * 100)

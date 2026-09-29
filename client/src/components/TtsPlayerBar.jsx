@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   Play, Pause, Square, SkipBack, SkipForward, X, 
-  Volume2, VolumeX, Gauge, Mic, Check, 
-  ChevronUp, ChevronDown, Minimize2, Maximize2, 
-  Repeat, Headphones, Sparkles
+  Volume2, Gauge, Mic, Check, 
+  ChevronUp, Minimize2, Maximize2, 
+  Repeat, Headphones
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 import { splitTextIntoReadableChunks, getAvailableVoices } from '../utils/textToSpeech';
@@ -16,15 +16,15 @@ export default function TtsPlayerBar({
   text = '',
   mode = 'page', // 'page' | 'selection'
   pageNumber = 1,
-  totalPages = 1,
+  _totalPages = 1,
   onNextPage,
   onPrevPage,
   theme = 'dark', // 'dark' | 'light' | 'sepia'
-  bookTitle = '',
+  _bookTitle = '',
 }) {
   const { t, lang: uiLang } = useI18n();
 
-  const [chunks, setChunks] = useState([]);
+  const chunks = useMemo(() => splitTextIntoReadableChunks(text), [text]);
   const [currentChunkIndex, setCurrentChunkIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -40,14 +40,14 @@ export default function TtsPlayerBar({
         const parsed = parseFloat(saved);
         if (!isNaN(parsed) && parsed >= 0.5 && parsed <= 3.0) return parsed;
       }
-    } catch (e) {}
+    } catch {}
     return 1.0;
   });
 
   const [selectedVoiceUri, setSelectedVoiceUri] = useState(() => {
     try {
       return localStorage.getItem('reader_tts_voice_uri') || '';
-    } catch (e) {
+    } catch {
       return '';
     }
   });
@@ -55,7 +55,7 @@ export default function TtsPlayerBar({
   const [autoAdvance, setAutoAdvance] = useState(() => {
     try {
       return localStorage.getItem('reader_tts_auto_advance') !== 'false';
-    } catch (e) {
+    } catch {
       return true;
     }
   });
@@ -115,7 +115,7 @@ export default function TtsPlayerBar({
   }, []);
 
   // Speak a specific chunk index
-  const speakChunk = useCallback((index) => {
+  const speakChunk = useCallback(function playChunk(index) {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
 
     window.speechSynthesis.cancel();
@@ -140,7 +140,7 @@ export default function TtsPlayerBar({
     const chunkText = activeChunks[index];
     if (!chunkText || !chunkText.trim()) {
       // Skip empty chunk
-      speakChunk(index + 1);
+      playChunk(index + 1);
       return;
     }
 
@@ -169,7 +169,7 @@ export default function TtsPlayerBar({
 
     utterance.onend = () => {
       if (isPlayingRef.current && !isPausedRef.current) {
-        speakChunk(index + 1);
+        playChunk(index + 1);
       }
     };
 
@@ -182,23 +182,23 @@ export default function TtsPlayerBar({
     window.speechSynthesis.speak(utterance);
   }, [onNextPage, uiLang]);
 
+  const [prevText, setPrevText] = useState(text);
+  if (text !== prevText) {
+    setPrevText(text);
+    setCurrentChunkIndex(0);
+  }
+
   // When new text arrives (e.g. initial open, page flip, or new selection):
   useEffect(() => {
     if (!isOpen) return;
 
-    const newChunks = splitTextIntoReadableChunks(text);
-    setChunks(newChunks);
-    chunksRef.current = newChunks;
-    setCurrentChunkIndex(0);
-
-    if (newChunks.length > 0) {
-      // Auto-start speaking when text updates
-      speakChunk(0);
-    } else {
-      setIsPlaying(false);
-      setIsPaused(false);
+    if (chunks.length > 0) {
+      const timer = setTimeout(() => {
+        speakChunk(0);
+      }, 0);
+      return () => clearTimeout(timer);
     }
-  }, [text, isOpen, speakChunk]);
+  }, [chunks, isOpen, speakChunk]);
 
   // Stop speech when component unmounts or closes
   useEffect(() => {
@@ -262,7 +262,7 @@ export default function TtsPlayerBar({
     rateRef.current = newRate;
     try {
       localStorage.setItem('reader_tts_rate', String(newRate));
-    } catch (e) {}
+    } catch {}
     setShowRateMenu(false);
 
     if (isPlaying && !isPaused) {
@@ -276,7 +276,7 @@ export default function TtsPlayerBar({
     selectedVoiceUriRef.current = uri;
     try {
       localStorage.setItem('reader_tts_voice_uri', uri);
-    } catch (e) {}
+    } catch {}
     setShowVoiceMenu(false);
 
     if (isPlaying && !isPaused) {
@@ -289,7 +289,7 @@ export default function TtsPlayerBar({
       const next = !prev;
       try {
         localStorage.setItem('reader_tts_auto_advance', String(next));
-      } catch (e) {}
+      } catch {}
       return next;
     });
   };

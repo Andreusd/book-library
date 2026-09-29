@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { 
   MessageSquare, Search, X, ArrowUpRight, Trash2, 
-  Edit3, Check, Bookmark, Calendar, Copy, Download, FileText 
+  Edit3, Check, Copy, Download, FileText 
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 

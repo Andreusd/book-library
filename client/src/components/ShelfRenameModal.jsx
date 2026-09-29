@@ -3,19 +3,22 @@ import { FolderEdit, X, Check, RotateCcw, AlertCircle } from 'lucide-react';
 import { useI18n } from '../i18n';
 
 export default function ShelfRenameModal({ shelf, isOpen, onClose, onSave }) {
-  const [name, setName] = useState('');
+  const [prevShelf, setPrevShelf] = useState(shelf);
+  const [name, setName] = useState(shelf?.name || '');
   const inputRef = useRef(null);
   const { t } = useI18n();
 
+  if (shelf !== prevShelf) {
+    setPrevShelf(shelf);
+    setName(shelf?.name || '');
+  }
+
   useEffect(() => {
-    if (shelf && isOpen) {
-      setName(shelf.name || '');
-      setTimeout(() => {
-        inputRef.current?.focus();
-        inputRef.current?.select();
-      }, 50);
+    if (isOpen) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
     }
-  }, [shelf, isOpen]);
+  }, [isOpen]);
 
   if (!isOpen || !shelf) return null;
 

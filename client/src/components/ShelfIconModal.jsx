@@ -1,25 +1,29 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Palette, X, Check, Search, RotateCcw } from 'lucide-react';
-import ShelfIcon, { AVAILABLE_SHELF_ICONS } from './ShelfIcon';
+import ShelfIcon from './ShelfIcon';
+import { AVAILABLE_SHELF_ICONS } from '../utils/shelfIcons';
 import { useI18n } from '../i18n';
 
 export default function ShelfIconModal({ shelf, isOpen, onClose, onSave }) {
-  const [selectedIcon, setSelectedIcon] = useState('');
+  const [prevShelf, setPrevShelf] = useState(shelf);
+  const [selectedIcon, setSelectedIcon] = useState(shelf?.icon || '');
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
   const searchInputRef = useRef(null);
   const { t, language } = useI18n();
 
+  if (shelf !== prevShelf) {
+    setPrevShelf(shelf);
+    setSelectedIcon(shelf?.icon || '');
+    setSearchTerm('');
+    setActiveCategory('all');
+  }
+
   useEffect(() => {
-    if (shelf && isOpen) {
-      setSelectedIcon(shelf.icon || '');
-      setSearchTerm('');
-      setActiveCategory('all');
-      setTimeout(() => {
-        searchInputRef.current?.focus();
-      }, 50);
+    if (isOpen) {
+      searchInputRef.current?.focus();
     }
-  }, [shelf, isOpen]);
+  }, [isOpen]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {

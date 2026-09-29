@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Library, Folder, BookOpen, Plus, ArrowRight, Settings, 
   AlertTriangle, User, Users, Edit2, Check, Sparkles, Trash2
@@ -15,6 +15,7 @@ export default function LibrarySelector({
   onUserChange
 }) {
   const { t } = useI18n();
+  const [prevUser, setPrevUser] = useState(currentUser);
   const [isEditingUser, setIsEditingUser] = useState(!currentUser);
   const [usernameInput, setUsernameInput] = useState(currentUser || '');
   const [existingUsers, setExistingUsers] = useState([]);
@@ -23,16 +24,16 @@ export default function LibrarySelector({
   const [isDeleting, setIsDeleting] = useState(false);
   const inputRef = useRef(null);
 
-  // Sync username input with prop if changed from outside
-  useEffect(() => {
+  if (currentUser !== prevUser) {
+    setPrevUser(currentUser);
     setUsernameInput(currentUser || '');
     if (!currentUser) {
       setIsEditingUser(true);
     }
-  }, [currentUser]);
+  }
 
   // Load existing users from backend
-  const loadUsers = () => {
+  const loadUsers = useCallback(() => {
     fetch('/api/users')
       .then(res => res.json())
       .then(data => {
@@ -44,11 +45,11 @@ export default function LibrarySelector({
         }
       })
       .catch(() => {});
-  };
+  }, [currentUser, usernameInput]);
 
   useEffect(() => {
     loadUsers();
-  }, []);
+  }, [loadUsers]);
 
   const handleSaveUser = (nameToSave) => {
     const clean = (nameToSave !== undefined ? nameToSave : usernameInput).trim();

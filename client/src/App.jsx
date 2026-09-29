@@ -22,9 +22,9 @@ import AppModals from './components/AppModals';
 import { getTagColorConfig } from './utils/tagColors';
 import { useI18n } from './i18n';
 import { useFullscreen } from './hooks/useFullscreen';
-import { useSettings } from './contexts/SettingsContext';
+import { useSettings } from './hooks/useSettings';
 import { useBookModals } from './hooks/useBookModals';
-import { useLibraryRouter, getPathForShelf, getPathForBook } from './hooks/useLibraryRouter';
+import { useLibraryRouter } from './hooks/useLibraryRouter';
 import { booksApi, foldersApi, librariesApi, tagsApi } from './api';
 
 export default function App() {
@@ -45,7 +45,7 @@ export default function App() {
   } = useSettings();
 
   const modals = useBookModals();
-  const { route, navigate, navigateToShelf: routerNavigateToShelf, navigateToBook, navigateToLibraries } = useLibraryRouter();
+  const { route, navigateToShelf: routerNavigateToShelf, navigateToBook, navigateToLibraries } = useLibraryRouter();
 
   const [shelves, setShelves] = useState([]);
   const [totalBooks, setTotalBooks] = useState(0);
@@ -64,6 +64,48 @@ export default function App() {
   const [sortBy, setSortBy] = useState('title_asc');
   const [activeBook, setActiveBook] = useState(null);
   const [routeLoading, setRouteLoading] = useState(() => Boolean(route.bookId));
+
+  const [prevRouteKey, setPrevRouteKey] = useState(() => `${route.libraryId || ''}_${route.shelfId || ''}_${route.bookId || ''}`);
+  const currentRouteKey = `${route.libraryId || ''}_${route.shelfId || ''}_${route.bookId || ''}`;
+
+  if (currentRouteKey !== prevRouteKey) {
+    setPrevRouteKey(currentRouteKey);
+    if (!route.libraryId && !route.bookId) {
+      setActiveLibraryId('');
+      setSelectedShelf(null);
+      setActiveBook(null);
+      setShelves([]);
+      setBooks([]);
+      setContinueReading([]);
+      setFavorites([]);
+      setFavoriteIds(new Set());
+      setTags([]);
+    } else {
+      if (route.libraryId && route.libraryId !== activeLibraryId) {
+        setActiveLibraryId(route.libraryId);
+      }
+      if (route.bookId) {
+        if (!activeBook || activeBook.id !== route.bookId) {
+          setRouteLoading(true);
+        }
+      } else {
+        if (activeBook) {
+          setActiveBook(null);
+        }
+        setSelectedShelf(route.shelfId);
+        setSearchQuery('');
+      }
+    }
+  }
+
+  const bookParamsKey = `${activeLibraryId}_${selectedShelf}_${debouncedQuery}_${sortBy}`;
+  const [prevBookParamsKey, setPrevBookParamsKey] = useState(bookParamsKey);
+  if (bookParamsKey !== prevBookParamsKey) {
+    setPrevBookParamsKey(bookParamsKey);
+    if (activeLibraryId) {
+      setLoading(true);
+    }
+  }
 
   const searchInputRef = useRef(null);
 
@@ -104,11 +146,7 @@ export default function App() {
   // Load Shelves & Totals
   const loadShelves = useCallback((libId) => {
     const targetLib = libId !== undefined ? libId : activeLibraryId;
-    if (!targetLib) {
-      setShelves([]);
-      setTotalBooks(0);
-      return;
-    }
+    if (!targetLib) return;
     foldersApi.getFolders(targetLib)
       .then(data => {
         setShelves(data.shelves || data.folders || []);
@@ -120,10 +158,7 @@ export default function App() {
   // Load Continue Reading
   const loadContinueReading = useCallback((libId) => {
     const targetLib = libId !== undefined ? libId : activeLibraryId;
-    if (!targetLib) {
-      setContinueReading([]);
-      return;
-    }
+    if (!targetLib) return;
     booksApi.getContinueReading(targetLib)
       .then(data => {
         setContinueReading(data.books || []);
@@ -134,11 +169,7 @@ export default function App() {
   // Load Favorites
   const loadFavorites = useCallback((libId) => {
     const targetLib = libId !== undefined ? libId : activeLibraryId;
-    if (!targetLib) {
-      setFavorites([]);
-      setFavoriteIds(new Set());
-      return;
-    }
+    if (!targetLib) return;
     booksApi.getFavorites(targetLib)
       .then(data => {
         setFavorites(data.books || []);
@@ -150,6 +181,7 @@ export default function App() {
   // Load Virtual Tags
   const loadTags = useCallback((libId) => {
     const targetLib = libId !== undefined ? libId : activeLibraryId;
+    if (!targetLib) return;
     tagsApi.getTags(targetLib)
       .then(data => {
         setTags(data.tags || []);
@@ -168,12 +200,7 @@ export default function App() {
   // Load Books
   const loadBooks = useCallback((libId, targetShelf) => {
     const targetLib = libId !== undefined ? libId : activeLibraryId;
-    if (!targetLib) {
-      setBooks([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
+    if (!targetLib) return;
     const shelfToUse = targetShelf !== undefined ? targetShelf : selectedShelf;
     const params = {
       library_id: targetLib,
@@ -297,20 +324,12 @@ export default function App() {
   // Synchronize route state with URL router
   useEffect(() => {
     if (!route.libraryId && !route.bookId) {
-      setActiveLibraryId('');
-      setSelectedShelf(null);
-      setActiveBook(null);
       loadLibraries();
       return;
     }
 
-    if (route.libraryId && route.libraryId !== activeLibraryId) {
-      setActiveLibraryId(route.libraryId);
-    }
-
     if (route.bookId) {
       if (!activeBook || activeBook.id !== route.bookId) {
-        setRouteLoading(true);
         booksApi.getBook(route.bookId)
           .then(book => {
             if (book && book.id) {
@@ -333,15 +352,23 @@ export default function App() {
       }
     } else {
       if (activeBook) {
-        setActiveBook(null);
         loadContinueReading(route.libraryId || activeLibraryId);
         loadFavorites(route.libraryId || activeLibraryId);
         loadTags(route.libraryId || activeLibraryId);
       }
-      setSelectedShelf(route.shelfId);
-      setSearchQuery('');
     }
-  }, [route.bookId, route.shelfId, route.libraryId]);
+  }, [
+    route.bookId,
+    route.libraryId,
+    activeBook,
+    activeLibraryId,
+    loadLibraries,
+    routerNavigateToShelf,
+    selectedShelf,
+    loadContinueReading,
+    loadFavorites,
+    loadTags
+  ]);
 
   useEffect(() => {
     loadLibraries();

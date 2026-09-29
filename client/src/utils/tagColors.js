@@ -86,3 +86,11 @@ export const COLOR_OPTIONS = Object.keys(TAG_COLORS);
 export function getTagColorConfig(colorName) {
   return TAG_COLORS[colorName] || TAG_COLORS.amber;
 }
+
+export function getTagCovers(tag, books = []) {
+  if (books && books.length > 0) {
+    const matching = books.filter(b => b.tags && b.tags.some(t => t.id === tag.id));
+    return matching.slice(0, 4).map(b => b.cover_url);
+  }
+  return [];
+}

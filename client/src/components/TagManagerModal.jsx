@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  X, Tag, Plus, Check, Trash2, Edit2, Bookmark, Folder
+  X, Tag, Plus, Check, Trash2, Edit2
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 import { COLOR_OPTIONS, getTagColorConfig } from '../utils/tagColors';
@@ -24,21 +24,21 @@ export default function TagManagerModal({
   const [error, setError] = useState('');
 
   // Set of tag IDs assigned to current book
+  const [prevBook, setPrevBook] = useState(book);
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
   const [assignedTagIds, setAssignedTagIds] = useState(() => {
     if (!book || !book.tags) return new Set();
     return new Set(book.tags.map(t => t.id));
   });
 
-  useEffect(() => {
-    if (book && book.tags) {
-      setAssignedTagIds(new Set(book.tags.map(t => t.id)));
-    } else {
-      setAssignedTagIds(new Set());
-    }
+  if (book !== prevBook || isOpen !== prevIsOpen) {
+    setPrevBook(book);
+    setPrevIsOpen(isOpen);
+    setAssignedTagIds(new Set(book?.tags ? book.tags.map(t => t.id) : []));
     setNewTagName('');
     setError('');
     setEditingTagId(null);
-  }, [book, isOpen]);
+  }
 
   // Handle escape key
   useEffect(() => {

@@ -7,7 +7,6 @@ import {
   USER_STORAGE_KEY,
   booksApi,
   librariesApi,
-  tagsApi,
   settingsApi,
 } from '../api';
 

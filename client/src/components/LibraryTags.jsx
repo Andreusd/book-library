@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Tag, ChevronLeft, ChevronRight, LayoutGrid, Layers, Plus } from 'lucide-react';
-import TagCard, { getTagCovers } from './TagCard';
+import TagCard from './TagCard';
+import { getTagCovers } from '../utils/tagColors';
 import { useI18n } from '../i18n';
 
 export default function LibraryTags({

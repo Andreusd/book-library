@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 
-export const translations = {
+const translations = {
   en: {
     // Sidebar
     appTitle: 'Digital Library',
@@ -1481,11 +1481,7 @@ export function I18nProvider({ children }) {
     return str;
   };
 
-  return (
-    <I18nContext.Provider value={{ lang, setLang, t }}>
-      {children}
-    </I18nContext.Provider>
-  );
+  return React.createElement(I18nContext.Provider, { value: { lang, setLang, t } }, children);
 }
 
 export function useI18n() {

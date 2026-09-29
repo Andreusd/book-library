@@ -94,7 +94,7 @@ export default function ContinueReading({
     : (() => {
         try {
           return localStorage.getItem('show_file_extension') !== 'false';
-        } catch (e) {
+        } catch {
           return true;
         }
       })();

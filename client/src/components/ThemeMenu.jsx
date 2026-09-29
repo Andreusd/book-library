@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Palette, Check, X, Moon, Sun } from 'lucide-react';
 import { useI18n } from '../i18n';
 
-export const THEMES = [
+const THEMES = [
   {
     id: 'default',
     titleKey: 'theme_default',
