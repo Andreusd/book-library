@@ -5,11 +5,11 @@ import {
   ArrowLeft, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, 
   Maximize2, Minimize2, Moon, Sun, ListTree,
   MessageSquare, Heart, Settings, SlidersHorizontal, X,
-  PanelTopClose, PanelTopOpen, RotateCcw, StretchHorizontal, BookOpen,
-  Search, Headphones, ScrollText
+  RotateCcw, StretchHorizontal,
+  Search, Headphones
 } from 'lucide-react';
 import PdfOutline from './PdfOutline';
-import PdfPageView, { getDualPageSpread, getNextSpreadPage, getPrevSpreadPage } from './PdfPageView';
+import PdfPageView, { getDualPageSpread, getNextSpreadPage, getPrevSpreadPage, queuePreloadPages, clearPageRenderCache } from './PdfPageView';
 import TextSelectionMenu from './TextSelectionMenu';
 import CommentsDrawer from './CommentsDrawer';
 import BookSearchBar from './BookSearchBar';
@@ -118,7 +118,11 @@ export default function Reader({
   onProgressUpdate, 
   onToggleFavorite, 
   isFavorite,
-  showFileExtension
+  showFileExtension,
+  theme,
+  onThemeChange,
+  mode,
+  onModeChange,
 }) {
   const isEpub = book?.format === 'epub' || book?.filename?.toLowerCase().endsWith('.epub');
 
@@ -141,6 +145,8 @@ export default function Reader({
         onToggleFavorite={onToggleFavorite}
         isFavorite={isFavorite}
         showFileExtension={shouldShowExtension}
+        mode={mode}
+        onModeChange={onModeChange}
       />
     );
   }
@@ -172,6 +178,15 @@ export default function Reader({
   };
 
   const getInitialInvertColors = () => {
+    if (mode === 'light') return false;
+    if (mode === 'dark') return true;
+
+    try {
+      const appMode = localStorage.getItem('app_mode');
+      if (appMode === 'light') return false;
+      if (appMode === 'dark') return true;
+    } catch (e) {}
+
     try {
       const localInvert = localStorage.getItem(`book_invert_${book.id}`);
       if (localInvert !== null) {
@@ -182,12 +197,18 @@ export default function Reader({
     if (book.progress?.invert_colors !== undefined) {
       return Boolean(book.progress.invert_colors);
     }
-    return false;
+    return true; // default dark mode for both
   };
 
   const [scale, setScale] = useState(getInitialZoom);
   const [loading, setLoading] = useState(true);
   const [invertColors, setInvertColors] = useState(getInitialInvertColors);
+
+  useEffect(() => {
+    if (mode === 'dark' || mode === 'light') {
+      setInvertColors(mode === 'dark');
+    }
+  }, [mode]);
   const [pageInput, setPageInput] = useState(String(book.progress?.page || 1));
   const [isFullscreen, setIsFullscreen] = useState(() => {
     return typeof document !== 'undefined' ? Boolean(document.fullscreenElement) : false;
@@ -288,6 +309,88 @@ export default function Reader({
     });
   };
 
+  const containerRef = useRef(null);
+
+  // Continuous Vertical Scroll Mode State
+  const [scrollMode, setScrollMode] = useState(() => {
+    try {
+      return localStorage.getItem('reader_scroll_mode') || 'flip'; // 'flip' | 'continuous'
+    } catch (e) {
+      return 'flip';
+    }
+  });
+
+  const isContinuous = scrollMode === 'continuous';
+
+  // Space Between Pages in Continuous Vertical Scroll (enabled by default)
+  const [continuousPageSpacing, setContinuousPageSpacing] = useState(() => {
+    try {
+      return localStorage.getItem('reader_continuous_spacing') !== 'false';
+    } catch (e) {
+      return true;
+    }
+  });
+
+  const toggleContinuousPageSpacing = () => {
+    setContinuousPageSpacing(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('reader_continuous_spacing', String(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  const [centerVertically, setCenterVertically] = useState(() => {
+    try {
+      return localStorage.getItem('reader_center_vertically') !== 'false';
+    } catch (e) {
+      return true;
+    }
+  });
+
+  const centerVerticallyRef = useRef(centerVertically);
+  useEffect(() => {
+    centerVerticallyRef.current = centerVertically;
+  }, [centerVertically]);
+
+  const scrollToPageInContinuousRef = useRef(null);
+
+  const centerPageVertically = useCallback(() => {
+    if (isContinuous || !containerRef.current) return;
+    const container = containerRef.current;
+    if (centerVerticallyRef.current) {
+      const scrollDiff = container.scrollHeight - container.clientHeight;
+      if (scrollDiff > 0) {
+        container.scrollTop = Math.round(scrollDiff / 2);
+      } else {
+        container.scrollTop = 0;
+      }
+    } else {
+      container.scrollTop = 0;
+    }
+  }, [isContinuous]);
+
+  const toggleCenterVertically = () => {
+    setCenterVertically(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('reader_center_vertically', String(next));
+      } catch (e) {}
+      centerVerticallyRef.current = next;
+      if (isContinuous) {
+        if (scrollToPageInContinuousRef.current) {
+          scrollToPageInContinuousRef.current(currentPageRef.current, true);
+        }
+      } else {
+        requestAnimationFrame(() => {
+          centerPageVertically();
+        });
+      }
+      return next;
+    });
+  };
+
   const toggleTrackpadSwipe = () => {
     setTrackpadSwipeEnabled(prev => {
       const next = !prev;
@@ -318,23 +421,31 @@ export default function Reader({
     });
   };
 
-  // Continuous Vertical Scroll Mode State
-  const [scrollMode, setScrollMode] = useState(() => {
-    try {
-      return localStorage.getItem('reader_scroll_mode') || 'flip'; // 'flip' | 'continuous'
-    } catch (e) {
-      return 'flip';
-    }
-  });
-
-  const isContinuous = scrollMode === 'continuous';
-
   const currentPageRef = useRef(currentPage);
   useEffect(() => {
     currentPageRef.current = currentPage;
   }, [currentPage]);
 
-  const [visiblePageNumbers, setVisiblePageNumbers] = useState(() => new Set([currentPage]));
+  // Compute text for page input display (e.g. "1-2" in dual mode)
+  const getPageDisplayText = useCallback((page) => {
+    if (!isDualPage) return String(page);
+    const sp = getDualPageSpread(page, totalPages, dualCoverStandalone);
+    if (sp.left && sp.right) {
+      return `${sp.left}-${sp.right}`;
+    }
+    return String(sp.left || sp.right || page);
+  }, [isDualPage, totalPages, dualCoverStandalone]);
+
+  const [visiblePageNumbers, setVisiblePageNumbers] = useState(() => {
+    if (isDualPage) {
+      const sp = getDualPageSpread(currentPage, totalPages, dualCoverStandalone);
+      const s = new Set();
+      if (sp.left) s.add(sp.left);
+      if (sp.right) s.add(sp.right);
+      return s;
+    }
+    return new Set([currentPage]);
+  });
   const pageDimsMapRef = useRef({});
   const [pageDimsMap, setPageDimsMap] = useState({});
   const pageRefsMap = useRef(new Map());
@@ -342,7 +453,12 @@ export default function Reader({
   const handlePageDimensionsLoaded = useCallback((p, dims) => {
     pageDimsMapRef.current[p] = dims;
     setPageDimsMap(prev => ({ ...prev, [p]: dims }));
-  }, []);
+    if (!isContinuous && centerVerticallyRef.current) {
+      requestAnimationFrame(() => {
+        centerPageVertically();
+      });
+    }
+  }, [isContinuous, centerPageVertically]);
 
   const estimatedPageDims = useMemo(() => {
     const known = Object.values(pageDimsMapRef.current);
@@ -355,80 +471,140 @@ export default function Reader({
     };
   }, [scale, pageDimsMap]);
 
+  const isProgrammaticScrollRef = useRef(false);
+  const programmaticScrollTimerRef = useRef(null);
+
   const scrollToPageInContinuous = useCallback((p, smooth = true) => {
     setVisiblePageNumbers(prev => {
-      if (prev.has(p)) return prev;
       const next = new Set(prev);
       next.add(p);
-      if (p > 1) next.add(p - 1);
-      if (p < totalPages) next.add(p + 1);
+      if (isDualPage) {
+        const sp = getDualPageSpread(p, totalPages, dualCoverStandalone);
+        if (sp.left) next.add(sp.left);
+        if (sp.right) next.add(sp.right);
+        if (sp.currentBase > 1) {
+          const prevSp = getDualPageSpread(sp.currentBase - 1, totalPages, dualCoverStandalone);
+          if (prevSp.left) next.add(prevSp.left);
+          if (prevSp.right) next.add(prevSp.right);
+        }
+        const nextBase = getNextSpreadPage(sp.currentBase, totalPages, dualCoverStandalone);
+        if (nextBase !== sp.currentBase) {
+          const nextSp = getDualPageSpread(nextBase, totalPages, dualCoverStandalone);
+          if (nextSp.left) next.add(nextSp.left);
+          if (nextSp.right) next.add(nextSp.right);
+        }
+      } else {
+        if (p > 1) next.add(p - 1);
+        if (p < totalPages) next.add(p + 1);
+      }
       return next;
     });
 
+    if (programmaticScrollTimerRef.current) {
+      clearTimeout(programmaticScrollTimerRef.current);
+    }
+    isProgrammaticScrollRef.current = true;
+    programmaticScrollTimerRef.current = setTimeout(() => {
+      isProgrammaticScrollRef.current = false;
+    }, smooth ? 1200 : 150);
+
     const scrollAction = () => {
       const container = containerRef.current;
-      const el = container?.querySelector(`#pdf-page-${p}`);
-      if (container && el) {
-        const targetScrollTop = el.offsetTop - 16;
-        container.scrollTo({
-          top: Math.max(0, targetScrollTop),
-          behavior: smooth ? 'smooth' : 'auto'
-        });
+      if (!container) return false;
+      const targetBase = isDualPage 
+        ? getDualPageSpread(p, totalPages, dualCoverStandalone).currentBase 
+        : p;
+      const el = (isDualPage ? container.querySelector(`#pdf-spread-${targetBase}`) : null) || 
+        container.querySelector(`#pdf-page-${p}`);
+      if (!el) return false;
+
+      const elRect = el.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      const elTopInScroll = elRect.top - containerRect.top + container.scrollTop;
+
+      let targetScrollTop = elTopInScroll - 16;
+      if (centerVerticallyRef.current) {
+        const containerHeight = container.clientHeight;
+        const elHeight = elRect.height;
+        if (containerHeight > elHeight) {
+          targetScrollTop = elTopInScroll - Math.round((containerHeight - elHeight) / 2);
+        }
       }
+
+      container.scrollTo({
+        top: Math.max(0, Math.round(targetScrollTop)),
+        behavior: smooth ? 'smooth' : 'auto'
+      });
+      return true;
     };
 
-    scrollAction();
-    requestAnimationFrame(() => {
-      scrollAction();
-    });
-  }, [totalPages]);
+    if (!scrollAction()) {
+      requestAnimationFrame(() => {
+        if (!scrollAction()) {
+          setTimeout(scrollAction, 40);
+        }
+      });
+    }
+  }, [totalPages, isDualPage, dualCoverStandalone]);
+
+  useEffect(() => {
+    scrollToPageInContinuousRef.current = scrollToPageInContinuous;
+  }, [scrollToPageInContinuous]);
 
   // Track active page on continuous scroll
   const scrollRafRef = useRef(null);
   const handleContinuousScroll = useCallback(() => {
-    if (!isContinuous || !containerRef.current) return;
+    if (!isContinuous || !containerRef.current || isProgrammaticScrollRef.current) return;
     const container = containerRef.current;
     const scrollTop = container.scrollTop;
     const clientHeight = container.clientHeight;
     const scrollHeight = container.scrollHeight;
 
-    if (scrollTop <= 20) {
+    if (scrollTop <= 15) {
       if (currentPageRef.current !== 1) {
         currentPageRef.current = 1;
         setCurrentPage(1);
-        setPageInput('1');
+        setPageInput(isDualPage ? getPageDisplayText(1) : '1');
       }
       return;
     }
 
     if (scrollTop + clientHeight >= scrollHeight - 20) {
-      if (currentPageRef.current !== totalPages) {
-        currentPageRef.current = totalPages;
-        setCurrentPage(totalPages);
-        setPageInput(String(totalPages));
+      const targetLast = isDualPage 
+        ? getDualPageSpread(totalPages, totalPages, dualCoverStandalone).currentBase 
+        : totalPages;
+      if (currentPageRef.current !== targetLast) {
+        currentPageRef.current = targetLast;
+        setCurrentPage(targetLast);
+        setPageInput(getPageDisplayText(targetLast));
       }
       return;
     }
 
-    // Probe point at 35% from the top of the viewport
-    const probe = scrollTop + clientHeight * 0.35;
+    // Probe point at 50% (vertical center) of the viewport
+    const containerRect = container.getBoundingClientRect();
+    const probeY = containerRect.top + clientHeight * 0.5;
 
     let foundPage = null;
     pageRefsMap.current.forEach((el, p) => {
       if (!el) return;
-      const top = el.offsetTop;
-      const bottom = top + el.offsetHeight;
-      if (probe >= top && probe <= bottom) {
+      const r = el.getBoundingClientRect();
+      if (probeY >= r.top && probeY <= r.bottom) {
         foundPage = p;
       }
     });
 
-    if (foundPage && foundPage !== currentPageRef.current) {
-      currentPageRef.current = foundPage;
-      setCurrentPage(foundPage);
-      setPageInput(String(foundPage));
+    if (foundPage) {
+      const activeBase = isDualPage 
+        ? getDualPageSpread(foundPage, totalPages, dualCoverStandalone).currentBase 
+        : foundPage;
+      if (activeBase !== currentPageRef.current) {
+        currentPageRef.current = activeBase;
+        setCurrentPage(activeBase);
+        setPageInput(getPageDisplayText(activeBase));
+      }
     }
-  }, [isContinuous, totalPages]);
+  }, [isContinuous, totalPages, isDualPage, dualCoverStandalone, getPageDisplayText]);
 
   const onContainerScroll = useCallback(() => {
     if (!isContinuous) return;
@@ -446,11 +622,27 @@ export default function Reader({
         localStorage.setItem('reader_scroll_mode', next);
       } catch (e) {}
       if (next === 'continuous') {
-        setVisiblePageNumbers(new Set([
-          Math.max(1, currentPage - 1), 
-          currentPage, 
-          Math.min(totalPages, currentPage + 1)
-        ]));
+        const pList = [currentPage];
+        if (isDualPage) {
+          const sp = getDualPageSpread(currentPage, totalPages, dualCoverStandalone);
+          if (sp.left) pList.push(sp.left);
+          if (sp.right) pList.push(sp.right);
+          if (sp.currentBase > 1) {
+            const prevSp = getDualPageSpread(sp.currentBase - 1, totalPages, dualCoverStandalone);
+            if (prevSp.left) pList.push(prevSp.left);
+            if (prevSp.right) pList.push(prevSp.right);
+          }
+          const nextBase = getNextSpreadPage(sp.currentBase, totalPages, dualCoverStandalone);
+          if (nextBase !== sp.currentBase) {
+            const nextSp = getDualPageSpread(nextBase, totalPages, dualCoverStandalone);
+            if (nextSp.left) pList.push(nextSp.left);
+            if (nextSp.right) pList.push(nextSp.right);
+          }
+        } else {
+          if (currentPage > 1) pList.push(currentPage - 1);
+          if (currentPage < totalPages) pList.push(currentPage + 1);
+        }
+        setVisiblePageNumbers(new Set(pList));
         setTimeout(() => {
           scrollToPageInContinuous(currentPage, false);
         }, 60);
@@ -616,7 +808,6 @@ export default function Reader({
   const isHeaderShowing = headerPinned || isHeaderVisible || readerSettingsOpen || commentsDrawerOpen || outlineOpen || searchOpen;
 
 
-  const containerRef = useRef(null);
   const linkServiceRef = useRef(new SimpleLinkService());
   const eventBusRef = useRef(null);
   const findControllerRef = useRef(null);
@@ -641,6 +832,20 @@ export default function Reader({
     return getDualPageSpread(currentPage, totalPages, dualCoverStandalone);
   }, [currentPage, totalPages, dualCoverStandalone]);
 
+  const allSpreads = useMemo(() => {
+    if (!isDualPage || totalPages < 1) return [];
+    const spreads = [];
+    let p = 1;
+    while (p <= totalPages) {
+      const sp = getDualPageSpread(p, totalPages, dualCoverStandalone);
+      spreads.push(sp);
+      const nextP = getNextSpreadPage(sp.currentBase, totalPages, dualCoverStandalone);
+      if (nextP <= sp.currentBase) break;
+      p = nextP;
+    }
+    return spreads;
+  }, [isDualPage, totalPages, dualCoverStandalone]);
+
   // Continuous Vertical Scroll: Observer for lazy rendering near the viewport
   useEffect(() => {
     if (!isContinuous || !containerRef.current || !pdfDoc) return;
@@ -657,9 +862,20 @@ export default function Reader({
               next.add(p);
               changed = true;
             }
+            if (isDualPage) {
+              const sp = getDualPageSpread(p, totalPages, dualCoverStandalone);
+              if (sp.left && !next.has(sp.left)) {
+                next.add(sp.left);
+                changed = true;
+              }
+              if (sp.right && !next.has(sp.right)) {
+                next.add(sp.right);
+                changed = true;
+              }
+            }
           } else {
-            // Keep nearby pages mounted (within 4 pages of active page)
-            if (next.has(p) && Math.abs(p - currentPageRef.current) > 4) {
+            // Keep nearby pages mounted (within 4 pages of active page, or 8 pages in dual)
+            if (next.has(p) && Math.abs(p - currentPageRef.current) > (isDualPage ? 8 : 4)) {
               next.delete(p);
               changed = true;
             }
@@ -680,7 +896,77 @@ export default function Reader({
     return () => {
       renderObserver.disconnect();
     };
-  }, [isContinuous, pdfDoc, totalPages, scale]);
+  }, [isContinuous, pdfDoc, totalPages, scale, isDualPage, dualCoverStandalone]);
+
+  // Preload adjacent pages so page flips are instantaneous without any visual blinking
+  useEffect(() => {
+    if (!pdfDoc || totalPages <= 1) return;
+
+    const timer = setTimeout(() => {
+      const pagesToPreload = [];
+      if (!isContinuous) {
+        if (isDualPage) {
+          const currentSp = getDualPageSpread(currentPage, totalPages, dualCoverStandalone);
+          const currentPages = new Set([currentSp.left, currentSp.right].filter(Boolean));
+
+          // Forward spreads (prioritized)
+          const next1 = getNextSpreadPage(currentSp.currentBase, totalPages, dualCoverStandalone);
+          if (next1 !== currentSp.currentBase) {
+            const next1Sp = getDualPageSpread(next1, totalPages, dualCoverStandalone);
+            if (next1Sp.left && !currentPages.has(next1Sp.left)) pagesToPreload.push(next1Sp.left);
+            if (next1Sp.right && !currentPages.has(next1Sp.right)) pagesToPreload.push(next1Sp.right);
+
+            const next2 = getNextSpreadPage(next1, totalPages, dualCoverStandalone);
+            if (next2 !== next1 && next2 !== currentSp.currentBase) {
+              const next2Sp = getDualPageSpread(next2, totalPages, dualCoverStandalone);
+              if (next2Sp.left && !currentPages.has(next2Sp.left) && !pagesToPreload.includes(next2Sp.left)) {
+                pagesToPreload.push(next2Sp.left);
+              }
+              if (next2Sp.right && !currentPages.has(next2Sp.right) && !pagesToPreload.includes(next2Sp.right)) {
+                pagesToPreload.push(next2Sp.right);
+              }
+            }
+          }
+
+          // Backward spread
+          const prev1 = getPrevSpreadPage(currentSp.currentBase, totalPages, dualCoverStandalone);
+          if (prev1 !== currentSp.currentBase) {
+            const prev1Sp = getDualPageSpread(prev1, totalPages, dualCoverStandalone);
+            if (prev1Sp.left && !currentPages.has(prev1Sp.left) && !pagesToPreload.includes(prev1Sp.left)) {
+              pagesToPreload.push(prev1Sp.left);
+            }
+            if (prev1Sp.right && !currentPages.has(prev1Sp.right) && !pagesToPreload.includes(prev1Sp.right)) {
+              pagesToPreload.push(prev1Sp.right);
+            }
+          }
+        } else {
+          // Single page flip mode: preload next 3 pages, and 1 previous page
+          const candidates = [currentPage + 1, currentPage + 2, currentPage + 3, currentPage - 1];
+          candidates.forEach(p => {
+            if (p >= 1 && p <= totalPages && p !== currentPage && !pagesToPreload.includes(p)) {
+              pagesToPreload.push(p);
+            }
+          });
+        }
+      } else {
+        // Continuous mode: preload next 2 pages ahead of the currently visible window
+        const visibleArr = Array.from(visiblePageNumbers);
+        if (visibleArr.length > 0) {
+          const maxP = Math.max(...visibleArr);
+          if (maxP + 1 <= totalPages) pagesToPreload.push(maxP + 1);
+          if (maxP + 2 <= totalPages) pagesToPreload.push(maxP + 2);
+          const minP = Math.min(...visibleArr);
+          if (minP - 1 >= 1) pagesToPreload.push(minP - 1);
+        }
+      }
+
+      if (pagesToPreload.length > 0) {
+        queuePreloadPages(pdfDoc, pagesToPreload, scale);
+      }
+    }, 80);
+
+    return () => clearTimeout(timer);
+  }, [pdfDoc, currentPage, isDualPage, dualCoverStandalone, isContinuous, scale, totalPages, visiblePageNumbers]);
 
   const hasPrev = isDualPage ? spread.currentBase > 1 : currentPage > 1;
   const hasNext = isDualPage 
@@ -711,8 +997,21 @@ export default function Reader({
         const sp = getDualPageSpread(currentPage, totalPages, dualCoverStandalone);
         setCurrentPage(sp.currentBase);
         setTimeout(() => fitWidth(true), 60);
+        if (isContinuous) {
+          const pList = [sp.currentBase];
+          if (sp.left) pList.push(sp.left);
+          if (sp.right) pList.push(sp.right);
+          setVisiblePageNumbers(new Set(pList));
+          setTimeout(() => {
+            scrollToPageInContinuous(sp.currentBase, false);
+          }, 80);
+        }
       } else {
-        setScale(1.2);
+        if (!isContinuous) {
+          setScale(1.2);
+        } else {
+          setTimeout(() => fitWidth(false), 60);
+        }
       }
       return next;
     });
@@ -727,6 +1026,11 @@ export default function Reader({
       if (isDualPage) {
         const sp = getDualPageSpread(currentPage, totalPages, next);
         setCurrentPage(sp.currentBase);
+        if (isContinuous) {
+          setTimeout(() => {
+            scrollToPageInContinuous(sp.currentBase, false);
+          }, 80);
+        }
       }
       return next;
     });
@@ -782,29 +1086,47 @@ export default function Reader({
   // Page Navigation handlers
   const goToNextPage = useCallback(() => {
     if (isContinuous) {
-      const nextP = Math.min(currentPage + 1, totalPages);
-      scrollToPageInContinuous(nextP);
-      setCurrentPage(nextP);
-      setPageInput(String(nextP));
+      if (isDualPage) {
+        const nextP = getNextSpreadPage(currentPageRef.current, totalPages, dualCoverStandalone);
+        currentPageRef.current = nextP;
+        setCurrentPage(nextP);
+        setPageInput(getPageDisplayText(nextP));
+        scrollToPageInContinuous(nextP);
+      } else {
+        const nextP = Math.min(currentPageRef.current + 1, totalPages);
+        currentPageRef.current = nextP;
+        setCurrentPage(nextP);
+        setPageInput(String(nextP));
+        scrollToPageInContinuous(nextP);
+      }
     } else if (!isDualPage) {
       setCurrentPage(prev => (prev < totalPages ? prev + 1 : prev));
     } else {
       setCurrentPage(prev => getNextSpreadPage(prev, totalPages, dualCoverStandalone));
     }
-  }, [isContinuous, currentPage, totalPages, scrollToPageInContinuous, isDualPage, dualCoverStandalone]);
+  }, [isContinuous, totalPages, scrollToPageInContinuous, isDualPage, dualCoverStandalone, getPageDisplayText]);
 
   const goToPrevPage = useCallback(() => {
     if (isContinuous) {
-      const prevP = Math.max(currentPage - 1, 1);
-      scrollToPageInContinuous(prevP);
-      setCurrentPage(prevP);
-      setPageInput(String(prevP));
+      if (isDualPage) {
+        const prevP = getPrevSpreadPage(currentPageRef.current, totalPages, dualCoverStandalone);
+        currentPageRef.current = prevP;
+        setCurrentPage(prevP);
+        setPageInput(getPageDisplayText(prevP));
+        scrollToPageInContinuous(prevP);
+      } else {
+        const prevP = Math.max(currentPageRef.current - 1, 1);
+        currentPageRef.current = prevP;
+        setCurrentPage(prevP);
+        setPageInput(String(prevP));
+        scrollToPageInContinuous(prevP);
+      }
     } else if (!isDualPage) {
       setCurrentPage(prev => (prev > 1 ? prev - 1 : prev));
     } else {
       setCurrentPage(prev => getPrevSpreadPage(prev, totalPages, dualCoverStandalone));
     }
-  }, [isContinuous, currentPage, totalPages, scrollToPageInContinuous, isDualPage, dualCoverStandalone]);
+  }, [isContinuous, totalPages, scrollToPageInContinuous, isDualPage, dualCoverStandalone, getPageDisplayText]);
 
   // Configure link service
   const handleLinkNavigate = useCallback((target) => {
@@ -815,9 +1137,18 @@ export default function Reader({
     } else if (typeof target === 'number') {
       const targetPage = Math.min(Math.max(1, target), totalPages);
       if (isContinuous) {
-        scrollToPageInContinuous(targetPage);
-        setCurrentPage(targetPage);
-        setPageInput(String(targetPage));
+        if (isDualPage) {
+          const sp = getDualPageSpread(targetPage, totalPages, dualCoverStandalone);
+          currentPageRef.current = sp.currentBase;
+          setCurrentPage(sp.currentBase);
+          setPageInput(getPageDisplayText(sp.currentBase));
+          scrollToPageInContinuous(targetPage);
+        } else {
+          currentPageRef.current = targetPage;
+          setCurrentPage(targetPage);
+          setPageInput(String(targetPage));
+          scrollToPageInContinuous(targetPage);
+        }
       } else if (isDualPage) {
         const sp = getDualPageSpread(targetPage, totalPages, dualCoverStandalone);
         setCurrentPage(sp.currentBase);
@@ -825,7 +1156,7 @@ export default function Reader({
         setCurrentPage(targetPage);
       }
     }
-  }, [isContinuous, goToNextPage, goToPrevPage, totalPages, scrollToPageInContinuous, isDualPage, dualCoverStandalone]);
+  }, [isContinuous, goToNextPage, goToPrevPage, totalPages, scrollToPageInContinuous, isDualPage, dualCoverStandalone, getPageDisplayText]);
 
   // Handle PDF index/outline item click
   const handleOutlineClick = useCallback((item) => {
@@ -1012,10 +1343,12 @@ export default function Reader({
     let active = true;
     setLoading(true);
 
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const loadingTask = pdfjsLib.getDocument({
       url: `/api/pdf/${book.id}`,
-      cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.379/cmaps/',
+      cMapUrl: `${origin}/pdfjs-cmaps/`,
       cMapPacked: true,
+      wasmUrl: `${origin}/pdfjs-wasm/`,
     });
 
     loadingTask.promise.then(
@@ -1055,6 +1388,7 @@ export default function Reader({
     return () => {
       active = false;
       loadingTask.destroy();
+      clearPageRenderCache();
     };
   }, [book.id]);
 
@@ -1175,9 +1509,18 @@ export default function Reader({
   const handleJumpToAnnotation = (ann) => {
     if (ann.page) {
       if (isContinuous) {
-        setCurrentPage(ann.page);
-        setPageInput(String(ann.page));
-        scrollToPageInContinuous(ann.page);
+        if (isDualPage) {
+          const sp = getDualPageSpread(ann.page, totalPages, dualCoverStandalone);
+          currentPageRef.current = sp.currentBase;
+          setCurrentPage(sp.currentBase);
+          setPageInput(getPageDisplayText(sp.currentBase));
+          scrollToPageInContinuous(ann.page);
+        } else {
+          currentPageRef.current = ann.page;
+          setCurrentPage(ann.page);
+          setPageInput(String(ann.page));
+          scrollToPageInContinuous(ann.page);
+        }
       } else if (isDualPage) {
         const sp = getDualPageSpread(ann.page, totalPages, dualCoverStandalone);
         setCurrentPage(sp.currentBase);
@@ -1193,6 +1536,7 @@ export default function Reader({
   // Save Progress to Backend
   const saveProgress = useCallback((page, total) => {
     if (!page || !total) return;
+    const calcPercent = Number(((page / total) * 100).toFixed(1));
     fetch('/api/progress', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1200,6 +1544,7 @@ export default function Reader({
         book_id: book.id,
         page: page,
         total_pages: total,
+        percent: calcPercent,
         zoom: scaleRef.current,
         invert_colors: invertColorsRef.current
       })
@@ -1213,13 +1558,44 @@ export default function Reader({
     .catch(err => console.error('Failed to save progress:', err));
   }, [book.id]);
 
-  // Scroll back to top on page change (only in flip mode)
+  // On page change in flip mode, center or reset scroll position according to centerVertically
   useEffect(() => {
     if (isContinuous) return;
-    if (containerRef.current) {
-      containerRef.current.scrollTop = 0;
+    centerPageVertically();
+    const raf = requestAnimationFrame(() => {
+      centerPageVertically();
+    });
+    const timer = setTimeout(() => {
+      centerPageVertically();
+    }, 80);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+    };
+  }, [currentPage, isContinuous, centerPageVertically]);
+
+  // When resizing with centerVertically on, re-center active page
+  useEffect(() => {
+    if (!centerVertically) return;
+    const handleResize = () => {
+      if (isContinuous) {
+        scrollToPageInContinuous(currentPageRef.current, false);
+      } else {
+        centerPageVertically();
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isContinuous, centerVertically, scrollToPageInContinuous, centerPageVertically]);
+
+  // When scale changes in flip mode with centerVertically on, re-center
+  useEffect(() => {
+    if (!isContinuous && centerVertically) {
+      requestAnimationFrame(() => {
+        centerPageVertically();
+      });
     }
-  }, [currentPage, isContinuous]);
+  }, [scale, isContinuous, centerVertically, centerPageVertically]);
 
   // Restore initial scroll position for continuous mode
   const initialScrollDoneRef = useRef(false);
@@ -1234,16 +1610,6 @@ export default function Reader({
       }, 150);
     }
   }, [isContinuous, pdfDoc, loading, book.progress?.page, totalPages, scrollToPageInContinuous]);
-
-  // Compute text for page input display (e.g. "1-2" in dual mode)
-  const getPageDisplayText = useCallback((page) => {
-    if (!isDualPage) return String(page);
-    const sp = getDualPageSpread(page, totalPages, dualCoverStandalone);
-    if (sp.left && sp.right) {
-      return `${sp.left}-${sp.right}`;
-    }
-    return String(sp.left || sp.right || page);
-  }, [isDualPage, totalPages, dualCoverStandalone]);
 
   // Keep pageInput synced with current page or spread
   useEffect(() => {
@@ -1303,14 +1669,23 @@ export default function Reader({
   }, [book.id, invertColors, pdfDoc]);
 
   const handlePageSubmit = (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     const match = pageInput.trim().match(/^\d+/);
     const num = match ? parseInt(match[0], 10) : NaN;
     if (!isNaN(num) && num >= 1 && num <= totalPages) {
       if (isContinuous) {
-        setCurrentPage(num);
-        setPageInput(String(num));
-        scrollToPageInContinuous(num);
+        if (isDualPage) {
+          const sp = getDualPageSpread(num, totalPages, dualCoverStandalone);
+          currentPageRef.current = sp.currentBase;
+          setCurrentPage(sp.currentBase);
+          setPageInput(getPageDisplayText(sp.currentBase));
+          scrollToPageInContinuous(num);
+        } else {
+          currentPageRef.current = num;
+          setCurrentPage(num);
+          setPageInput(String(num));
+          scrollToPageInContinuous(num);
+        }
       } else if (isDualPage) {
         const sp = getDualPageSpread(num, totalPages, dualCoverStandalone);
         setCurrentPage(sp.currentBase);
@@ -1320,6 +1695,10 @@ export default function Reader({
     } else {
       setPageInput(getPageDisplayText(currentPage));
     }
+  };
+
+  const handlePageInputBlur = () => {
+    setPageInput(getPageDisplayText(currentPage));
   };
 
   const handleToggleFav = () => {
@@ -1365,7 +1744,7 @@ export default function Reader({
       } else if (e.key === 'PageUp') {
         e.preventDefault();
         if (isScrollable) {
-          const atTop = container.scrollTop <= 30;
+          const atTop = container.scrollTop <= 2;
           if (atTop) {
             goToPrevPage();
           } else {
@@ -1378,7 +1757,7 @@ export default function Reader({
         e.preventDefault();
         if (upDownFlipEnabled) {
           if (isScrollable) {
-            const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 10;
+            const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 5;
             if (atBottom) {
               goToNextPage();
             } else {
@@ -1396,7 +1775,7 @@ export default function Reader({
         e.preventDefault();
         if (upDownFlipEnabled) {
           if (isScrollable) {
-            const atTop = container.scrollTop <= 10;
+            const atTop = container.scrollTop <= 2;
             if (atTop) {
               goToPrevPage();
             } else {
@@ -1565,6 +1944,66 @@ export default function Reader({
     ? 'bg-neutral-900/80 hover:bg-neutral-800 border-neutral-700 hover:border-amber-500/60 text-neutral-300 hover:text-white'
     : 'bg-white/90 hover:bg-white border-neutral-300 hover:border-amber-500/60 text-neutral-700 hover:text-neutral-900 shadow-xl';
 
+  const renderContinuousPage = (p, pageSide = 'single') => {
+    const isVisible = visiblePageNumbers.has(p);
+    const dims = pageDimsMap[p] || estimatedPageDims;
+    return (
+      <div
+        key={p}
+        id={`pdf-page-${p}`}
+        data-page-number={p}
+        ref={(el) => {
+          if (el) pageRefsMap.current.set(p, el);
+          else pageRefsMap.current.delete(p);
+        }}
+        style={{
+          minHeight: dims.height ? `${dims.height}px` : `${estimatedPageDims.height}px`,
+          width: dims.width ? `${dims.width}px` : `${estimatedPageDims.width}px`,
+        }}
+        className="pdf-page-container relative flex justify-center items-center select-text"
+      >
+        {isVisible ? (
+          <PdfPageView
+            pdfDoc={pdfDoc}
+            pageNum={p}
+            scale={scale}
+            invertColors={invertColors}
+            linkService={linkServiceRef.current}
+            findController={findControllerRef.current}
+            eventBus={eventBusRef.current}
+            annotations={annotations.filter(a => a.page === p)}
+            onUpdateComment={handleUpdateComment}
+            onDeleteAnnotation={handleDeleteAnnotation}
+            pageSide={pageSide}
+            showBookTexture={bookTextureEnabled}
+            onDimensionsLoaded={handlePageDimensionsLoaded}
+            initialDims={dims}
+            hasPageSpacing={continuousPageSpacing}
+          />
+        ) : (
+          <div 
+            style={{
+              width: dims.width ? `${dims.width}px` : `${estimatedPageDims.width}px`,
+              height: dims.height ? `${dims.height}px` : `${estimatedPageDims.height}px`,
+            }}
+            className={`shadow-md flex flex-col items-center justify-center gap-2 select-none border transition-colors ${
+              !continuousPageSpacing
+                ? ''
+                : pageSide === 'left' ? 'rounded-l-sm' : pageSide === 'right' ? 'rounded-r-sm' : 'rounded-sm'
+            } ${
+              invertColors 
+                ? 'bg-neutral-900/60 border-neutral-800 text-neutral-400' 
+                : 'bg-neutral-100 border-neutral-200 text-neutral-500'
+            }`}
+          >
+            <div className="w-5 h-5 border-2 border-amber-500/60 border-t-transparent rounded-full animate-spin" />
+            <span className="text-xs font-mono font-medium">{t('pageBadge', { page: p })}</span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className={`fixed inset-0 z-50 flex flex-col ${invertColors ? 'bg-black text-neutral-100' : 'bg-white text-neutral-800'} overflow-hidden overscroll-none touch-pan-y transition-colors duration-300`}>
       {/* Top Header / Toolbar */}
@@ -1650,7 +2089,7 @@ export default function Reader({
               type="text"
               value={pageInput}
               onChange={(e) => setPageInput(e.target.value)}
-              onBlur={handlePageSubmit}
+              onBlur={handlePageInputBlur}
               className={`w-14 sm:w-16 h-7 text-center py-0 rounded focus:outline-none ${inputClass}`}
             />
             <span className={`mx-1.5 ${pageSlashClass}`}>/</span>
@@ -1698,27 +2137,6 @@ export default function Reader({
             <StretchHorizontal className="w-4 h-4" />
           </button>
 
-          {/* Toggle Dual Page View */}
-          <button 
-            onClick={toggleDualPage}
-            className={`h-7 w-7 flex items-center justify-center rounded-lg transition shrink-0 cursor-pointer hidden md:inline-flex ${
-              isDualPage && !isContinuous ? btnActiveClass : btnClass
-            }`}
-            title={isDualPage ? t('singlePageMode') : t('dualPageMode')}
-          >
-            <BookOpen className="w-4 h-4" />
-          </button>
-
-          {/* Toggle Continuous Vertical Scroll */}
-          <button 
-            onClick={toggleScrollMode}
-            className={`h-7 w-7 flex items-center justify-center rounded-lg transition shrink-0 cursor-pointer hidden sm:inline-flex ${
-              isContinuous ? btnActiveClass : btnClass
-            }`}
-            title={isContinuous ? t('pageFlipMode') : t('verticalScrollMode')}
-          >
-            <ScrollText className="w-4 h-4" />
-          </button>
 
           <button 
             onClick={() => setScale(s => Math.min(3.5, Number((s + 0.15).toFixed(2))))}
@@ -1761,7 +2179,20 @@ export default function Reader({
 
           {/* Invert Dark / Light */}
           <button 
-            onClick={() => setInvertColors(!invertColors)}
+            onClick={() => {
+              const nextInvert = !invertColors;
+              setInvertColors(nextInvert);
+              const newMode = nextInvert ? 'dark' : 'light';
+              try {
+                localStorage.setItem('app_mode', newMode);
+                document.documentElement.setAttribute('data-mode', newMode);
+                localStorage.setItem(`book_invert_${book.id}`, String(nextInvert));
+              } catch (e) {}
+              if (onModeChange) {
+                onModeChange(newMode);
+              }
+              window.dispatchEvent(new CustomEvent('app_mode_change', { detail: { mode: newMode } }));
+            }}
             className={`h-7 w-7 flex items-center justify-center rounded-lg transition shrink-0 cursor-pointer ${
               invertColors ? btnActiveClass : btnClass
             }`}
@@ -1794,20 +2225,6 @@ export default function Reader({
             <MessageSquare className="w-4 h-4" />
           </button>
 
-          {/* Toggle Header Auto-Hide / Keep Header Visible */}
-          <button 
-            onClick={toggleHeaderPinned}
-            className={`h-7 w-7 flex items-center justify-center rounded-lg transition shrink-0 cursor-pointer ${
-              headerPinned ? btnActiveClass : btnClass
-            }`}
-            title={headerPinned ? t('unpinHeaderTitle') : t('pinHeaderTitle')}
-          >
-            {headerPinned ? (
-              <PanelTopClose className="w-4 h-4" />
-            ) : (
-              <PanelTopOpen className="w-4 h-4" />
-            )}
-          </button>
 
           {/* Fullscreen */}
           <button 
@@ -1855,6 +2272,27 @@ export default function Reader({
                   </div>
 
                   <div className="space-y-1.5 reader-settings-scroll flex-1 pr-1">
+                    {/* Toggle Centralize Page Vertically */}
+                    <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
+                      <div className="min-w-0 flex-1">
+                        <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
+                          {t('centerVertically')}
+                        </span>
+                        <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                          {t('centerVerticallyDesc')}
+                        </span>
+                      </div>
+                      <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                        <input 
+                          type="checkbox"
+                          checked={centerVertically}
+                          onChange={toggleCenterVertically}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
+                      </div>
+                    </label>
+
                     {/* Toggle Bottom Progress Bar */}
                     <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
                       <div className="min-w-0 flex-1">
@@ -1959,6 +2397,29 @@ export default function Reader({
                         <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
                       </div>
                     </label>
+
+                    {/* Toggle Space Between Pages (when in continuous vertical scroll) */}
+                    {isContinuous && (
+                      <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group pl-5 border-l-2 border-amber-500/40 ml-1 ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
+                        <div className="min-w-0 flex-1">
+                          <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
+                            {t('continuousPageSpacing')}
+                          </span>
+                          <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
+                            {t('continuousPageSpacingDesc')}
+                          </span>
+                        </div>
+                        <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
+                          <input 
+                            type="checkbox"
+                            checked={continuousPageSpacing}
+                            onChange={toggleContinuousPageSpacing}
+                            className="sr-only peer"
+                          />
+                          <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
+                        </div>
+                      </label>
+                    )}
 
                     {/* Toggle Dual Page View */}
                     <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
@@ -2074,7 +2535,7 @@ export default function Reader({
             tabIndex={0}
             onScroll={onContainerScroll}
             onContextMenu={handleTextContextMenu}
-            className="flex-1 overflow-y-auto overflow-x-auto p-4 sm:p-6 focus:outline-none select-text overscroll-none touch-pan-y"
+            className="relative flex-1 overflow-y-auto overflow-x-auto p-4 sm:p-6 focus:outline-none select-text overscroll-none touch-pan-y"
           >
             {loading ? (
               <div className="flex flex-col items-center justify-center h-full min-h-[400px] gap-3 text-neutral-400 select-none">
@@ -2084,65 +2545,31 @@ export default function Reader({
             ) : (
               <div className="min-h-full flex justify-center items-start">
                 {isContinuous ? (
-                  <div className="w-full flex flex-col items-center gap-6 pb-24">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => {
-                      const isVisible = visiblePageNumbers.has(p);
-                      const dims = pageDimsMap[p] || estimatedPageDims;
-                      return (
+                  isDualPage ? (
+                    <div className={`w-full flex flex-col items-center ${continuousPageSpacing ? 'gap-6' : 'gap-0'} pb-24`}>
+                      {allSpreads.map((sp) => (
                         <div
-                          key={p}
-                          id={`pdf-page-${p}`}
-                          data-page-number={p}
-                          ref={(el) => {
-                            if (el) pageRefsMap.current.set(p, el);
-                            else pageRefsMap.current.delete(p);
-                          }}
-                          style={{
-                            minHeight: dims.height ? `${dims.height}px` : `${estimatedPageDims.height}px`,
-                            width: dims.width ? `${dims.width}px` : `${estimatedPageDims.width}px`,
-                          }}
-                          className="pdf-page-container relative flex justify-center items-center select-text"
+                          key={sp.currentBase}
+                          id={`pdf-spread-${sp.currentBase}`}
+                          className={`flex items-start justify-center ${bookTextureEnabled && sp.left && sp.right ? 'shadow-2xl' : 'shadow-md'}`}
                         >
-                          {isVisible ? (
-                            <PdfPageView
-                              pdfDoc={pdfDoc}
-                              pageNum={p}
-                              scale={scale}
-                              invertColors={invertColors}
-                              linkService={linkServiceRef.current}
-                              findController={findControllerRef.current}
-                              eventBus={eventBusRef.current}
-                              annotations={annotations.filter(a => a.page === p)}
-                              onUpdateComment={handleUpdateComment}
-                              onDeleteAnnotation={handleDeleteAnnotation}
-                              pageSide="single"
-                              showBookTexture={bookTextureEnabled}
-                              onDimensionsLoaded={handlePageDimensionsLoaded}
-                            />
-                          ) : (
-                            <div 
-                              style={{
-                                width: dims.width ? `${dims.width}px` : `${estimatedPageDims.width}px`,
-                                height: dims.height ? `${dims.height}px` : `${estimatedPageDims.height}px`,
-                              }}
-                              className={`rounded-sm shadow-md flex flex-col items-center justify-center gap-2 select-none border transition-colors ${
-                                invertColors 
-                                  ? 'bg-neutral-900/60 border-neutral-800 text-neutral-400' 
-                                  : 'bg-neutral-100 border-neutral-200 text-neutral-500'
-                              }`}
-                            >
-                              <div className="w-5 h-5 border-2 border-amber-500/60 border-t-transparent rounded-full animate-spin" />
-                              <span className="text-xs font-mono font-medium">{t('pageBadge', { page: p })}</span>
-                            </div>
-                          )}
+                          {sp.left && renderContinuousPage(sp.left, sp.right ? 'left' : 'single')}
+                          {sp.right && renderContinuousPage(sp.right, sp.left ? 'right' : 'single')}
                         </div>
-                      );
-                    })}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className={`w-full flex flex-col items-center ${continuousPageSpacing ? 'gap-6' : 'gap-0'} pb-24`}>
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                        renderContinuousPage(p, 'single')
+                      ))}
+                    </div>
+                  )
                 ) : isDualPage ? (
-                  <div className={`flex items-start justify-center ${bookTextureEnabled ? 'shadow-2xl' : 'shadow-md'}`}>
+                  <div className={`flex items-start justify-center ${bookTextureEnabled ? 'shadow-2xl' : 'shadow-md'} ${centerVertically ? 'my-auto' : ''}`}>
                     {spread.left && (
                       <PdfPageView
+                        key={`dual-left-${spread.left}`}
                         pdfDoc={pdfDoc}
                         pageNum={spread.left}
                         scale={scale}
@@ -2155,10 +2582,13 @@ export default function Reader({
                         onDeleteAnnotation={handleDeleteAnnotation}
                         pageSide={spread.right ? 'left' : 'single'}
                         showBookTexture={bookTextureEnabled}
+                        onDimensionsLoaded={handlePageDimensionsLoaded}
+                        initialDims={pageDimsMap[spread.left] || estimatedPageDims}
                       />
                     )}
                     {spread.right && (
                       <PdfPageView
+                        key={`dual-right-${spread.right}`}
                         pdfDoc={pdfDoc}
                         pageNum={spread.right}
                         scale={scale}
@@ -2171,24 +2601,31 @@ export default function Reader({
                         onDeleteAnnotation={handleDeleteAnnotation}
                         pageSide={spread.left ? 'right' : 'single'}
                         showBookTexture={bookTextureEnabled}
+                        onDimensionsLoaded={handlePageDimensionsLoaded}
+                        initialDims={pageDimsMap[spread.right] || estimatedPageDims}
                       />
                     )}
                   </div>
                 ) : (
-                  <PdfPageView
-                    pdfDoc={pdfDoc}
-                    pageNum={currentPage}
-                    scale={scale}
-                    invertColors={invertColors}
-                    linkService={linkServiceRef.current}
-                    findController={findControllerRef.current}
-                    eventBus={eventBusRef.current}
-                    annotations={annotations.filter(a => a.page === currentPage)}
-                    onUpdateComment={handleUpdateComment}
-                    onDeleteAnnotation={handleDeleteAnnotation}
-                    pageSide="single"
-                    showBookTexture={bookTextureEnabled}
-                  />
+                  <div className={`relative ${centerVertically ? 'my-auto' : ''}`}>
+                    <PdfPageView
+                      key={`single-${currentPage}`}
+                      pdfDoc={pdfDoc}
+                      pageNum={currentPage}
+                      scale={scale}
+                      invertColors={invertColors}
+                      linkService={linkServiceRef.current}
+                      findController={findControllerRef.current}
+                      eventBus={eventBusRef.current}
+                      annotations={annotations.filter(a => a.page === currentPage)}
+                      onUpdateComment={handleUpdateComment}
+                      onDeleteAnnotation={handleDeleteAnnotation}
+                      pageSide="single"
+                      showBookTexture={bookTextureEnabled}
+                      onDimensionsLoaded={handlePageDimensionsLoaded}
+                      initialDims={pageDimsMap[currentPage] || estimatedPageDims}
+                    />
+                  </div>
                 )}
               </div>
             )}

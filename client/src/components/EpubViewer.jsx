@@ -128,7 +128,9 @@ export default function EpubViewer({
   onProgressUpdate,
   onToggleFavorite,
   isFavorite,
-  showFileExtension
+  showFileExtension,
+  mode,
+  onModeChange,
 }) {
   const { t } = useI18n();
 
@@ -327,6 +329,13 @@ export default function EpubViewer({
 
   // Preferences: Theme ('dark' | 'light' | 'sepia')
   const [theme, setTheme] = useState(() => {
+    if (mode === 'light') return 'light';
+    if (mode === 'dark') return 'dark';
+    try {
+      const appMode = localStorage.getItem('app_mode');
+      if (appMode === 'light') return 'light';
+      if (appMode === 'dark') return 'dark';
+    } catch (e) {}
     try {
       const saved = localStorage.getItem(`book_theme_${book.id}`);
       if (saved && ['dark', 'light', 'sepia'].includes(saved)) return saved;
@@ -2063,6 +2072,17 @@ export default function EpubViewer({
       localStorage.setItem(`book_theme_${book.id}`, newTheme);
       localStorage.setItem(`book_invert_${book.id}`, String(newTheme === 'dark'));
     } catch (e) {}
+
+    if (newTheme === 'dark' || newTheme === 'light') {
+      try {
+        localStorage.setItem('app_mode', newTheme);
+        document.documentElement.setAttribute('data-mode', newTheme);
+      } catch (e) {}
+      if (onModeChange) {
+        onModeChange(newTheme);
+      }
+      window.dispatchEvent(new CustomEvent('app_mode_change', { detail: { mode: newTheme } }));
+    }
 
     if (renditionRef.current) {
       try {

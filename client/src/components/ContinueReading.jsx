@@ -196,7 +196,10 @@ export default function ContinueReading({
         }
       >
         {inProgressBooks.map((book) => {
-          const percent = book.progress ? Math.round(book.progress.percent) : 0;
+          const calcPercent = (book.progress?.total_pages > 1 && book.progress?.page > 0 && !book.progress?.cfi)
+            ? Math.round((book.progress.page / book.progress.total_pages) * 100)
+            : Math.round(book.progress?.percent || 0);
+          const percent = Math.min(100, Math.max(0, calcPercent));
 
           return (
             <div

@@ -63,9 +63,9 @@
 
 /* Wooden / Modern Shelf Ridge */
 .shelf-ledge {
-  background: linear-gradient(180deg, #262626 0%, #171717 60%, #0a0a0a 100%);
+  background: linear-gradient(180deg, var(--color-neutral-800) 0%, var(--color-neutral-900) 60%, var(--color-neutral-950) 100%);
   border-top: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
 }
 
 /* PDF.js Text & Annotation Layers */
@@ -153,5 +153,483 @@
 .reader-settings-scroll::-webkit-scrollbar-thumb:hover {
   background: rgba(140, 140, 140, 0.7);
 }
+
+/* ==========================================================================
+   THEMES SYSTEM (Tailwind v4 CSS Variable Overrides)
+   Supports Dark Mode (Default) and Light Mode alongside each theme.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   DARK MODE PALETTES (Default)
+   -------------------------------------------------------------------------- */
+
+/* 1. Default Dark (Classic charcoal & warm amber) */
+:root:not([data-mode="light"]):not([data-theme]),
+html:not([data-mode="light"]):not([data-theme]),
+html[data-mode="dark"]:not([data-theme]),
+html:not([data-mode="light"])[data-theme="default"],
+html[data-mode="dark"][data-theme="default"] {
+  --theme-id: default;
+  --color-neutral-950: #0a0a0a;
+  --color-neutral-900: #171717;
+  --color-neutral-800: #262626;
+  --color-neutral-700: #404040;
+  --color-neutral-600: #525252;
+  --color-neutral-500: #737373;
+  --color-neutral-400: #a3a3a3;
+  --color-neutral-300: #d4d4d4;
+  --color-neutral-200: #e5e5e5;
+  --color-neutral-100: #f5f5f5;
+  --color-neutral-50: #fafafa;
+  --color-amber-500: #f59e0b;
+  --color-amber-400: #fbbf24;
+  --color-amber-300: #fcd34d;
+  --color-amber-600: #d97706;
+  scrollbar-color: rgba(64, 64, 64, 0.8) rgba(23, 23, 23, 0.6);
+}
+
+/* 2. Warm Sepia Dark (Vintage Bookshop & Antique Brass) */
+html:not([data-mode="light"])[data-theme="sepia"],
+html[data-mode="dark"][data-theme="sepia"] {
+  --theme-id: sepia;
+  --color-neutral-950: #19140f;
+  --color-neutral-900: #241d16;
+  --color-neutral-800: #342a20;
+  --color-neutral-700: #483a2d;
+  --color-neutral-600: #604e3d;
+  --color-neutral-500: #826c57;
+  --color-neutral-400: #bda891;
+  --color-neutral-300: #d8c8b4;
+  --color-neutral-200: #ebe0d2;
+  --color-neutral-100: #fbf5eb;
+  --color-neutral-50: #fffbf5;
+  --color-amber-500: #d97706;
+  --color-amber-400: #f59e0b;
+  --color-amber-300: #fbbf24;
+  --color-amber-600: #b45309;
+  scrollbar-color: rgba(96, 78, 61, 0.8) rgba(36, 29, 22, 0.6);
+}
+html:not([data-mode="light"])[data-theme="sepia"] ::selection,
+html[data-mode="dark"][data-theme="sepia"] ::selection {
+  background-color: rgba(217, 119, 6, 0.35);
+  color: #fffbf5;
+}
+
+/* 3. Hearth Dark (Fireplace Embers & Roasted Chestnut) */
+html:not([data-mode="light"])[data-theme="hearth"],
+html[data-mode="dark"][data-theme="hearth"] {
+  --theme-id: hearth;
+  --color-neutral-950: #170f0b;
+  --color-neutral-900: #241610;
+  --color-neutral-800: #362017;
+  --color-neutral-700: #4c2e21;
+  --color-neutral-600: #653d2d;
+  --color-neutral-500: #8a553f;
+  --color-neutral-400: #bfa08f;
+  --color-neutral-300: #d9c2b5;
+  --color-neutral-200: #ecded6;
+  --color-neutral-100: #fdf4ee;
+  --color-neutral-50: #fffaf7;
+  --color-amber-500: #ea580c;
+  --color-amber-400: #f97316;
+  --color-amber-300: #fdba74;
+  --color-amber-600: #c2410c;
+  scrollbar-color: rgba(101, 61, 45, 0.8) rgba(36, 22, 16, 0.6);
+}
+html:not([data-mode="light"])[data-theme="hearth"] ::selection,
+html[data-mode="dark"][data-theme="hearth"] ::selection {
+  background-color: rgba(234, 88, 12, 0.35);
+  color: #fffaf7;
+}
+
+/* 4. Nordic Pine Dark (Evergreen Forest & Mountain Cabin) */
+html:not([data-mode="light"])[data-theme="nordic"],
+html[data-mode="dark"][data-theme="nordic"] {
+  --theme-id: nordic;
+  --color-neutral-950: #0c1411;
+  --color-neutral-900: #131e1a;
+  --color-neutral-800: #1c2c26;
+  --color-neutral-700: #283d35;
+  --color-neutral-600: #375349;
+  --color-neutral-500: #4e7366;
+  --color-neutral-400: #8eaf9f;
+  --color-neutral-300: #b7cfc3;
+  --color-neutral-200: #dce8e1;
+  --color-neutral-100: #f0fbf5;
+  --color-neutral-50: #f7fdfa;
+  --color-amber-500: #10b981;
+  --color-amber-400: #34d399;
+  --color-amber-300: #6ee7b7;
+  --color-amber-600: #059669;
+  scrollbar-color: rgba(55, 83, 73, 0.8) rgba(19, 30, 26, 0.6);
+}
+html:not([data-mode="light"])[data-theme="nordic"] ::selection,
+html[data-mode="dark"][data-theme="nordic"] ::selection {
+  background-color: rgba(16, 185, 129, 0.35);
+  color: #f7fdfa;
+}
+
+/* 5. Midnight Navy Dark (Deep Ocean & Starry Night) */
+html:not([data-mode="light"])[data-theme="navy"],
+html[data-mode="dark"][data-theme="navy"] {
+  --theme-id: navy;
+  --color-neutral-950: #090e17;
+  --color-neutral-900: #101726;
+  --color-neutral-800: #1c263b;
+  --color-neutral-700: #293753;
+  --color-neutral-600: #394c6f;
+  --color-neutral-500: #4f6690;
+  --color-neutral-400: #8da2c4;
+  --color-neutral-300: #b5c4dc;
+  --color-neutral-200: #dae3f0;
+  --color-neutral-100: #f1f5fa;
+  --color-neutral-50: #f8fafc;
+  --color-amber-500: #0ea5e9;
+  --color-amber-400: #38bdf8;
+  --color-amber-300: #7dd3fc;
+  --color-amber-600: #0284c7;
+  scrollbar-color: rgba(57, 76, 111, 0.8) rgba(16, 23, 38, 0.6);
+}
+html:not([data-mode="light"])[data-theme="navy"] ::selection,
+html[data-mode="dark"][data-theme="navy"] ::selection {
+  background-color: rgba(14, 165, 233, 0.35);
+  color: #f8fafc;
+}
+
+/* 6. Plum Velvet Dark (Victorian Salon & Lavender Silk) */
+html:not([data-mode="light"])[data-theme="velvet"],
+html[data-mode="dark"][data-theme="velvet"] {
+  --theme-id: velvet;
+  --color-neutral-950: #130c17;
+  --color-neutral-900: #1e1324;
+  --color-neutral-800: #2c1c35;
+  --color-neutral-700: #3d2849;
+  --color-neutral-600: #533762;
+  --color-neutral-500: #714c85;
+  --color-neutral-400: #a785bd;
+  --color-neutral-300: #caaedc;
+  --color-neutral-200: #e5d7ee;
+  --color-neutral-100: #faf5ff;
+  --color-neutral-50: #fdfaff;
+  --color-amber-500: #a855f7;
+  --color-amber-400: #c084fc;
+  --color-amber-300: #d8b4fe;
+  --color-amber-600: #9333ea;
+  scrollbar-color: rgba(83, 55, 98, 0.8) rgba(30, 19, 36, 0.6);
+}
+html:not([data-mode="light"])[data-theme="velvet"] ::selection,
+html[data-mode="dark"][data-theme="velvet"] ::selection {
+  background-color: rgba(168, 85, 247, 0.35);
+  color: #fdfaff;
+}
+
+/* 7. Café Espresso Dark (Dark Roast Mocha & Warm Caramel) */
+html:not([data-mode="light"])[data-theme="espresso"],
+html[data-mode="dark"][data-theme="espresso"] {
+  --theme-id: espresso;
+  --color-neutral-950: #120e0b;
+  --color-neutral-900: #1c1511;
+  --color-neutral-800: #2a1f18;
+  --color-neutral-700: #3c2d24;
+  --color-neutral-600: #523e32;
+  --color-neutral-500: #735848;
+  --color-neutral-400: #b09684;
+  --color-neutral-300: #cfbcad;
+  --color-neutral-200: #e7dbcf;
+  --color-neutral-100: #fdf8f4;
+  --color-neutral-50: #fffaf7;
+  --color-amber-500: #d97706;
+  --color-amber-400: #f59e0b;
+  --color-amber-300: #fbbf24;
+  --color-amber-600: #b45309;
+  scrollbar-color: rgba(82, 62, 50, 0.8) rgba(28, 21, 17, 0.6);
+}
+html:not([data-mode="light"])[data-theme="espresso"] ::selection,
+html[data-mode="dark"][data-theme="espresso"] ::selection {
+  background-color: rgba(217, 119, 6, 0.35);
+  color: #fffaf7;
+}
+
+/* 8. Linen Dark (Charcoal Flax & Golden Thread) */
+html:not([data-mode="light"])[data-theme="linen"],
+html[data-mode="dark"][data-theme="linen"] {
+  --theme-id: linen;
+  --color-neutral-950: #141210;
+  --color-neutral-900: #1f1b17;
+  --color-neutral-800: #2d2822;
+  --color-neutral-700: #423b33;
+  --color-neutral-600: #5c5348;
+  --color-neutral-500: #7d7264;
+  --color-neutral-400: #a69a8a;
+  --color-neutral-300: #cbbfb1;
+  --color-neutral-200: #e2d9cd;
+  --color-neutral-100: #f5ede2;
+  --color-neutral-50: #faf6f0;
+  --color-amber-500: #d97706;
+  --color-amber-400: #f59e0b;
+  --color-amber-300: #fbbf24;
+  --color-amber-600: #b45309;
+  scrollbar-color: rgba(92, 83, 72, 0.8) rgba(31, 27, 23, 0.6);
+}
+html:not([data-mode="light"])[data-theme="linen"] ::selection,
+html[data-mode="dark"][data-theme="linen"] ::selection {
+  background-color: rgba(217, 119, 6, 0.35);
+  color: #faf6f0;
+}
+
+
+/* --------------------------------------------------------------------------
+   LIGHT MODE PALETTES (Activated via data-mode="light")
+   -------------------------------------------------------------------------- */
+
+html[data-mode="light"] {
+  color-scheme: light;
+}
+
+html[data-mode="light"] body {
+  background-color: var(--color-neutral-950);
+  color: var(--color-neutral-100);
+}
+
+html[data-mode="light"] * {
+  scrollbar-color: rgba(160, 160, 160, 0.6) rgba(240, 240, 240, 0.5);
+}
+
+html[data-mode="light"] ::-webkit-scrollbar-track {
+  background: rgba(235, 235, 235, 0.8);
+}
+html[data-mode="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(180, 180, 180, 0.8);
+}
+html[data-mode="light"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(140, 140, 140, 1);
+}
+
+html[data-mode="light"] .shelf-ledge {
+  background: linear-gradient(180deg, var(--color-neutral-800) 0%, var(--color-neutral-900) 60%, var(--color-neutral-950) 100%);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 10px -2px rgba(0, 0, 0, 0.08);
+}
+
+html[data-mode="light"] .book-card:hover .book-cover-container {
+  box-shadow: 
+    -4px 12px 24px -6px rgba(0, 0, 0, 0.22),
+    0 4px 8px -2px rgba(0, 0, 0, 0.12),
+    0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+/* Ensure text on bright action buttons remains crisp dark in light mode */
+html[data-mode="light"] .text-neutral-950 {
+  color: #020617;
+}
+html[data-mode="light"] .hover\:text-neutral-950:hover {
+  color: #020617;
+}
+html[data-mode="light"] .group:hover .group-hover\:text-neutral-950 {
+  color: #020617;
+}
+
+/* 1. Default Light (Crisp modern paper & classic amber) */
+html[data-mode="light"]:not([data-theme]),
+html[data-mode="light"][data-theme="default"] {
+  --theme-id: default;
+  --color-neutral-950: #f8fafc;
+  --color-neutral-900: #ffffff;
+  --color-neutral-800: #e2e8f0;
+  --color-neutral-700: #cbd5e1;
+  --color-neutral-600: #94a3b8;
+  --color-neutral-500: #64748b;
+  --color-neutral-400: #475569;
+  --color-neutral-300: #334155;
+  --color-neutral-200: #1e293b;
+  --color-neutral-100: #0f172a;
+  --color-neutral-50: #020617;
+  --color-amber-500: #d97706;
+  --color-amber-400: #b45309;
+  --color-amber-300: #92400e;
+  --color-amber-600: #78350f;
+  scrollbar-color: rgba(180, 180, 180, 0.6) rgba(240, 240, 240, 0.5);
+}
+html[data-mode="light"]:not([data-theme]) ::selection,
+html[data-mode="light"][data-theme="default"] ::selection {
+  background-color: rgba(217, 119, 6, 0.25);
+  color: #0f172a;
+}
+
+/* 2. Warm Sepia Light (Parchment & Antique Brass) */
+html[data-mode="light"][data-theme="sepia"] {
+  --theme-id: sepia;
+  --color-neutral-950: #fbf7ee;
+  --color-neutral-900: #f4ece1;
+  --color-neutral-800: #e5d8c5;
+  --color-neutral-700: #d2c0a8;
+  --color-neutral-600: #b59f84;
+  --color-neutral-500: #8c7358;
+  --color-neutral-400: #6d543b;
+  --color-neutral-300: #4f3b27;
+  --color-neutral-200: #382818;
+  --color-neutral-100: #23180c;
+  --color-neutral-50: #150d06;
+  --color-amber-500: #b45309;
+  --color-amber-400: #d97706;
+  --color-amber-300: #f59e0b;
+  --color-amber-600: #92400e;
+  scrollbar-color: rgba(181, 159, 132, 0.6) rgba(244, 236, 225, 0.5);
+}
+html[data-mode="light"][data-theme="sepia"] ::selection {
+  background-color: rgba(180, 83, 9, 0.25);
+  color: #23180c;
+}
+
+/* 3. Hearth Light (Warm Terracotta & Roasted Chestnut) */
+html[data-mode="light"][data-theme="hearth"] {
+  --theme-id: hearth;
+  --color-neutral-950: #faf4f0;
+  --color-neutral-900: #f5e9e2;
+  --color-neutral-800: #e8d5cb;
+  --color-neutral-700: #d5b8aa;
+  --color-neutral-600: #b99382;
+  --color-neutral-500: #916856;
+  --color-neutral-400: #714a38;
+  --color-neutral-300: #523122;
+  --color-neutral-200: #3b2014;
+  --color-neutral-100: #26120a;
+  --color-neutral-50: #170905;
+  --color-amber-500: #c2410c;
+  --color-amber-400: #ea580c;
+  --color-amber-300: #f97316;
+  --color-amber-600: #9a3412;
+  scrollbar-color: rgba(185, 147, 130, 0.6) rgba(245, 233, 226, 0.5);
+}
+html[data-mode="light"][data-theme="hearth"] ::selection {
+  background-color: rgba(194, 65, 12, 0.25);
+  color: #26120a;
+}
+
+/* 4. Nordic Pine Light (Alpine Snow & Evergreen) */
+html[data-mode="light"][data-theme="nordic"] {
+  --theme-id: nordic;
+  --color-neutral-950: #f2f8f5;
+  --color-neutral-900: #e5f2ec;
+  --color-neutral-800: #cde4d9;
+  --color-neutral-700: #accfc1;
+  --color-neutral-600: #82b29e;
+  --color-neutral-500: #578a76;
+  --color-neutral-400: #3a6856;
+  --color-neutral-300: #254a3c;
+  --color-neutral-200: #18352a;
+  --color-neutral-100: #0d221a;
+  --color-neutral-50: #05140e;
+  --color-amber-500: #059669;
+  --color-amber-400: #10b981;
+  --color-amber-300: #34d399;
+  --color-amber-600: #047857;
+  scrollbar-color: rgba(130, 178, 158, 0.6) rgba(229, 242, 236, 0.5);
+}
+html[data-mode="light"][data-theme="nordic"] ::selection {
+  background-color: rgba(5, 150, 105, 0.25);
+  color: #0d221a;
+}
+
+/* 5. Midnight Navy Light (Arctic Breeze & Deep Blue) */
+html[data-mode="light"][data-theme="navy"] {
+  --theme-id: navy;
+  --color-neutral-950: #f0f5fa;
+  --color-neutral-900: #e2ecf5;
+  --color-neutral-800: #c8d9e8;
+  --color-neutral-700: #a7bed4;
+  --color-neutral-600: #7998b6;
+  --color-neutral-500: #527192;
+  --color-neutral-400: #395473;
+  --color-neutral-300: #243c57;
+  --color-neutral-200: #16283d;
+  --color-neutral-100: #0b1828;
+  --color-neutral-50: #040c16;
+  --color-amber-500: #0284c7;
+  --color-amber-400: #0ea5e9;
+  --color-amber-300: #38bdf8;
+  --color-amber-600: #0369a1;
+  scrollbar-color: rgba(121, 152, 182, 0.6) rgba(226, 236, 245, 0.5);
+}
+html[data-mode="light"][data-theme="navy"] ::selection {
+  background-color: rgba(2, 132, 199, 0.25);
+  color: #0b1828;
+}
+
+/* 6. Plum Velvet Light (Lavender Mist & Royal Plum) */
+html[data-mode="light"][data-theme="velvet"] {
+  --theme-id: velvet;
+  --color-neutral-950: #f7f3f9;
+  --color-neutral-900: #eee7f2;
+  --color-neutral-800: #ded1e5;
+  --color-neutral-700: #c6b3d1;
+  --color-neutral-600: #a58cb3;
+  --color-neutral-500: #806390;
+  --color-neutral-400: #624471;
+  --color-neutral-300: #482c55;
+  --color-neutral-200: #331c3e;
+  --color-neutral-100: #200f28;
+  --color-neutral-50: #110617;
+  --color-amber-500: #9333ea;
+  --color-amber-400: #a855f7;
+  --color-amber-300: #c084fc;
+  --color-amber-600: #7e22ce;
+  scrollbar-color: rgba(165, 140, 179, 0.6) rgba(238, 231, 242, 0.5);
+}
+html[data-mode="light"][data-theme="velvet"] ::selection {
+  background-color: rgba(147, 51, 234, 0.25);
+  color: #200f28;
+}
+
+/* 7. Café Espresso Light (Café au Lait & Mocha) */
+html[data-mode="light"][data-theme="espresso"] {
+  --theme-id: espresso;
+  --color-neutral-950: #f8f4f0;
+  --color-neutral-900: #efe7e0;
+  --color-neutral-800: #decbc0;
+  --color-neutral-700: #c7aca0;
+  --color-neutral-600: #a9897b;
+  --color-neutral-500: #856557;
+  --color-neutral-400: #664a3e;
+  --color-neutral-300: #4b3429;
+  --color-neutral-200: #35231a;
+  --color-neutral-100: #21140e;
+  --color-neutral-50: #120905;
+  --color-amber-500: #b45309;
+  --color-amber-400: #d97706;
+  --color-amber-300: #f59e0b;
+  --color-amber-600: #92400e;
+  scrollbar-color: rgba(169, 137, 123, 0.6) rgba(239, 231, 224, 0.5);
+}
+html[data-mode="light"][data-theme="espresso"] ::selection {
+  background-color: rgba(180, 83, 9, 0.25);
+  color: #21140e;
+}
+
+/* 8. Daylight Linen (Soft Sunlit Paper & Walnut Ink) */
+html[data-mode="light"][data-theme="linen"] {
+  --theme-id: linen;
+  --color-neutral-950: #fbf8f3;
+  --color-neutral-900: #f3ede2;
+  --color-neutral-800: #e4dac9;
+  --color-neutral-700: #cec1ac;
+  --color-neutral-600: #b2a28b;
+  --color-neutral-500: #8f7d66;
+  --color-neutral-400: #685844;
+  --color-neutral-300: #4c3f2f;
+  --color-neutral-200: #382e22;
+  --color-neutral-100: #211a13;
+  --color-neutral-50: #16110c;
+  --color-amber-500: #b45309;
+  --color-amber-400: #92400e;
+  --color-amber-300: #78350f;
+  --color-amber-600: #d97706;
+  scrollbar-color: rgba(178, 162, 139, 0.8) rgba(243, 237, 226, 0.6);
+}
+html[data-mode="light"][data-theme="linen"] ::selection {
+  background-color: rgba(180, 83, 9, 0.25);
+  color: #16110c;
+}
+
 
 

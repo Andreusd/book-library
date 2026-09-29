@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Search, SlidersHorizontal, Menu, X, BookOpen, 
   ArrowUpDown, FolderOpen, RefreshCw, PanelLeftClose, PanelLeftOpen,
-  Settings, Heart, Bookmark, Home, Maximize2, Minimize2, Library, Folder, Tag, Plus
+  Settings, Heart, Bookmark, Home, Maximize2, Minimize2, Library, Folder, Tag, Plus, Palette
 } from 'lucide-react';
 
 import Sidebar from './components/Sidebar';
@@ -24,6 +24,7 @@ import ShelfIcon from './components/ShelfIcon';
 import SettingsModal from './components/SettingsModal';
 import TagManagerModal from './components/TagManagerModal';
 import BookDetailsModal from './components/BookDetailsModal';
+import ThemeMenu from './components/ThemeMenu';
 import { getTagColorConfig } from './utils/tagColors';
 import { useI18n } from './i18n';
 import { getCurrentUser, setCurrentUser } from './api';
@@ -230,6 +231,56 @@ export default function App() {
     } else {
       document.exitFullscreen().catch(err => console.log(err));
     }
+  }, []);
+
+  const [currentTheme, setCurrentTheme] = useState(() => {
+    try {
+      return localStorage.getItem('app_theme') || 'default';
+    } catch (e) {
+      return 'default';
+    }
+  });
+  const [currentMode, setCurrentMode] = useState(() => {
+    try {
+      return localStorage.getItem('app_mode') || 'dark';
+    } catch (e) {
+      return 'dark';
+    }
+  });
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
+
+  const handleSelectTheme = useCallback((themeId) => {
+    setCurrentTheme(themeId);
+    try {
+      localStorage.setItem('app_theme', themeId);
+    } catch (e) {}
+    document.documentElement.setAttribute('data-theme', themeId);
+  }, []);
+
+  const handleSelectMode = useCallback((mode) => {
+    setCurrentMode(mode);
+    try {
+      localStorage.setItem('app_mode', mode);
+    } catch (e) {}
+    document.documentElement.setAttribute('data-mode', mode);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', currentTheme);
+  }, [currentTheme]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-mode', currentMode);
+  }, [currentMode]);
+
+  useEffect(() => {
+    const handleModeEvent = (e) => {
+      if (e.detail?.mode && (e.detail.mode === 'dark' || e.detail.mode === 'light')) {
+        setCurrentMode(e.detail.mode);
+      }
+    };
+    window.addEventListener('app_mode_change', handleModeEvent);
+    return () => window.removeEventListener('app_mode_change', handleModeEvent);
   }, []);
 
   const [contextMenu, setContextMenu] = useState({ isOpen: false, x: 0, y: 0, book: null });
@@ -980,6 +1031,33 @@ export default function App() {
               {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
             </button>
 
+            {/* Themes Menu */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setThemeMenuOpen(prev => !prev)}
+                className={`p-1.5 rounded-lg border transition shadow-sm cursor-pointer ${
+                  themeMenuOpen 
+                    ? 'bg-amber-500/15 border-amber-500/30 text-amber-400' 
+                    : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-amber-400 hover:border-amber-500/30'
+                }`}
+                title={t('themes')}
+                aria-label={t('themes')}
+              >
+                <Palette className="w-4 h-4" />
+              </button>
+
+              {themeMenuOpen && (
+                <ThemeMenu
+                  currentTheme={currentTheme}
+                  currentMode={currentMode}
+                  onSelectTheme={handleSelectTheme}
+                  onSelectMode={handleSelectMode}
+                  onClose={() => setThemeMenuOpen(false)}
+                />
+              )}
+            </div>
+
             {/* Settings Button */}
             <button
               onClick={() => setSettingsOpen(true)}
@@ -1270,7 +1348,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Embedded Fullscreen PDF Reader */}
+      {/* Embedded Fullscreen Reader */}
       {activeBook && (
         <Reader
           book={activeBook}
@@ -1279,6 +1357,10 @@ export default function App() {
           onProgressUpdate={handleProgressUpdate}
           onToggleFavorite={handleToggleFavorite}
           showFileExtension={showFileExtension}
+          theme={currentTheme}
+          onThemeChange={handleSelectTheme}
+          mode={currentMode}
+          onModeChange={handleSelectMode}
         />
       )}
 

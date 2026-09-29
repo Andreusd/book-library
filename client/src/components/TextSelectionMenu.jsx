@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   MessageSquare, Copy, Check, X, BookOpen, Languages, 
-  Volume2, ChevronLeft, Loader2, Sparkles, ExternalLink,
+  Volume2, ChevronLeft, Loader2, ExternalLink,
   Headphones, Globe 
 } from 'lucide-react';
 import { useI18n } from '../i18n';
@@ -35,7 +35,6 @@ export default function TextSelectionMenu({
 
   // Views: 'main' | 'comment' | 'define' | 'translate'
   const [view, setView] = useState('main');
-  const [copied, setCopied] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [selectedColor, setSelectedColor] = useState('yellow');
 
@@ -104,7 +103,7 @@ export default function TextSelectionMenu({
       case 'comment':
         return { width: 280, height: 230 };
       default:
-        return { width: 240, height: 228 };
+        return { width: 240, height: 195 };
     }
   };
 
@@ -118,17 +117,6 @@ export default function TextSelectionMenu({
       const url = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
       window.open(url, '_blank', 'noopener,noreferrer');
       onClose();
-    }
-  };
-
-  const handleCopy = () => {
-    if (selectedText) {
-      navigator.clipboard.writeText(selectedText).then(() => {
-        setCopied(true);
-        setTimeout(() => {
-          onClose();
-        }, 500);
-      });
     }
   };
 
@@ -330,24 +318,6 @@ export default function TextSelectionMenu({
               <span>{t('readAloud')}</span>
             </button>
           )}
-
-          {/* Copy Text Button */}
-          <button
-            onClick={handleCopy}
-            className="w-full px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-neutral-800/90 text-neutral-200 hover:text-white transition text-left cursor-pointer"
-          >
-            {copied ? (
-              <>
-                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span className="text-emerald-300 font-medium">{t('pathCopied')}</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-4 h-4 text-neutral-400 shrink-0" />
-                <span>{t('copyFilePath')}</span>
-              </>
-            )}
-          </button>
         </div>
       )}
 

@@ -20,7 +20,21 @@ class ProgressTracker:
             try:
                 with open(self.data_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    return {k: v for k, v in data.items() if isinstance(v, dict)}
+                    res = {k: v for k, v in data.items() if isinstance(v, dict)}
+                    changed = False
+                    for b_id, item in res.items():
+                        if not item.get("cfi") and item.get("total_pages", 0) > 1 and item.get("page", 0) > 0:
+                            calc = round((item["page"] / item["total_pages"]) * 100, 1)
+                            if abs(item.get("percent", 0.0) - calc) > 0.5:
+                                item["percent"] = calc
+                                changed = True
+                    if changed:
+                        try:
+                            with open(self.data_path, "w", encoding="utf-8") as f_out:
+                                json.dump(res, f_out, indent=2, ensure_ascii=False)
+                        except Exception:
+                            pass
+                    return res
             except Exception as e:
                 print(f"Error loading progress file: {e}")
         return {}
@@ -48,8 +62,10 @@ class ProgressTracker:
                 pct = round(max(0.0, min(100.0, float(percent))), 1)
             elif percent == 0.0 and (not current_cfi or current_cfi.strip() == ""):
                 pct = 0.0
-            elif existing.get("percent", 0) > 0 and (percent is None or percent == 0.0):
+            elif current_cfi and existing.get("percent", 0) > 0 and (percent is None or percent == 0.0):
                 pct = existing.get("percent", 0.0)
+            elif total_pages > 0 and page > 0:
+                pct = round((page / max(total_pages, 1)) * 100, 1)
             elif percent is not None:
                 pct = round(max(0.0, min(100.0, float(percent))), 1)
             else:

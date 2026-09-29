@@ -65,7 +65,10 @@ export default function BookDetailsModal({
   const isEpub = details.format === 'epub' || details.filename?.toLowerCase().endsWith('.epub');
   const isPdf = !isEpub;
   const progress = details.progress || { page: 1, total_pages: details.total_pages || 1, percent: 0 };
-  const percent = Math.round(progress.percent || 0);
+  const calcPercent = (progress.total_pages > 1 && progress.page > 0 && !progress.cfi)
+    ? Math.round((progress.page / progress.total_pages) * 100)
+    : Math.round(progress.percent || 0);
+  const percent = Math.min(100, Math.max(0, calcPercent));
   const isFinished = progress.status === 'completed' || percent >= 100;
   const isStarted = !isFinished && (progress.status === 'in_progress' || (progress.page && progress.page > 1) || (progress.percent && progress.percent > 0) || progress.cfi);
   const totalPages = details.total_pages || progress.total_pages || (isEpub ? 0 : 1);

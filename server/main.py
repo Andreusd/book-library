@@ -456,6 +456,12 @@ def list_books(
                     prog["percent"] = est
                     tracker._data[b["id"]]["percent"] = est
                     tracker._save()
+            elif not p_cfi and prog.get("total_pages", 0) > 1 and prog.get("page", 0) > 0:
+                calc_pct = round((prog["page"] / prog["total_pages"]) * 100, 1)
+                if abs((p_pct or 0) - calc_pct) > 0.5:
+                    prog["percent"] = calc_pct
+                    tracker._data[b["id"]]["percent"] = calc_pct
+                    tracker._save()
         b["progress"] = prog if prog else {"page": 1, "total_pages": 0, "percent": 0}
         b["cover_url"] = f"/api/cover/{b['id']}"
         b["is_favorite"] = favorites_mgr.is_favorite(b["id"])
@@ -518,6 +524,12 @@ def continue_reading(request: Request, library_id: Optional[str] = Query(None)):
                 if est is not None and est > 0:
                     r_pct = est
                     tracker._data[r["book_id"]]["percent"] = est
+                    tracker._save()
+            elif not r_cfi and r.get("total_pages", 0) > 1 and r.get("page", 0) > 0:
+                calc_pct = round((r["page"] / r["total_pages"]) * 100, 1)
+                if abs((r_pct or 0) - calc_pct) > 0.5:
+                    r_pct = calc_pct
+                    tracker._data[r["book_id"]]["percent"] = calc_pct
                     tracker._save()
 
             prog = {
