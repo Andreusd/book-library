@@ -8,6 +8,23 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/pdfjs-dist')) {
+            return 'pdfjs-vendor';
+          }
+          if (id.includes('node_modules/epubjs')) {
+            return 'epubjs-vendor';
+          }
+          if (id.includes('node_modules/lucide-react')) {
+            return 'lucide-icons';
+          }
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
-  Search, SlidersHorizontal, Menu, X, BookOpen, 
-  ArrowUpDown, FolderOpen, RefreshCw, PanelLeftClose, PanelLeftOpen,
-  Settings, Heart, Bookmark, Home, Maximize2, Minimize2, Library, Folder, Tag, Plus, Palette
+  Search, X, BookOpen, 
+  FolderOpen, PanelLeftClose, PanelLeftOpen,
+  Settings, Heart, Bookmark, Maximize2, Minimize2, Library, Folder, Tag, Plus, Palette
 } from 'lucide-react';
 
 import Sidebar from './components/Sidebar';
@@ -16,277 +16,54 @@ import LibraryTags from './components/LibraryTags';
 import AllBooks from './components/AllBooks';
 import LibrarySelector from './components/LibrarySelector';
 import Reader from './components/Reader';
-import ContextMenu from './components/ContextMenu';
-import ShelfContextMenu from './components/ShelfContextMenu';
-import ShelfRenameModal from './components/ShelfRenameModal';
-import ShelfIconModal from './components/ShelfIconModal';
 import ShelfIcon from './components/ShelfIcon';
-import SettingsModal from './components/SettingsModal';
-import TagManagerModal from './components/TagManagerModal';
-import BookDetailsModal from './components/BookDetailsModal';
 import ThemeMenu from './components/ThemeMenu';
+import AppModals from './components/AppModals';
 import { getTagColorConfig } from './utils/tagColors';
 import { useI18n } from './i18n';
-import { getCurrentUser, setCurrentUser } from './api';
-
-// Helper to extract view & route information from URL
-// Scoped routes: /:libraryId, /:libraryId/folder/:id, /:libraryId/continue-reading, /:libraryId/favorites, /:libraryId/book/:id
-// Root / -> view: 'select-library'
-function parseRoute() {
-  if (typeof window === 'undefined') {
-    return { view: 'select-library', libraryId: null, shelfId: null, bookId: null };
-  }
-
-  let rawPath = window.location.pathname;
-  if (window.location.hash && window.location.hash.startsWith('#/')) {
-    rawPath = window.location.hash.slice(1);
-  }
-
-  // Split path into clean segments
-  const segments = rawPath.split('/').filter(Boolean).map(s => decodeURIComponent(s));
-
-  // 1. Root / -> Select Library view
-  if (segments.length === 0) {
-    return { view: 'select-library', libraryId: null, shelfId: null, bookId: null };
-  }
-
-  // 2. Legacy direct paths without library prefix (for backward compatibility)
-  if (segments[0] === 'book' && segments[1]) {
-    return { view: 'book', libraryId: null, shelfId: null, bookId: segments[1] };
-  }
-  if (segments[0] === 'continue-reading') {
-    return { view: 'continue-reading', libraryId: null, shelfId: 'continue-reading', bookId: null };
-  }
-  if (segments[0] === 'favorites') {
-    return { view: 'favorites', libraryId: null, shelfId: 'favorites', bookId: null };
-  }
-  if (segments[0] === 'folders' || segments[0] === 'shelves') {
-    return { view: 'folders', libraryId: null, shelfId: 'folders', bookId: null };
-  }
-  if (segments[0] === 'all-books' || segments[0] === 'all') {
-    return { view: 'all-books', libraryId: null, shelfId: 'all-books', bookId: null };
-  }
-  if (segments[0] === 'tags') {
-    return { view: 'tags', libraryId: null, shelfId: 'tags', bookId: null };
-  }
-  if ((segments[0] === 'folder' || segments[0] === 'shelf') && segments[1]) {
-    return { view: 'folder', libraryId: null, shelfId: segments[1], bookId: null };
-  }
-  if (segments[0] === 'tag' && segments[1]) {
-    return { view: 'tag', libraryId: null, shelfId: `tag:${segments[1]}`, bookId: null };
-  }
-
-  // 3. Library-scoped routes:
-  // Support both /:libraryId and /library/:libraryId
-  let libId = segments[0];
-  let rest = segments.slice(1);
-  if (libId === 'library' && rest.length > 0) {
-    libId = rest[0];
-    rest = rest.slice(1);
-  }
-
-  // /:libraryId
-  if (rest.length === 0) {
-    return { view: 'home', libraryId: libId, shelfId: null, bookId: null };
-  }
-
-  // /:libraryId/book/:bookId
-  if (rest[0] === 'book' && rest[1]) {
-    return { view: 'book', libraryId: libId, shelfId: null, bookId: rest[1] };
-  }
-
-  // /:libraryId/continue-reading
-  if (rest[0] === 'continue-reading') {
-    return { view: 'continue-reading', libraryId: libId, shelfId: 'continue-reading', bookId: null };
-  }
-
-  // /:libraryId/favorites
-  if (rest[0] === 'favorites') {
-    return { view: 'favorites', libraryId: libId, shelfId: 'favorites', bookId: null };
-  }
-
-  // /:libraryId/folders or /:libraryId/shelves
-  if (rest[0] === 'folders' || rest[0] === 'shelves') {
-    return { view: 'folders', libraryId: libId, shelfId: 'folders', bookId: null };
-  }
-
-  // /:libraryId/all-books or /:libraryId/all
-  if (rest[0] === 'all-books' || rest[0] === 'all') {
-    return { view: 'all-books', libraryId: libId, shelfId: 'all-books', bookId: null };
-  }
-
-  // /:libraryId/tags
-  if (rest[0] === 'tags') {
-    return { view: 'tags', libraryId: libId, shelfId: 'tags', bookId: null };
-  }
-
-  // /:libraryId/folder/:folderId or /:libraryId/shelf/:folderId
-  if ((rest[0] === 'folder' || rest[0] === 'shelf') && rest[1]) {
-    return { view: 'folder', libraryId: libId, shelfId: rest[1], bookId: null };
-  }
-
-  // /:libraryId/tag/:tagId
-  if (rest[0] === 'tag' && rest[1]) {
-    return { view: 'tag', libraryId: libId, shelfId: `tag:${rest[1]}`, bookId: null };
-  }
-
-  return { view: 'home', libraryId: libId, shelfId: null, bookId: null };
-}
-
-function getPathForShelf(shelfId, libraryId) {
-  if (!libraryId) return '/';
-  const base = `/${encodeURIComponent(libraryId)}`;
-  if (!shelfId) return base;
-  if (shelfId === 'continue-reading') return `${base}/continue-reading`;
-  if (shelfId === 'favorites') return `${base}/favorites`;
-  if (shelfId === 'folders' || shelfId === 'shelves') return `${base}/folders`;
-  if (shelfId === 'all-books' || shelfId === 'all') return `${base}/all-books`;
-  if (shelfId === 'tags') return `${base}/tags`;
-  if (shelfId.startsWith('tag:')) return `${base}/tag/${encodeURIComponent(shelfId.slice(4))}`;
-  return `${base}/folder/${encodeURIComponent(shelfId)}`;
-}
-const getPathForFolder = getPathForShelf;
-
-function getPathForBook(bookId, libraryId) {
-  if (!libraryId) return `/book/${encodeURIComponent(bookId)}`;
-  return `/${encodeURIComponent(libraryId)}/book/${encodeURIComponent(bookId)}`;
-}
+import { useFullscreen } from './hooks/useFullscreen';
+import { useSettings } from './contexts/SettingsContext';
+import { useBookModals } from './hooks/useBookModals';
+import { useLibraryRouter, getPathForShelf, getPathForBook } from './hooks/useLibraryRouter';
+import { booksApi, foldersApi, librariesApi, tagsApi } from './api';
 
 export default function App() {
-  const initialRoute = parseRoute();
   const { t } = useI18n();
+  const { isFullscreen, toggleFullscreen } = useFullscreen();
+  const {
+    theme,
+    setTheme,
+    mode,
+    setMode,
+    showFileExtension,
+    setShowFileExtension,
+    sidebarOpen,
+    toggleSidebar,
+    setSidebarOpen,
+    currentUser,
+    setCurrentUser,
+  } = useSettings();
+
+  const modals = useBookModals();
+  const { route, navigate, navigateToShelf: routerNavigateToShelf, navigateToBook, navigateToLibraries } = useLibraryRouter();
+
   const [shelves, setShelves] = useState([]);
   const [totalBooks, setTotalBooks] = useState(0);
   const [libraries, setLibraries] = useState([]);
-  const [currentUser, setCurrentUserState] = useState(() => getCurrentUser());
-  const [activeLibraryId, setActiveLibraryId] = useState(() => initialRoute.libraryId || '');
-  const [selectedShelf, setSelectedShelf] = useState(() => initialRoute.shelfId);
+  const [activeLibraryId, setActiveLibraryId] = useState(() => route.libraryId || '');
+  const [selectedShelf, setSelectedShelf] = useState(() => route.shelfId);
   const [books, setBooks] = useState([]);
   const [continueReading, setContinueReading] = useState([]);
   const [favorites, setFavorites] = useState([]);
   const [favoriteIds, setFavoriteIds] = useState(new Set());
   const [tags, setTags] = useState([]);
-  const [tagModal, setTagModal] = useState({ isOpen: false, book: null });
-  const [detailsModal, setDetailsModal] = useState({ isOpen: false, book: null });
   const [loading, setLoading] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [showFileExtension, setShowFileExtension] = useState(() => {
-    try {
-      const saved = localStorage.getItem('show_file_extension');
-      return saved !== null ? saved === 'true' : true;
-    } catch (e) {
-      return true;
-    }
-  });
-
-  const handleToggleFileExtension = useCallback((enabled) => {
-    setShowFileExtension(enabled);
-    try {
-      localStorage.setItem('show_file_extension', String(enabled));
-    } catch (e) {}
-  }, []);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [sortBy, setSortBy] = useState('title_asc');
   const [activeBook, setActiveBook] = useState(null);
-  const [routeLoading, setRouteLoading] = useState(() => Boolean(initialRoute.bookId));
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    try {
-      const saved = localStorage.getItem('sidebar_open');
-      if (saved !== null) {
-        return saved === 'true';
-      }
-    } catch (e) {}
-    return typeof window !== 'undefined' ? window.innerWidth >= 1024 : true;
-  });
-
-  const toggleSidebar = useCallback(() => {
-    setSidebarOpen(prev => {
-      const next = !prev;
-      try {
-        localStorage.setItem('sidebar_open', String(next));
-      } catch (e) {}
-      return next;
-    });
-  }, []);
-
-  const [isFullscreen, setIsFullscreen] = useState(() => {
-    return typeof document !== 'undefined' ? Boolean(document.fullscreenElement) : false;
-  });
-
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(Boolean(document.fullscreenElement));
-    };
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-    };
-  }, []);
-
-  const toggleFullscreen = useCallback(() => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(err => console.log(err));
-    } else {
-      document.exitFullscreen().catch(err => console.log(err));
-    }
-  }, []);
-
-  const [currentTheme, setCurrentTheme] = useState(() => {
-    try {
-      return localStorage.getItem('app_theme') || 'default';
-    } catch (e) {
-      return 'default';
-    }
-  });
-  const [currentMode, setCurrentMode] = useState(() => {
-    try {
-      return localStorage.getItem('app_mode') || 'dark';
-    } catch (e) {
-      return 'dark';
-    }
-  });
-  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
-
-  const handleSelectTheme = useCallback((themeId) => {
-    setCurrentTheme(themeId);
-    try {
-      localStorage.setItem('app_theme', themeId);
-    } catch (e) {}
-    document.documentElement.setAttribute('data-theme', themeId);
-  }, []);
-
-  const handleSelectMode = useCallback((mode) => {
-    setCurrentMode(mode);
-    try {
-      localStorage.setItem('app_mode', mode);
-    } catch (e) {}
-    document.documentElement.setAttribute('data-mode', mode);
-  }, []);
-
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', currentTheme);
-  }, [currentTheme]);
-
-  useEffect(() => {
-    document.documentElement.setAttribute('data-mode', currentMode);
-  }, [currentMode]);
-
-  useEffect(() => {
-    const handleModeEvent = (e) => {
-      if (e.detail?.mode && (e.detail.mode === 'dark' || e.detail.mode === 'light')) {
-        setCurrentMode(e.detail.mode);
-      }
-    };
-    window.addEventListener('app_mode_change', handleModeEvent);
-    return () => window.removeEventListener('app_mode_change', handleModeEvent);
-  }, []);
-
-  const [contextMenu, setContextMenu] = useState({ isOpen: false, x: 0, y: 0, book: null });
-  const [shelfContextMenu, setShelfContextMenu] = useState({ isOpen: false, x: 0, y: 0, shelf: null });
-  const [renameModal, setRenameModal] = useState({ isOpen: false, shelf: null });
-  const [iconModal, setIconModal] = useState({ isOpen: false, shelf: null });
+  const [routeLoading, setRouteLoading] = useState(() => Boolean(route.bookId));
 
   const searchInputRef = useRef(null);
 
@@ -317,25 +94,11 @@ export default function App() {
 
   // Load Libraries
   const loadLibraries = useCallback(() => {
-    fetch('/api/libraries')
-      .then(res => res.json())
+    librariesApi.getLibraries()
       .then(data => {
         setLibraries(data.libraries || []);
       })
       .catch(err => console.error('Failed to load libraries:', err));
-
-    fetch('/api/settings')
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.show_file_extension !== undefined) {
-          const localSaved = localStorage.getItem('show_file_extension');
-          if (localSaved === null) {
-            setShowFileExtension(data.show_file_extension);
-            localStorage.setItem('show_file_extension', String(data.show_file_extension));
-          }
-        }
-      })
-      .catch(() => {});
   }, []);
 
   // Load Shelves & Totals
@@ -346,11 +109,9 @@ export default function App() {
       setTotalBooks(0);
       return;
     }
-    const url = `/api/shelves?library_id=${encodeURIComponent(targetLib)}`;
-    fetch(url)
-      .then(res => res.json())
+    foldersApi.getFolders(targetLib)
       .then(data => {
-        setShelves(data.shelves || []);
+        setShelves(data.shelves || data.folders || []);
         setTotalBooks(data.total_books || 0);
       })
       .catch(err => console.error('Failed to load shelves:', err));
@@ -363,9 +124,7 @@ export default function App() {
       setContinueReading([]);
       return;
     }
-    const url = `/api/continue-reading?library_id=${encodeURIComponent(targetLib)}`;
-    fetch(url)
-      .then(res => res.json())
+    booksApi.getContinueReading(targetLib)
       .then(data => {
         setContinueReading(data.books || []);
       })
@@ -380,9 +139,7 @@ export default function App() {
       setFavoriteIds(new Set());
       return;
     }
-    const url = `/api/favorites?library_id=${encodeURIComponent(targetLib)}`;
-    fetch(url)
-      .then(res => res.json())
+    booksApi.getFavorites(targetLib)
       .then(data => {
         setFavorites(data.books || []);
         setFavoriteIds(new Set(data.favorite_ids || []));
@@ -393,11 +150,7 @@ export default function App() {
   // Load Virtual Tags
   const loadTags = useCallback((libId) => {
     const targetLib = libId !== undefined ? libId : activeLibraryId;
-    const url = targetLib 
-      ? `/api/tags?library_id=${encodeURIComponent(targetLib)}` 
-      : '/api/tags';
-    fetch(url)
-      .then(res => res.json())
+    tagsApi.getTags(targetLib)
       .then(data => {
         setTags(data.tags || []);
       })
@@ -422,18 +175,20 @@ export default function App() {
     }
     setLoading(true);
     const shelfToUse = targetShelf !== undefined ? targetShelf : selectedShelf;
-    const params = new URLSearchParams();
-    params.append('library_id', targetLib);
+    const params = {
+      library_id: targetLib,
+      sort: sortBy,
+    };
     if (shelfToUse && shelfToUse.startsWith('tag:')) {
-      params.append('tag', shelfToUse.slice(4));
+      params.tag = shelfToUse.slice(4);
     } else if (shelfToUse && shelfToUse !== 'folders' && shelfToUse !== 'tags' && shelfToUse !== 'all-books') {
-      params.append('shelf', shelfToUse);
+      params.shelf = shelfToUse;
     }
-    if (debouncedQuery && shelfToUse !== 'folders' && shelfToUse !== 'tags') params.append('query', debouncedQuery);
-    if (sortBy) params.append('sort', sortBy);
+    if (debouncedQuery && shelfToUse !== 'folders' && shelfToUse !== 'tags') {
+      params.query = debouncedQuery;
+    }
 
-    fetch(`/api/books?${params.toString()}`)
-      .then(res => res.json())
+    booksApi.getBooks(params)
       .then(data => {
         setBooks(data.books || []);
         setLoading(false);
@@ -444,42 +199,29 @@ export default function App() {
       });
   }, [activeLibraryId, selectedShelf, debouncedQuery, sortBy]);
 
-  // Handle User Change (persists to localStorage and reloads user-specific data)
+  // Handle User Change (persists to storage and reloads user-specific data)
   const handleUserChange = useCallback((newUsername) => {
     setCurrentUser(newUsername);
-    setCurrentUserState(newUsername);
     if (activeLibraryId) {
       loadContinueReading(activeLibraryId);
       loadFavorites(activeLibraryId);
       loadTags(activeLibraryId);
       loadBooks(activeLibraryId);
     }
-  }, [activeLibraryId, loadContinueReading, loadFavorites, loadTags, loadBooks]);
-
-  useEffect(() => {
-    const onUserChanged = (e) => {
-      const u = e?.detail?.user || '';
-      setCurrentUserState(u);
-    };
-    window.addEventListener('book_library_user_changed', onUserChanged);
-    return () => window.removeEventListener('book_library_user_changed', onUserChanged);
-  }, []);
+  }, [activeLibraryId, setCurrentUser, loadContinueReading, loadFavorites, loadTags, loadBooks]);
 
   // Select Library from selector screen
   const selectLibrary = useCallback((libraryId) => {
     setActiveLibraryId(libraryId);
     setSelectedShelf(null);
     setSearchQuery('');
-    const targetPath = `/${encodeURIComponent(libraryId)}`;
-    if (window.location.pathname !== targetPath) {
-      window.history.pushState({ libraryId, shelfId: null }, '', targetPath);
-    }
+    routerNavigateToShelf(null, libraryId);
     loadShelves(libraryId);
     loadBooks(libraryId, null);
     loadContinueReading(libraryId);
     loadFavorites(libraryId);
     loadTags(libraryId);
-  }, [loadShelves, loadBooks, loadContinueReading, loadFavorites, loadTags]);
+  }, [routerNavigateToShelf, loadShelves, loadBooks, loadContinueReading, loadFavorites, loadTags]);
 
   // Return to All Libraries selection screen
   const selectAllLibraries = useCallback(() => {
@@ -487,12 +229,10 @@ export default function App() {
     setSelectedShelf(null);
     setActiveBook(null);
     setSearchQuery('');
-    if (window.location.pathname !== '/') {
-      window.history.pushState(null, '', '/');
-    }
+    navigateToLibraries();
     loadLibraries();
     loadTags('');
-  }, [loadLibraries, loadTags]);
+  }, [navigateToLibraries, loadLibraries, loadTags]);
 
   // Switch Active Library
   const switchLibrary = useCallback((libraryId) => {
@@ -502,52 +242,40 @@ export default function App() {
   // Toggle Favorite
   const handleToggleFavorite = useCallback((book) => {
     if (!book) return;
-    fetch('/api/favorites/toggle', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ book_id: book.id })
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.status === 'ok') {
-        const nextIds = new Set(data.favorite_ids || []);
-        setFavoriteIds(nextIds);
-        setBooks(prev => {
-          const updated = prev.map(b => b.id === book.id ? { ...b, is_favorite: data.is_favorite } : b);
-          if (selectedShelf === 'favorites') {
-            return updated.filter(b => b.is_favorite);
-          }
-          if (selectedShelf && selectedShelf !== 'continue-reading') {
-            return [...updated].sort((a, b) => {
-              const aFav = nextIds.has(a.id) ? 0 : 1;
-              const bFav = nextIds.has(b.id) ? 0 : 1;
-              return aFav - bFav;
-            });
-          }
-          return updated;
-        });
-        setContinueReading(prev => prev.map(b => b.id === book.id ? { ...b, is_favorite: data.is_favorite } : b));
-        loadFavorites(activeLibraryId);
-      }
-    })
-    .catch(err => console.error('Failed to toggle favorite:', err));
+    booksApi.toggleFavorite(book.id)
+      .then(data => {
+        if (data.status === 'ok') {
+          const nextIds = new Set(data.favorite_ids || []);
+          setFavoriteIds(nextIds);
+          setBooks(prev => {
+            const updated = prev.map(b => b.id === book.id ? { ...b, is_favorite: data.is_favorite } : b);
+            if (selectedShelf === 'favorites') {
+              return updated.filter(b => b.is_favorite);
+            }
+            if (selectedShelf && selectedShelf !== 'continue-reading') {
+              return [...updated].sort((a, b) => {
+                const aFav = nextIds.has(a.id) ? 0 : 1;
+                const bFav = nextIds.has(b.id) ? 0 : 1;
+                return aFav - bFav;
+              });
+            }
+            return updated;
+          });
+          setContinueReading(prev => prev.map(b => b.id === book.id ? { ...b, is_favorite: data.is_favorite } : b));
+          loadFavorites(activeLibraryId);
+        }
+      })
+      .catch(err => console.error('Failed to toggle favorite:', err));
   }, [loadFavorites, selectedShelf, activeLibraryId]);
 
   // Navigate to shelf and update browser URL
-  const navigateToShelf = useCallback((shelfId, replace = false) => {
+  const navigateToShelf = useCallback((shelfId) => {
     setSelectedShelf(shelfId);
     setSearchQuery('');
-    const targetPath = getPathForShelf(shelfId, activeLibraryId);
-    if (window.location.pathname !== targetPath) {
-      if (replace) {
-        window.history.replaceState({ libraryId: activeLibraryId, shelfId }, '', targetPath);
-      } else {
-        window.history.pushState({ libraryId: activeLibraryId, shelfId }, '', targetPath);
-      }
-    }
-  }, [activeLibraryId]);
+    routerNavigateToShelf(shelfId, activeLibraryId);
+  }, [activeLibraryId, routerNavigateToShelf]);
 
-  // Open reader and update browser route to /:libraryId/book/:id
+  // Open reader and update browser route
   const openReader = useCallback((book) => {
     if (!book) return;
     setActiveBook(book);
@@ -555,124 +283,88 @@ export default function App() {
     if (!activeLibraryId && book.library_id) {
       setActiveLibraryId(book.library_id);
     }
-    const targetPath = getPathForBook(book.id, targetLib);
-    if (window.location.pathname !== targetPath) {
-      window.history.pushState({ bookId: book.id, libraryId: targetLib, shelfId: selectedShelf }, '', targetPath);
-    }
-  }, [activeLibraryId, selectedShelf]);
+    navigateToBook(book.id, targetLib);
+  }, [activeLibraryId, navigateToBook]);
 
   // Close reader and return to current shelf route
   const closeReader = useCallback(() => {
     setActiveBook(null);
-    const targetPath = getPathForShelf(selectedShelf, activeLibraryId);
-    if (window.location.pathname !== targetPath) {
-      window.history.pushState({ libraryId: activeLibraryId, shelfId: selectedShelf }, '', targetPath);
-    }
+    routerNavigateToShelf(selectedShelf, activeLibraryId);
     loadContinueReading(activeLibraryId);
     loadFavorites(activeLibraryId);
-  }, [selectedShelf, activeLibraryId, loadContinueReading, loadFavorites]);
+  }, [selectedShelf, activeLibraryId, routerNavigateToShelf, loadContinueReading, loadFavorites]);
 
-  // Handle browser Back and Forward navigation (popstate)
+  // Synchronize route state with URL router
   useEffect(() => {
-    const handlePopState = () => {
-      const route = parseRoute();
-      if (!route.libraryId && !route.bookId) {
-        setActiveLibraryId('');
-        setSelectedShelf(null);
-        setActiveBook(null);
-        loadLibraries();
-        return;
-      }
-
-      if (route.libraryId && route.libraryId !== activeLibraryId) {
-        setActiveLibraryId(route.libraryId);
-      }
-
-      if (route.bookId) {
-        if (!activeBook || activeBook.id !== route.bookId) {
-          fetch(`/api/book/${encodeURIComponent(route.bookId)}`)
-            .then(res => {
-              if (!res.ok) throw new Error('Book not found');
-              return res.json();
-            })
-            .then(book => {
-              if (book && book.id) {
-                setActiveBook(book);
-                if (book.library_id && !route.libraryId) {
-                  setActiveLibraryId(book.library_id);
-                }
-              }
-            })
-            .catch(() => {
-              setActiveBook(null);
-              window.history.replaceState(null, '', getPathForShelf(selectedShelf, route.libraryId || activeLibraryId));
-            });
-        }
-      } else {
-        if (activeBook) {
-          setActiveBook(null);
-          loadContinueReading(route.libraryId || activeLibraryId);
-          loadFavorites(route.libraryId || activeLibraryId);
-          loadTags(route.libraryId || activeLibraryId);
-        }
-        setSelectedShelf(route.shelfId);
-        setSearchQuery('');
-      }
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [activeBook, selectedShelf, activeLibraryId, loadLibraries, loadContinueReading, loadFavorites, loadTags]);
-
-  // Load book directly from route on initial page load / reload
-  useEffect(() => {
-    const route = parseRoute();
-    if (route.bookId) {
-      fetch(`/api/book/${encodeURIComponent(route.bookId)}`)
-        .then(res => {
-          if (!res.ok) throw new Error('Book not found');
-          return res.json();
-        })
-        .then(book => {
-          if (book && book.id) {
-            const targetLib = route.libraryId || book.library_id || 'default';
-            setActiveLibraryId(targetLib);
-            setActiveBook(book);
-            setSelectedShelf(prev => prev || book.shelf || null);
-            window.history.replaceState({ bookId: book.id, libraryId: targetLib }, '', getPathForBook(book.id, targetLib));
-          }
-        })
-        .catch(err => {
-          console.error('Failed to load book from route:', err);
-          window.history.replaceState(null, '', route.libraryId ? getPathForShelf(route.shelfId, route.libraryId) : '/');
-        })
-        .finally(() => {
-          setRouteLoading(false);
-        });
-    } else {
-      setRouteLoading(false);
+    if (!route.libraryId && !route.bookId) {
+      setActiveLibraryId('');
+      setSelectedShelf(null);
+      setActiveBook(null);
+      loadLibraries();
+      return;
     }
-  }, []);
+
+    if (route.libraryId && route.libraryId !== activeLibraryId) {
+      setActiveLibraryId(route.libraryId);
+    }
+
+    if (route.bookId) {
+      if (!activeBook || activeBook.id !== route.bookId) {
+        setRouteLoading(true);
+        booksApi.getBook(route.bookId)
+          .then(book => {
+            if (book && book.id) {
+              setActiveBook(book);
+              const targetLib = route.libraryId || book.library_id || 'default';
+              if (!activeLibraryId) {
+                setActiveLibraryId(targetLib);
+              }
+              setSelectedShelf(prev => prev || book.shelf || null);
+            }
+          })
+          .catch(err => {
+            console.error('Failed to load book from route:', err);
+            setActiveBook(null);
+            routerNavigateToShelf(selectedShelf, route.libraryId || activeLibraryId);
+          })
+          .finally(() => {
+            setRouteLoading(false);
+          });
+      }
+    } else {
+      if (activeBook) {
+        setActiveBook(null);
+        loadContinueReading(route.libraryId || activeLibraryId);
+        loadFavorites(route.libraryId || activeLibraryId);
+        loadTags(route.libraryId || activeLibraryId);
+      }
+      setSelectedShelf(route.shelfId);
+      setSearchQuery('');
+    }
+  }, [route.bookId, route.shelfId, route.libraryId]);
 
   useEffect(() => {
     loadLibraries();
   }, [loadLibraries]);
 
   useEffect(() => {
-    loadShelves();
-    loadContinueReading();
-    loadFavorites();
-    loadTags();
+    if (activeLibraryId) {
+      loadShelves(activeLibraryId);
+      loadContinueReading(activeLibraryId);
+      loadFavorites(activeLibraryId);
+      loadTags(activeLibraryId);
+    }
   }, [activeLibraryId, loadShelves, loadContinueReading, loadFavorites, loadTags]);
 
   useEffect(() => {
-    loadBooks();
-  }, [loadBooks]);
+    if (activeLibraryId) {
+      loadBooks(activeLibraryId, selectedShelf);
+    }
+  }, [activeLibraryId, selectedShelf, debouncedQuery, sortBy, loadBooks]);
 
   // Handle book progress update from Reader or status change
   const handleProgressUpdate = useCallback((bookId, newProgress) => {
     setBooks(prev => prev.map(b => (b.id === bookId ? { ...b, progress: newProgress } : b)));
-    setDetailsModal(prev => (prev.isOpen && prev.book?.id === bookId ? { ...prev, book: { ...prev.book, progress: newProgress } } : prev));
     setContinueReading(prev => {
       const isNotReading = !newProgress || 
         newProgress.status === 'not_started' || 
@@ -688,21 +380,11 @@ export default function App() {
   }, []);
 
   const handleOpenDetails = useCallback((book) => {
-    setDetailsModal({ isOpen: true, book });
-  }, []);
-
-  // Right-click context menu handler
-  const handleContextMenu = (e, book) => {
-    setContextMenu({
-      isOpen: true,
-      x: e.clientX,
-      y: e.clientY,
-      book: book
-    });
-  };
+    modals.openDetailsModal(book);
+  }, [modals]);
 
   // Mark status handler (not_started / completed)
-  const handleMarkStatus = (book, status) => {
+  const handleMarkStatus = useCallback((book, status) => {
     // Instant optimistic update
     if (status === 'not_started') {
       const resetProgress = {
@@ -724,74 +406,62 @@ export default function App() {
       handleProgressUpdate(book.id, completedProgress);
     }
 
-    fetch('/api/book/status', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ book_id: book.id, status: status })
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.status === 'ok') {
-        handleProgressUpdate(book.id, data.progress);
+    booksApi.updateStatus(book.id, status)
+      .then(data => {
+        if (data.status === 'ok') {
+          handleProgressUpdate(book.id, data.progress);
+          loadContinueReading();
+        }
+      })
+      .catch(err => {
+        console.error('Failed to update book status:', err);
         loadContinueReading();
-      }
-    })
-    .catch(err => {
-      console.error('Failed to update book status:', err);
-      loadContinueReading();
-      loadBooks();
-    });
-  };
-
-  // Shelf right-click context menu handler
-  const handleShelfContextMenu = (e, shelf) => {
-    setShelfContextMenu({
-      isOpen: true,
-      x: e.clientX,
-      y: e.clientY,
-      shelf: shelf
-    });
-  };
+        loadBooks();
+      });
+  }, [handleProgressUpdate, loadContinueReading, loadBooks]);
 
   // Save renamed shelf
-  const handleSaveShelfName = (shelfId, customName) => {
-    fetch('/api/shelves/rename', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ shelf_id: shelfId, custom_name: customName })
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.status === 'ok') {
-        setShelves(data.shelves);
-        setRenameModal({ isOpen: false, shelf: null });
-        loadBooks();
-      }
-    })
-    .catch(err => console.error('Failed to rename shelf:', err));
-  };
+  const handleSaveShelfName = useCallback((shelfId, customName) => {
+    foldersApi.renameFolder({ shelf_id: shelfId, custom_name: customName, library_id: activeLibraryId })
+      .then(data => {
+        if (data.status === 'ok') {
+          setShelves(data.shelves || data.folders || []);
+          modals.closeRenameModal();
+          loadBooks();
+        }
+      })
+      .catch(err => console.error('Failed to rename shelf:', err));
+  }, [activeLibraryId, modals, loadBooks]);
 
   // Reset shelf name to original
-  const handleResetShelfName = (shelf) => {
+  const handleResetShelfName = useCallback((shelf) => {
     handleSaveShelfName(shelf.id, '');
-  };
+  }, [handleSaveShelfName]);
 
   // Save shelf icon
-  const handleSaveShelfIcon = (shelfId, iconName) => {
-    fetch('/api/shelves/icon', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ shelf_id: shelfId, icon: iconName })
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.status === 'ok') {
-        setShelves(data.shelves);
-        setIconModal({ isOpen: false, shelf: null });
-      }
-    })
-    .catch(err => console.error('Failed to save shelf icon:', err));
-  };
+  const handleSaveShelfIcon = useCallback((shelfId, iconName) => {
+    foldersApi.setFolderIcon({ shelf_id: shelfId, icon: iconName, library_id: activeLibraryId })
+      .then(data => {
+        if (data.status === 'ok') {
+          setShelves(data.shelves || data.folders || []);
+          modals.closeIconModal();
+        }
+      })
+      .catch(err => console.error('Failed to save shelf icon:', err));
+  }, [activeLibraryId, modals]);
+
+  const handleLibraryChanged = useCallback((newActiveId) => {
+    loadLibraries();
+    if (newActiveId && newActiveId !== activeLibraryId) {
+      selectLibrary(newActiveId);
+    } else if (activeLibraryId) {
+      loadShelves(activeLibraryId);
+      loadBooks(activeLibraryId);
+      loadContinueReading(activeLibraryId);
+      loadFavorites(activeLibraryId);
+      loadTags(activeLibraryId);
+    }
+  }, [activeLibraryId, loadLibraries, selectLibrary, loadShelves, loadBooks, loadContinueReading, loadFavorites, loadTags]);
 
   // Find active shelf or tag metadata
   const currentShelfObj = shelves.find(s => s.id === selectedShelf);
@@ -832,23 +502,29 @@ export default function App() {
         <LibrarySelector
           libraries={libraries}
           onSelectLibrary={selectLibrary}
-          onOpenSettings={() => setSettingsOpen(true)}
-          onAddNewLibrary={() => setSettingsOpen(true)}
+          onOpenSettings={() => modals.setSettingsOpen(true)}
+          onAddNewLibrary={() => modals.setSettingsOpen(true)}
           currentUser={currentUser}
           onUserChange={handleUserChange}
         />
 
-        <SettingsModal
-          isOpen={settingsOpen}
-          onClose={() => setSettingsOpen(false)}
+        <AppModals
+          modals={modals}
+          activeLibraryId={activeLibraryId}
+          favoriteIds={favoriteIds}
+          tags={tags}
           showFileExtension={showFileExtension}
-          onToggleFileExtension={handleToggleFileExtension}
-          onLibraryChanged={(newActiveId) => {
-            loadLibraries();
-            if (newActiveId) {
-              selectLibrary(newActiveId);
-            }
-          }}
+          onToggleFileExtension={setShowFileExtension}
+          onOpenReader={openReader}
+          onToggleFavorite={handleToggleFavorite}
+          onMarkStatus={handleMarkStatus}
+          onSaveShelfName={handleSaveShelfName}
+          onResetShelfName={handleResetShelfName}
+          onSaveShelfIcon={handleSaveShelfIcon}
+          onBookTagsUpdated={handleBookTagsUpdated}
+          onTagsUpdated={() => loadTags(activeLibraryId)}
+          onLibraryChanged={handleLibraryChanged}
+          onNavigateToShelf={navigateToShelf}
         />
       </>
     );
@@ -869,16 +545,16 @@ export default function App() {
             setSidebarOpen(false);
           }
         }}
-        onShelfContextMenu={handleShelfContextMenu}
+        onShelfContextMenu={modals.openShelfContextMenu}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         libraries={libraries}
         activeLibraryId={activeLibraryId}
         onSwitchLibrary={switchLibrary}
         onSelectAllLibraries={selectAllLibraries}
-        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenSettings={() => modals.setSettingsOpen(true)}
         tags={tags}
-        onOpenTagManager={() => setTagModal({ isOpen: true, book: null })}
+        onOpenTagManager={() => modals.openTagModal(null)}
         currentUser={currentUser}
       />
 
@@ -1035,9 +711,9 @@ export default function App() {
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setThemeMenuOpen(prev => !prev)}
+                onClick={() => modals.setThemeMenuOpen(prev => !prev)}
                 className={`p-1.5 rounded-lg border transition shadow-sm cursor-pointer ${
-                  themeMenuOpen 
+                  modals.themeMenuOpen 
                     ? 'bg-amber-500/15 border-amber-500/30 text-amber-400' 
                     : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-amber-400 hover:border-amber-500/30'
                 }`}
@@ -1047,20 +723,20 @@ export default function App() {
                 <Palette className="w-4 h-4" />
               </button>
 
-              {themeMenuOpen && (
+              {modals.themeMenuOpen && (
                 <ThemeMenu
-                  currentTheme={currentTheme}
-                  currentMode={currentMode}
-                  onSelectTheme={handleSelectTheme}
-                  onSelectMode={handleSelectMode}
-                  onClose={() => setThemeMenuOpen(false)}
+                  currentTheme={theme}
+                  currentMode={mode}
+                  onSelectTheme={setTheme}
+                  onSelectMode={setMode}
+                  onClose={() => modals.setThemeMenuOpen(false)}
                 />
               )}
             </div>
 
             {/* Settings Button */}
             <button
-              onClick={() => setSettingsOpen(true)}
+              onClick={() => modals.setSettingsOpen(true)}
               className="p-1.5 rounded-lg bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-amber-400 hover:border-amber-500/30 transition shadow-sm cursor-pointer"
               title={t('settings')}
             >
@@ -1071,26 +747,26 @@ export default function App() {
 
         {/* Books Content */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto relative z-0">
-          {/* Continue Reading Shelf (only displayed when browsing all books without active search) */}
+          {/* Continue Reading Shelf */}
           {!selectedShelf && !debouncedQuery && continueReading.length > 0 && (
             <ContinueReading 
               books={continueReading} 
               onSelectBook={(book) => openReader(book)} 
               onOpenDetails={handleOpenDetails}
-              onContextMenu={handleContextMenu}
+              onContextMenu={modals.openBookContextMenu}
               onViewAll={() => navigateToShelf('continue-reading')}
               onSelectTag={(tg) => navigateToShelf(`tag:${tg.id}`)}
               showFileExtension={showFileExtension}
             />
           )}
 
-          {/* Favorite Books Shelf (displayed below Continue Reading) */}
+          {/* Favorite Books Shelf */}
           {!selectedShelf && !debouncedQuery && favorites.length > 0 && (
             <FavoriteBooks
               books={favorites}
               onSelectBook={(book) => openReader(book)}
               onOpenDetails={handleOpenDetails}
-              onContextMenu={handleContextMenu}
+              onContextMenu={modals.openBookContextMenu}
               onToggleFavorite={handleToggleFavorite}
               onViewAll={() => navigateToShelf('favorites')}
               onSelectTag={(tg) => navigateToShelf(`tag:${tg.id}`)}
@@ -1098,29 +774,29 @@ export default function App() {
             />
           )}
 
-          {/* Folders (displayed when browsing all books without active search) */}
+          {/* Folders Carousel */}
           {!selectedShelf && !debouncedQuery && shelves.length > 0 && (
             <LibraryFolders
               folders={shelves}
               books={books}
               onSelectFolder={(folderId) => navigateToShelf(folderId)}
-              onContextMenu={handleShelfContextMenu}
+              onContextMenu={modals.openShelfContextMenu}
               onViewAll={() => navigateToShelf('folders')}
             />
           )}
 
-          {/* Tags Carousel (displayed when browsing all books without active search) */}
+          {/* Tags Carousel */}
           {!selectedShelf && !debouncedQuery && tags.length > 0 && (
             <LibraryTags
               tags={tags}
               books={books}
               onSelectTag={(tg) => navigateToShelf(`tag:${tg.id}`)}
               onViewAll={() => navigateToShelf('tags')}
-              onOpenTagManager={() => setTagModal({ isOpen: true, book: null })}
+              onOpenTagManager={() => modals.openTagModal(null)}
             />
           )}
 
-          {/* Shelf Section Title & Count (displayed when browsing a specific folder, shelf, or search query) */}
+          {/* Shelf Section Title & Count */}
           {(selectedShelf || debouncedQuery) && (
             <div className="flex items-center justify-between mb-6 pb-2 border-b border-neutral-800">
               <div>
@@ -1171,7 +847,7 @@ export default function App() {
               {selectedShelf === 'tags' && (
                 <button
                   type="button"
-                  onClick={() => setTagModal({ isOpen: true, book: null })}
+                  onClick={() => modals.openTagModal(null)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-300 text-xs font-medium transition cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -1181,7 +857,7 @@ export default function App() {
             </div>
           )}
 
-          {/* Content: Dedicated Folders Page Grid, Dedicated Tags Page Grid, Loading Skeletons, AllBooks Carousel, or Books Grid */}
+          {/* Content: Folders Grid, Tags Grid, Loading Skeletons, AllBooks Carousel, or Books Grid */}
           {selectedShelf === 'folders' ? (
             (() => {
               const displayFolders = debouncedQuery
@@ -1210,7 +886,7 @@ export default function App() {
                       folder={folder}
                       books={books}
                       onSelectFolder={(folderId) => navigateToShelf(folderId)}
-                      onContextMenu={handleShelfContextMenu}
+                      onContextMenu={modals.openShelfContextMenu}
                       className="w-full"
                     />
                   ))}
@@ -1237,7 +913,7 @@ export default function App() {
                     </p>
                     <button
                       type="button"
-                      onClick={() => setTagModal({ isOpen: true, book: null })}
+                      onClick={() => modals.openTagModal(null)}
                       className="mt-4 flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-500 text-white font-medium text-xs hover:bg-indigo-600 transition shadow-lg shadow-indigo-500/20 cursor-pointer"
                     >
                       <Plus className="w-4 h-4" />
@@ -1278,7 +954,7 @@ export default function App() {
                 favoriteIds={favoriteIds}
                 onSelectBook={(selected) => openReader(selected)}
                 onOpenDetails={handleOpenDetails}
-                onContextMenu={handleContextMenu}
+                onContextMenu={modals.openBookContextMenu}
                 onToggleFavorite={handleToggleFavorite}
                 onViewAll={() => navigateToShelf('all-books')}
                 onSelectTag={(tg) => navigateToShelf(`tag:${tg.id}`)}
@@ -1293,7 +969,7 @@ export default function App() {
                     isFavorite={favoriteIds.has(book.id)}
                     onSelectBook={(selected) => openReader(selected)}
                     onOpenDetails={handleOpenDetails}
-                    onContextMenu={handleContextMenu}
+                    onContextMenu={modals.openBookContextMenu}
                     onToggleFavorite={handleToggleFavorite}
                     onSelectTag={(tg) => navigateToShelf(`tag:${tg.id}`)}
                     showFileExtension={showFileExtension}
@@ -1311,7 +987,7 @@ export default function App() {
                 {t('setupPromptDesc')}
               </p>
               <button
-                onClick={() => setSettingsOpen(true)}
+                onClick={() => modals.setSettingsOpen(true)}
                 className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-bold rounded-xl inline-flex items-center gap-2 shadow-xl shadow-amber-500/20 transition cursor-pointer"
               >
                 <Settings className="w-4 h-4" />
@@ -1357,107 +1033,31 @@ export default function App() {
           onProgressUpdate={handleProgressUpdate}
           onToggleFavorite={handleToggleFavorite}
           showFileExtension={showFileExtension}
-          theme={currentTheme}
-          onThemeChange={handleSelectTheme}
-          mode={currentMode}
-          onModeChange={handleSelectMode}
+          theme={theme}
+          onThemeChange={setTheme}
+          mode={mode}
+          onModeChange={setMode}
         />
       )}
 
-      {/* Custom Context Menu on Right Click (Books) */}
-      {contextMenu.isOpen && contextMenu.book && (
-        <ContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          book={contextMenu.book}
-          isFavorite={favoriteIds.has(contextMenu.book.id)}
-          onClose={() => setContextMenu({ isOpen: false, x: 0, y: 0, book: null })}
-          onOpenReader={(book) => openReader(book)}
-          onOpenDetails={handleOpenDetails}
-          onMarkStatus={handleMarkStatus}
-          onToggleFavorite={handleToggleFavorite}
-          onManageTags={(book) => setTagModal({ isOpen: true, book })}
-        />
-      )}
-
-      {/* Shelf Context Menu on Right Click (Sidebar) */}
-      {shelfContextMenu.isOpen && shelfContextMenu.shelf && (
-        <ShelfContextMenu
-          x={shelfContextMenu.x}
-          y={shelfContextMenu.y}
-          shelf={shelfContextMenu.shelf}
-          onClose={() => setShelfContextMenu({ isOpen: false, x: 0, y: 0, shelf: null })}
-          onOpenRename={(shelf) => setRenameModal({ isOpen: true, shelf: shelf })}
-          onOpenIconModal={(shelf) => setIconModal({ isOpen: true, shelf: shelf })}
-          onResetName={handleResetShelfName}
-        />
-      )}
-
-      {/* Shelf Virtual Rename Modal */}
-      <ShelfRenameModal
-        shelf={renameModal.shelf}
-        isOpen={renameModal.isOpen}
-        onClose={() => setRenameModal({ isOpen: false, shelf: null })}
-        onSave={handleSaveShelfName}
-      />
-
-      {/* Shelf Icon Picker Modal */}
-      <ShelfIconModal
-        shelf={iconModal.shelf}
-        isOpen={iconModal.isOpen}
-        onClose={() => setIconModal({ isOpen: false, shelf: null })}
-        onSave={handleSaveShelfIcon}
-      />
-
-      {/* Virtual Tag Manager Modal */}
-      <TagManagerModal
-        isOpen={tagModal.isOpen}
-        onClose={() => setTagModal({ isOpen: false, book: null })}
-        book={tagModal.book}
+      {/* Encapsulated Modals and Context Menus */}
+      <AppModals
+        modals={modals}
+        activeLibraryId={activeLibraryId}
+        favoriteIds={favoriteIds}
         tags={tags}
-        libraryId={activeLibraryId}
-        onTagsUpdated={() => loadTags(activeLibraryId)}
-        onBookTagsUpdated={handleBookTagsUpdated}
-      />
-
-      {/* Book Details & Metadata Inspector Modal */}
-      <BookDetailsModal
-        isOpen={detailsModal.isOpen}
-        onClose={() => setDetailsModal({ isOpen: false, book: null })}
-        book={detailsModal.book}
-        isFavorite={detailsModal.book ? favoriteIds.has(detailsModal.book.id) : false}
-        onOpenReader={(book) => openReader(book)}
+        showFileExtension={showFileExtension}
+        onToggleFileExtension={setShowFileExtension}
+        onOpenReader={openReader}
         onToggleFavorite={handleToggleFavorite}
         onMarkStatus={handleMarkStatus}
-        onManageTags={(book) => {
-          setDetailsModal({ isOpen: false, book: null });
-          setTagModal({ isOpen: true, book: book });
-        }}
-        onSelectTag={(tg) => {
-          setDetailsModal({ isOpen: false, book: null });
-          navigateToShelf(`tag:${tg.id}`);
-        }}
-        showFileExtension={showFileExtension}
-      />
-
-      {/* Library Settings Modal */}
-      <SettingsModal
-        isOpen={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        showFileExtension={showFileExtension}
-        onToggleFileExtension={handleToggleFileExtension}
-        onLibraryChanged={(newActiveId) => {
-          loadLibraries();
-          if (newActiveId && newActiveId !== activeLibraryId) {
-            selectLibrary(newActiveId);
-          } else if (activeLibraryId) {
-            loadShelves(activeLibraryId);
-            loadBooks(activeLibraryId);
-            loadContinueReading(activeLibraryId);
-            loadFavorites(activeLibraryId);
-            loadTags(activeLibraryId);
-          }
-        }}
+        onSaveShelfName={handleSaveShelfName}
+        onResetShelfName={handleResetShelfName}
+        onSaveShelfIcon={handleSaveShelfIcon}
+        onBookTagsUpdated={handleBookTagsUpdated}
+        onTagsUpdated={() => loadTags(activeLibraryId)}
+        onLibraryChanged={handleLibraryChanged}
+        onNavigateToShelf={navigateToShelf}
       />
     </div>
   );

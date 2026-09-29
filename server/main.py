@@ -3,7 +3,7 @@ import sys
 from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Query, Request, status
+from fastapi import FastAPI, HTTPException, Query, Request, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -19,23 +19,23 @@ from .favorites import FavoritesManager
 from .lookup import LookupManager
 from .tags import TagsManager
 from .users import UserManager
+from .deps import (
+    get_scanner,
+    get_cover_mgr,
+    get_lookup_mgr,
+    get_user_mgr,
+    get_request_user,
+)
 
 # Base paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CLIENT_DIST = os.path.abspath(os.path.join(BASE_DIR, "..", "client", "dist"))
 
-# Core components
-scanner = LibraryScanner()
-cover_mgr = CoverManager()
-lookup_mgr = LookupManager()
-user_mgr = UserManager()
-
-def get_request_user(request: Request) -> str:
-    """Extracts username from X-User header or user query param."""
-    x_user = request.headers.get("x-user") or request.headers.get("X-User")
-    if not x_user:
-        x_user = request.query_params.get("user")
-    return (x_user or "default").strip() or "default"
+# Core components via dependency injection
+scanner = get_scanner()
+cover_mgr = get_cover_mgr()
+lookup_mgr = get_lookup_mgr()
+user_mgr = get_user_mgr()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -154,12 +154,12 @@ class UserPayload(BaseModel):
     username: str
 
 @app.get("/api/users")
-def list_users():
+def list_users(user_mgr: UserManager = Depends(get_user_mgr)):
     """Returns list of registered users sorted by recent activity."""
     return {"users": user_mgr.list_users()}
 
 @app.post("/api/users")
-def register_user(payload: UserPayload):
+def register_user(payload: UserPayload, user_mgr: UserManager = Depends(get_user_mgr)):
     """Registers or touches a user profile."""
     clean = payload.username.strip()
     if not clean:
@@ -168,14 +168,13 @@ def register_user(payload: UserPayload):
     return {"status": "ok", "user": profile, "users": user_mgr.list_users()}
 
 @app.get("/api/users/current")
-def get_current_user_profile(request: Request):
+def get_current_user_profile(user: str = Depends(get_request_user), user_mgr: UserManager = Depends(get_user_mgr)):
     """Returns profile for the current requesting user."""
-    user = get_request_user(request)
     profile = user_mgr.touch_user(user)
     return {"user": profile}
 
 @app.delete("/api/users/{username}")
-def delete_user(username: str):
+def delete_user(username: str, user_mgr: UserManager = Depends(get_user_mgr)):
     """Deletes a user profile and all their scoped data from disk."""
     clean = username.strip()
     if not clean:
@@ -189,7 +188,7 @@ def delete_user(username: str):
 
 
 @app.get("/api/libraries")
-def list_libraries(library_id: Optional[str] = Query(None)):
+def list_libraries(library_id: Optional[str] = Query(None), scanner: LibraryScanner = Depends(get_scanner)):
     """Returns list of all configured libraries with validation, folder/book counts, and sample covers."""
     libs = scanner.config_mgr.get_libraries()
     results = []
@@ -229,7 +228,7 @@ def list_libraries(library_id: Optional[str] = Query(None)):
     }
 
 @app.post("/api/libraries")
-def add_library(payload: AddLibraryPayload):
+def add_library(payload: AddLibraryPayload, scanner: LibraryScanner = Depends(get_scanner), cover_mgr: CoverManager = Depends(get_cover_mgr)):
     """Adds a new library directory path."""
     val = scanner.config_mgr.validate_path(payload.path)
     if not val["valid"]:
@@ -250,7 +249,7 @@ def add_library(payload: AddLibraryPayload):
     }
 
 @app.put("/api/libraries/{library_id}")
-def update_library(library_id: str, payload: UpdateLibraryPayload):
+def update_library(library_id: str, payload: UpdateLibraryPayload, scanner: LibraryScanner = Depends(get_scanner), cover_mgr: CoverManager = Depends(get_cover_mgr)):
     """Updates the display name or path of an existing library."""
     if payload.path:
         val = scanner.config_mgr.validate_path(payload.path)
@@ -272,7 +271,7 @@ def update_library(library_id: str, payload: UpdateLibraryPayload):
     }
 
 @app.delete("/api/libraries/{library_id}")
-def delete_library(library_id: str):
+def delete_library(library_id: str, scanner: LibraryScanner = Depends(get_scanner)):
     """Removes a library from the library list (files on disk remain untouched)."""
     success = scanner.config_mgr.remove_library(library_id)
     if not success:
@@ -285,7 +284,7 @@ def delete_library(library_id: str):
     }
 
 @app.post("/api/libraries/active")
-def set_active_library(payload: SetActiveLibraryPayload):
+def set_active_library(payload: SetActiveLibraryPayload, scanner: LibraryScanner = Depends(get_scanner), cover_mgr: CoverManager = Depends(get_cover_mgr)):
     """Switches the active library directory."""
     success = scanner.config_mgr.set_active_library(payload.library_id)
     if not success:
@@ -300,7 +299,7 @@ def set_active_library(payload: SetActiveLibraryPayload):
     }
 
 @app.get("/api/settings")
-def get_settings(library_id: Optional[str] = Query(None)):
+def get_settings(library_id: Optional[str] = Query(None), scanner: LibraryScanner = Depends(get_scanner)):
     """Returns application settings, display preferences, and library status."""
     lib = scanner.config_mgr.get_library_by_id(library_id) if library_id else None
     path = lib["path"] if lib else scanner.library_path
@@ -316,18 +315,18 @@ def get_settings(library_id: Optional[str] = Query(None)):
     }
 
 @app.post("/api/settings/display")
-def update_display_settings(payload: DisplaySettingsPayload):
+def update_display_settings(payload: DisplaySettingsPayload, scanner: LibraryScanner = Depends(get_scanner)):
     """Updates display preferences such as showing/hiding file extension tags."""
     val = scanner.config_mgr.set_show_file_extension(payload.show_file_extension)
     return {"status": "ok", "show_file_extension": val}
 
 @app.post("/api/settings/validate")
-def validate_settings_path(payload: ValidatePathPayload):
+def validate_settings_path(payload: ValidatePathPayload, scanner: LibraryScanner = Depends(get_scanner)):
     """Validates a prospective book library folder path."""
     return scanner.config_mgr.validate_path(payload.path)
 
 @app.post("/api/settings")
-def save_settings(payload: SettingsPayload):
+def save_settings(payload: SettingsPayload, scanner: LibraryScanner = Depends(get_scanner), cover_mgr: CoverManager = Depends(get_cover_mgr)):
     """Saves and persists a new book library folder path."""
     clean = payload.library_path.strip()
     validation = scanner.config_mgr.validate_path(clean)
@@ -348,7 +347,7 @@ def save_settings(payload: SettingsPayload):
 
 @app.get("/api/folders")
 @app.get("/api/shelves")
-def list_folders(library_id: Optional[str] = Query(None)):
+def list_folders(library_id: Optional[str] = Query(None), scanner: LibraryScanner = Depends(get_scanner)):
     """Returns list of all folders with book counts for a specific or active library."""
     lib_val = library_id if isinstance(library_id, str) else None
     folders = scanner.get_folders(library_id=lib_val)
@@ -364,7 +363,7 @@ def list_folders(library_id: Optional[str] = Query(None)):
 
 @app.post("/api/folders/rename")
 @app.post("/api/shelves/rename")
-def rename_folder(payload: RenameShelfPayload):
+def rename_folder(payload: RenameShelfPayload, scanner: LibraryScanner = Depends(get_scanner)):
     """Virtually renames a folder inside the app without changing the physical folder."""
     target_id = payload.folder_id or payload.shelf_id
     if not target_id:
@@ -382,7 +381,7 @@ def rename_folder(payload: RenameShelfPayload):
 
 @app.post("/api/folders/icon")
 @app.post("/api/shelves/icon")
-def set_folder_icon(payload: SetShelfIconPayload):
+def set_folder_icon(payload: SetShelfIconPayload, scanner: LibraryScanner = Depends(get_scanner)):
     """Sets or resets the icon for a folder without changing the physical folder."""
     target_id = payload.folder_id or payload.shelf_id
     if not target_id:
@@ -400,16 +399,17 @@ def set_folder_icon(payload: SetShelfIconPayload):
 
 @app.get("/api/books")
 def list_books(
-    request: Request,
     shelf: Optional[str] = Query(None, description="Filter by folder or shelf name"),
     folder: Optional[str] = Query(None, description="Filter by folder name"),
     tag: Optional[str] = Query(None, description="Filter by tag ID"),
     library_id: Optional[str] = Query(None, description="Filter by library ID"),
     query: Optional[str] = Query(None, description="Search query across titles"),
-    sort: Optional[str] = Query("title_asc", description="Sort order: title_asc, title_desc, size_desc, recent")
+    sort: Optional[str] = Query("title_asc", description="Sort order: title_asc, title_desc, size_desc, recent"),
+    user: str = Depends(get_request_user),
+    scanner: LibraryScanner = Depends(get_scanner),
+    user_mgr: UserManager = Depends(get_user_mgr),
 ):
     """Returns books enriched with reading progress, favorite status, tags, and cover URLs, strictly isolated by library and user."""
-    user = get_request_user(request)
     tracker = user_mgr.get_tracker(user)
     favorites_mgr = user_mgr.get_favorites_mgr(user)
     tags_mgr = user_mgr.get_tags_mgr(user)
@@ -501,9 +501,13 @@ def list_books(
     }
 
 @app.get("/api/continue-reading")
-def continue_reading(request: Request, library_id: Optional[str] = Query(None)):
+def continue_reading(
+    library_id: Optional[str] = Query(None),
+    user: str = Depends(get_request_user),
+    scanner: LibraryScanner = Depends(get_scanner),
+    user_mgr: UserManager = Depends(get_user_mgr)
+):
     """Returns recently opened books that have reading progress, strictly scoped to library and user."""
-    user = get_request_user(request)
     tracker = user_mgr.get_tracker(user)
     favorites_mgr = user_mgr.get_favorites_mgr(user)
     tags_mgr = user_mgr.get_tags_mgr(user)
@@ -553,9 +557,13 @@ def continue_reading(request: Request, library_id: Optional[str] = Query(None)):
     return {"books": results}
 
 @app.post("/api/progress")
-def save_progress(payload: ProgressPayload, request: Request):
+def save_progress(
+    payload: ProgressPayload,
+    user: str = Depends(get_request_user),
+    scanner: LibraryScanner = Depends(get_scanner),
+    user_mgr: UserManager = Depends(get_user_mgr)
+):
     """Saves the current reading page/cfi, zoom, and night reading mode for a book."""
-    user = get_request_user(request)
     tracker = user_mgr.get_tracker(user)
 
     pct = payload.percent
@@ -578,25 +586,35 @@ def save_progress(payload: ProgressPayload, request: Request):
     return {"status": "ok", "progress": record}
 
 @app.post("/api/book/zoom")
-def save_zoom(payload: ZoomPayload, request: Request):
+def save_zoom(
+    payload: ZoomPayload,
+    user: str = Depends(get_request_user),
+    user_mgr: UserManager = Depends(get_user_mgr)
+):
     """Saves the preferred zoom level for a book."""
-    user = get_request_user(request)
     tracker = user_mgr.get_tracker(user)
     record = tracker.set_zoom(payload.book_id, payload.zoom)
     return {"status": "ok", "record": record}
 
 @app.post("/api/book/night-mode")
-def save_night_mode(payload: NightModePayload, request: Request):
+def save_night_mode(
+    payload: NightModePayload,
+    user: str = Depends(get_request_user),
+    user_mgr: UserManager = Depends(get_user_mgr)
+):
     """Saves the preferred night reading mode (invert colors) for a book."""
-    user = get_request_user(request)
     tracker = user_mgr.get_tracker(user)
     record = tracker.set_night_mode(payload.book_id, payload.invert_colors)
     return {"status": "ok", "record": record}
 
 @app.post("/api/book/status")
-def update_book_status(payload: StatusPayload, request: Request):
+def update_book_status(
+    payload: StatusPayload,
+    user: str = Depends(get_request_user),
+    scanner: LibraryScanner = Depends(get_scanner),
+    user_mgr: UserManager = Depends(get_user_mgr)
+):
     """Marks a book as not started or completed."""
-    user = get_request_user(request)
     tracker = user_mgr.get_tracker(user)
 
     b = scanner.find_book(payload.book_id)
@@ -626,9 +644,13 @@ def update_book_status(payload: StatusPayload, request: Request):
         raise HTTPException(status_code=400, detail="Invalid status. Must be 'not_started' or 'completed'")
 
 @app.get("/api/book/{book_id}")
-def get_book(book_id: str, request: Request):
+def get_book(
+    book_id: str,
+    user: str = Depends(get_request_user),
+    scanner: LibraryScanner = Depends(get_scanner),
+    user_mgr: UserManager = Depends(get_user_mgr)
+):
     """Returns details for a single book enriched with reading stats, annotations, and metadata."""
-    user = get_request_user(request)
     tracker = user_mgr.get_tracker(user)
     favorites_mgr = user_mgr.get_favorites_mgr(user)
     tags_mgr = user_mgr.get_tags_mgr(user)
@@ -685,7 +707,7 @@ def get_book(book_id: str, request: Request):
     return b_copy
 
 @app.get("/api/cover/{book_id}")
-def get_cover(book_id: str):
+def get_cover(book_id: str, scanner: LibraryScanner = Depends(get_scanner), cover_mgr: CoverManager = Depends(get_cover_mgr)):
     """Serves the WebP cover thumbnail for a book (generates on-the-fly if needed)."""
     b = scanner.find_book(book_id)
     if not b:
@@ -702,7 +724,7 @@ def get_cover(book_id: str):
 @app.get("/api/epub/{book_id}")
 @app.get("/api/epub/{book_id}.epub")
 @app.get("/api/book-file/{book_id}")
-def stream_book_file(book_id: str):
+def stream_book_file(book_id: str, scanner: LibraryScanner = Depends(get_scanner)):
     """Streams the book file (.pdf or .epub) with byte-range support for fast in-browser rendering."""
     clean_id = book_id.removesuffix(".epub").removesuffix(".pdf")
     b = scanner.find_book(clean_id) or scanner.find_book(book_id)
@@ -720,9 +742,13 @@ def stream_book_file(book_id: str):
     )
 
 @app.get("/api/favorites")
-def get_favorites(request: Request, library_id: Optional[str] = Query(None)):
+def get_favorites(
+    library_id: Optional[str] = Query(None),
+    user: str = Depends(get_request_user),
+    scanner: LibraryScanner = Depends(get_scanner),
+    user_mgr: UserManager = Depends(get_user_mgr)
+):
     """Returns list of favorite book IDs and favorite books strictly scoped to library and user."""
-    user = get_request_user(request)
     favorites_mgr = user_mgr.get_favorites_mgr(user)
     tracker = user_mgr.get_tracker(user)
     tags_mgr = user_mgr.get_tags_mgr(user)
@@ -749,9 +775,12 @@ def get_favorites(request: Request, library_id: Optional[str] = Query(None)):
     }
 
 @app.post("/api/favorites/toggle")
-def toggle_favorite(payload: ToggleFavoritePayload, request: Request):
+def toggle_favorite(
+    payload: ToggleFavoritePayload,
+    user: str = Depends(get_request_user),
+    user_mgr: UserManager = Depends(get_user_mgr)
+):
     """Toggles a book's favorite status."""
-    user = get_request_user(request)
     favorites_mgr = user_mgr.get_favorites_mgr(user)
     is_fav = favorites_mgr.toggle_favorite(payload.book_id)
     return {
@@ -764,9 +793,13 @@ def toggle_favorite(payload: ToggleFavoritePayload, request: Request):
 # --- Virtual Tags & Custom Collections API ---
 
 @app.get("/api/tags")
-def list_tags(request: Request, library_id: Optional[str] = Query(None)):
+def list_tags(
+    library_id: Optional[str] = Query(None),
+    user: str = Depends(get_request_user),
+    scanner: LibraryScanner = Depends(get_scanner),
+    user_mgr: UserManager = Depends(get_user_mgr)
+):
     """Returns all virtual tags with book counts strictly scoped to library and user."""
-    user = get_request_user(request)
     tags_mgr = user_mgr.get_tags_mgr(user)
     lib_val = library_id if isinstance(library_id, str) and library_id.strip() else None
     if lib_val:
@@ -776,9 +809,12 @@ def list_tags(request: Request, library_id: Optional[str] = Query(None)):
     return {"tags": tags_mgr.get_tags()}
 
 @app.post("/api/tags")
-def create_tag(payload: CreateTagPayload, request: Request):
+def create_tag(
+    payload: CreateTagPayload,
+    user: str = Depends(get_request_user),
+    user_mgr: UserManager = Depends(get_user_mgr)
+):
     """Creates a new virtual tag scoped to a specific library."""
-    user = get_request_user(request)
     tags_mgr = user_mgr.get_tags_mgr(user)
     clean = payload.name.strip()
     if not clean:
@@ -788,9 +824,14 @@ def create_tag(payload: CreateTagPayload, request: Request):
     return {"status": "ok", "tag": tag, "tags": tags_mgr.get_tags(library_id=lib_id)}
 
 @app.put("/api/tags/{tag_id}")
-def update_tag(tag_id: str, payload: UpdateTagPayload, request: Request, library_id: Optional[str] = Query(None)):
+def update_tag(
+    tag_id: str,
+    payload: UpdateTagPayload,
+    library_id: Optional[str] = Query(None),
+    user: str = Depends(get_request_user),
+    user_mgr: UserManager = Depends(get_user_mgr)
+):
     """Updates an existing tag's name or color."""
-    user = get_request_user(request)
     tags_mgr = user_mgr.get_tags_mgr(user)
     existing_tag = tags_mgr.get_tag(tag_id)
     tag = tags_mgr.update_tag(tag_id, name=payload.name, color=payload.color)
@@ -800,9 +841,13 @@ def update_tag(tag_id: str, payload: UpdateTagPayload, request: Request, library
     return {"status": "ok", "tag": tag, "tags": tags_mgr.get_tags(library_id=lib_val)}
 
 @app.delete("/api/tags/{tag_id}")
-def delete_tag(tag_id: str, request: Request, library_id: Optional[str] = Query(None)):
+def delete_tag(
+    tag_id: str,
+    library_id: Optional[str] = Query(None),
+    user: str = Depends(get_request_user),
+    user_mgr: UserManager = Depends(get_user_mgr)
+):
     """Deletes a virtual tag and untags all books."""
-    user = get_request_user(request)
     tags_mgr = user_mgr.get_tags_mgr(user)
     existing_tag = tags_mgr.get_tag(tag_id)
     lib_val = library_id or (existing_tag.get("library_id") if existing_tag else None)
@@ -812,16 +857,24 @@ def delete_tag(tag_id: str, request: Request, library_id: Optional[str] = Query(
     return {"status": "ok", "tags": tags_mgr.get_tags(library_id=lib_val)}
 
 @app.get("/api/books/{book_id}/tags")
-def get_book_tags(book_id: str, request: Request):
+def get_book_tags(
+    book_id: str,
+    user: str = Depends(get_request_user),
+    user_mgr: UserManager = Depends(get_user_mgr)
+):
     """Returns the tags assigned to a book."""
-    user = get_request_user(request)
     tags_mgr = user_mgr.get_tags_mgr(user)
     return {"tags": tags_mgr.get_book_tags(book_id)}
 
 @app.post("/api/books/{book_id}/tags")
-def set_book_tags(book_id: str, payload: SetBookTagsPayload, request: Request):
+def set_book_tags(
+    book_id: str,
+    payload: SetBookTagsPayload,
+    user: str = Depends(get_request_user),
+    scanner: LibraryScanner = Depends(get_scanner),
+    user_mgr: UserManager = Depends(get_user_mgr)
+):
     """Sets the tags for a book."""
-    user = get_request_user(request)
     tags_mgr = user_mgr.get_tags_mgr(user)
     b = scanner.find_book(book_id)
     if not b:
@@ -830,9 +883,14 @@ def set_book_tags(book_id: str, payload: SetBookTagsPayload, request: Request):
     return {"status": "ok", "book_id": book_id, "tags": tags}
 
 @app.post("/api/books/{book_id}/tags/toggle")
-def toggle_book_tag(book_id: str, payload: ToggleBookTagPayload, request: Request):
+def toggle_book_tag(
+    book_id: str,
+    payload: ToggleBookTagPayload,
+    user: str = Depends(get_request_user),
+    scanner: LibraryScanner = Depends(get_scanner),
+    user_mgr: UserManager = Depends(get_user_mgr)
+):
     """Toggles a tag on a book."""
-    user = get_request_user(request)
     tags_mgr = user_mgr.get_tags_mgr(user)
     b = scanner.find_book(book_id)
     if not b:
@@ -847,24 +905,36 @@ def toggle_book_tag(book_id: str, payload: ToggleBookTagPayload, request: Reques
     }
 
 @app.get("/api/annotations/{book_id}")
-def get_annotations(book_id: str, request: Request):
+def get_annotations(
+    book_id: str,
+    user: str = Depends(get_request_user),
+    user_mgr: UserManager = Depends(get_user_mgr)
+):
     """Returns all highlights and comments for a book."""
-    user = get_request_user(request)
     annotations_mgr = user_mgr.get_annotations_mgr(user)
     return {"annotations": annotations_mgr.get_annotations(book_id)}
 
 @app.post("/api/annotations")
-def create_annotation(payload: AnnotationPayload, request: Request):
+def create_annotation(
+    payload: AnnotationPayload,
+    user: str = Depends(get_request_user),
+    user_mgr: UserManager = Depends(get_user_mgr)
+):
     """Saves a new highlight or comment for a book."""
-    user = get_request_user(request)
     annotations_mgr = user_mgr.get_annotations_mgr(user)
-    record = annotations_mgr.add_annotation(payload.book_id, payload.dict())
+    data = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
+    record = annotations_mgr.add_annotation(payload.book_id, data)
     return {"status": "ok", "annotation": record}
 
 @app.put("/api/annotations/{book_id}/{annotation_id}")
-def update_annotation(book_id: str, annotation_id: str, payload: UpdateAnnotationPayload, request: Request):
+def update_annotation(
+    book_id: str,
+    annotation_id: str,
+    payload: UpdateAnnotationPayload,
+    user: str = Depends(get_request_user),
+    user_mgr: UserManager = Depends(get_user_mgr)
+):
     """Updates an existing annotation's comment or color."""
-    user = get_request_user(request)
     annotations_mgr = user_mgr.get_annotations_mgr(user)
     data = {}
     if payload.comment is not None:
@@ -877,9 +947,13 @@ def update_annotation(book_id: str, annotation_id: str, payload: UpdateAnnotatio
     return {"status": "ok", "annotation": record}
 
 @app.delete("/api/annotations/{book_id}/{annotation_id}")
-def delete_annotation(book_id: str, annotation_id: str, request: Request):
+def delete_annotation(
+    book_id: str,
+    annotation_id: str,
+    user: str = Depends(get_request_user),
+    user_mgr: UserManager = Depends(get_user_mgr)
+):
     """Deletes an annotation."""
-    user = get_request_user(request)
     annotations_mgr = user_mgr.get_annotations_mgr(user)
     success = annotations_mgr.delete_annotation(book_id, annotation_id)
     if not success:
@@ -889,7 +963,8 @@ def delete_annotation(book_id: str, annotation_id: str, request: Request):
 @app.get("/api/lookup/define")
 def define_word(
     word: str = Query(..., description="Word to define"),
-    lang: Optional[str] = Query("en", description="Target language code for definitions")
+    lang: Optional[str] = Query("en", description="Target language code for definitions"),
+    lookup_mgr: LookupManager = Depends(get_lookup_mgr)
 ):
     """Returns definitions, parts of speech, and examples for a word."""
     if not word.strip():
@@ -897,7 +972,10 @@ def define_word(
     return lookup_mgr.define_word(word.strip(), lang=lang or "en")
 
 @app.post("/api/lookup/translate")
-def translate_text(payload: TranslatePayload):
+def translate_text(
+    payload: TranslatePayload,
+    lookup_mgr: LookupManager = Depends(get_lookup_mgr)
+):
     """Translates text to target language."""
     if not payload.text.strip():
         raise HTTPException(status_code=400, detail="Text cannot be empty")
@@ -911,7 +989,8 @@ def translate_text(payload: TranslatePayload):
 def translate_text_get(
     text: str = Query(..., description="Text to translate"),
     target: Optional[str] = Query("pt", description="Target language code"),
-    source: Optional[str] = Query("auto", description="Source language code")
+    source: Optional[str] = Query("auto", description="Source language code"),
+    lookup_mgr: LookupManager = Depends(get_lookup_mgr)
 ):
     """Translates text to target language (convenience GET endpoint)."""
     if not text.strip():

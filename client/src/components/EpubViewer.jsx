@@ -15,6 +15,7 @@ import BookSearchBar from './BookSearchBar';
 import TtsPlayerBar from './TtsPlayerBar';
 import { extractEpubVisibleText } from '../utils/textToSpeech';
 import PdfOutline from './PdfOutline';
+import { useFullscreen } from '../hooks/useFullscreen';
 
 const COLOR_HEX_MAP = {
   yellow: '#facc15',
@@ -913,9 +914,7 @@ export default function EpubViewer({
     handleIframeMouseMoveRef.current = handleIframeMouseMove;
   }, [handleIframeMouseMove]);
 
-  const [isFullscreen, setIsFullscreen] = useState(() => {
-    return typeof document !== 'undefined' ? Boolean(document.fullscreenElement) : false;
-  });
+  const { isFullscreen, toggleFullscreen } = useFullscreen();
 
   // Keep favorite state synchronized with prop
   useEffect(() => {
@@ -928,7 +927,6 @@ export default function EpubViewer({
   useEffect(() => {
     let resizeTimer = null;
     const handleResize = () => {
-      setIsFullscreen(Boolean(document.fullscreenElement));
       if (resizeTimer) clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
         renditionRef.current?.resize();
@@ -964,14 +962,6 @@ export default function EpubViewer({
       document.documentElement.style.overscrollBehavior = originalHtmlOverscroll;
     };
   }, []);
-
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
-    } else {
-      document.exitFullscreen().catch(() => {});
-    }
-  };
 
   // Debounced API progress saving
   const saveProgressDebounced = useCallback((cfi, percent, page, total) => {
