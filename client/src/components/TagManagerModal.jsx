@@ -10,6 +10,7 @@ export default function TagManagerModal({
   onClose, 
   book = null, 
   tags = [], 
+  libraryId = null,
   onTagsUpdated, 
   onBookTagsUpdated 
 }) {
@@ -95,10 +96,15 @@ export default function TagManagerModal({
     setError('');
 
     try {
+      const activeLib = libraryId || (book ? book.library_id : null);
       const res = await fetch('/api/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: clean, color: selectedColor })
+        body: JSON.stringify({ 
+          name: clean, 
+          color: selectedColor,
+          library_id: activeLib
+        })
       });
       const data = await res.json();
       if (!res.ok) {
@@ -126,7 +132,9 @@ export default function TagManagerModal({
     if (!window.confirm(t('deleteTagConfirm', { name: tagName }))) return;
 
     try {
-      const res = await fetch(`/api/tags/${encodeURIComponent(tagId)}`, {
+      const activeLib = libraryId || (book ? book.library_id : null);
+      const q = activeLib ? `?library_id=${encodeURIComponent(activeLib)}` : '';
+      const res = await fetch(`/api/tags/${encodeURIComponent(tagId)}${q}`, {
         method: 'DELETE'
       });
       if (res.ok) {
@@ -155,7 +163,9 @@ export default function TagManagerModal({
     if (!clean) return;
 
     try {
-      const res = await fetch(`/api/tags/${encodeURIComponent(tagId)}`, {
+      const activeLib = libraryId || (book ? book.library_id : null);
+      const q = activeLib ? `?library_id=${encodeURIComponent(activeLib)}` : '';
+      const res = await fetch(`/api/tags/${encodeURIComponent(tagId)}${q}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: clean, color: editTagColor })

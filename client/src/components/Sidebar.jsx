@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
-import { 
-  Library, Search, Folder, Heart, Bookmark, Home, 
-  ChevronDown, Check, Plus, Settings, Tag, User
+import {
+  Library, Search, Folder, Heart, Bookmark, Home,
+  ChevronDown, Check, Plus, Settings, Tag, User, BookOpen
 } from 'lucide-react';
 import ShelfIcon from './ShelfIcon';
 import { useI18n } from '../i18n';
 import { getTagColorConfig } from '../utils/tagColors';
 
-export default function Sidebar({ 
-  shelves, 
-  totalBooks, 
+export default function Sidebar({
+  shelves,
+  totalBooks,
   favoriteCount = 0,
   continueReadingCount = 0,
-  selectedShelf, 
+  selectedShelf,
   onSelectShelf,
   onShelfContextMenu,
   isOpen,
@@ -28,11 +28,50 @@ export default function Sidebar({
 }) {
   const [shelfFilter, setShelfFilter] = useState('');
   const [libraryDropdownOpen, setLibraryDropdownOpen] = useState(false);
+  const [isFoldersOpen, setIsFoldersOpen] = useState(() => {
+    try {
+      const saved = localStorage.getItem('sidebar_folders_open');
+      return saved !== null ? saved === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
+
+  const [isTagsOpen, setIsTagsOpen] = useState(() => {
+    try {
+      const saved = localStorage.getItem('sidebar_tags_open');
+      return saved !== null ? saved === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
   const { t } = useI18n();
+
+  const toggleFoldersOpen = (e) => {
+    if (e) e.stopPropagation();
+    setIsFoldersOpen((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('sidebar_folders_open', String(next));
+      } catch { }
+      return next;
+    });
+  };
+
+  const toggleTagsOpen = (e) => {
+    if (e) e.stopPropagation();
+    setIsTagsOpen((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('sidebar_tags_open', String(next));
+      } catch { }
+      return next;
+    });
+  };
 
   const activeLibrary = libraries.find(l => l.id === activeLibraryId) || libraries[0];
 
-  const filteredShelves = shelves.filter(s => 
+  const filteredShelves = shelves.filter(s =>
     s.name.toLowerCase().includes(shelfFilter.toLowerCase())
   );
 
@@ -40,11 +79,14 @@ export default function Sidebar({
     t.name.toLowerCase().includes(shelfFilter.toLowerCase())
   );
 
+  const shouldShowFolders = isFoldersOpen || Boolean(shelfFilter.trim());
+  const shouldShowTags = isTagsOpen || Boolean(shelfFilter.trim());
+
   return (
     <>
       {/* Mobile Backdrop */}
       {isOpen && (
-        <div 
+        <div
           onClick={onClose}
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 lg:hidden"
         />
@@ -54,8 +96,8 @@ export default function Sidebar({
       <aside className={`
         fixed top-0 bottom-0 left-0 z-40 bg-neutral-900 border-r border-neutral-800 flex flex-col transition-all duration-300 ease-in-out shrink-0 overflow-hidden
         lg:static lg:h-screen lg:sticky lg:top-0
-        ${isOpen 
-          ? 'w-72 translate-x-0 opacity-100' 
+        ${isOpen
+          ? 'w-72 translate-x-0 opacity-100'
           : 'w-72 -translate-x-full opacity-0 pointer-events-none lg:w-0 lg:border-r-0'
         }
       `}>
@@ -108,9 +150,9 @@ export default function Sidebar({
               {/* Dropdown Menu */}
               {libraryDropdownOpen && (
                 <>
-                  <div 
-                    className="fixed inset-0 z-40" 
-                    onClick={() => setLibraryDropdownOpen(false)} 
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setLibraryDropdownOpen(false)}
                   />
                   <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-neutral-900 border border-neutral-750 rounded-xl shadow-2xl py-1.5 animate-in fade-in zoom-in-95 duration-100">
                     {/* Switch to All Libraries selection */}
@@ -142,11 +184,10 @@ export default function Sidebar({
                                 onSwitchLibrary(lib.id);
                               }
                             }}
-                            className={`w-full flex items-center justify-between px-3 py-2 text-xs transition text-left cursor-pointer ${
-                              isSelected 
-                                ? 'bg-amber-500/15 text-amber-300 font-semibold' 
-                                : 'text-neutral-300 hover:bg-neutral-800 hover:text-white'
-                            }`}
+                            className={`w-full flex items-center justify-between px-3 py-2 text-xs transition text-left cursor-pointer ${isSelected
+                              ? 'bg-amber-500/15 text-amber-300 font-semibold'
+                              : 'text-neutral-300 hover:bg-neutral-800 hover:text-white'
+                              }`}
                           >
                             <div className="flex items-center gap-2 min-w-0">
                               <Folder className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-amber-400' : 'text-neutral-500'}`} />
@@ -199,8 +240,8 @@ export default function Sidebar({
               }}
               className={`
                 w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors
-                ${selectedShelf === null 
-                  ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' 
+                ${selectedShelf === null
+                  ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
                   : 'text-neutral-300 hover:bg-neutral-800 hover:text-white'}
               `}
             >
@@ -224,8 +265,8 @@ export default function Sidebar({
                 }}
                 className={`
                   w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors
-                  ${selectedShelf === 'continue-reading' 
-                    ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' 
+                  ${selectedShelf === 'continue-reading'
+                    ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
                     : 'text-neutral-300 hover:bg-neutral-800 hover:text-white'}
                 `}
               >
@@ -250,8 +291,8 @@ export default function Sidebar({
                 }}
                 className={`
                   w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors
-                  ${selectedShelf === 'favorites' 
-                    ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30' 
+                  ${selectedShelf === 'favorites'
+                    ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30'
                     : 'text-neutral-300 hover:bg-neutral-800 hover:text-white'}
                 `}
               >
@@ -268,131 +309,205 @@ export default function Sidebar({
               </button>
             )}
 
-            {/* Virtual Tags Section */}
-            <div className="pt-3 pb-1 px-3 flex items-center justify-between">
-              <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider">
-                {t('tags')} ({filteredTags.length})
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  if (onOpenTagManager) onOpenTagManager();
-                }}
-                className="p-1 rounded text-neutral-400 hover:text-amber-400 hover:bg-neutral-800 transition cursor-pointer"
-                title={t('manageTags')}
-              >
-                <Plus className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {/* Individual Tags */}
-            {filteredTags.map((tg) => {
-              const tagShelfKey = `tag:${tg.id}`;
-              const isSelected = selectedShelf === tagShelfKey;
-              const cfg = getTagColorConfig(tg.color);
-
-              return (
-                <button
-                  key={tg.id}
-                  onClick={() => {
-                    onSelectShelf(tagShelfKey);
-                  }}
-                  className={`
-                    w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer
-                    ${isSelected 
-                      ? `${cfg.activeBg} border` 
-                      : 'text-neutral-300 hover:bg-neutral-800 hover:text-white'}
-                  `}
-                  title={tg.name}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className={`w-2 h-2 rounded-full ${cfg.dot} shrink-0`} />
-                    <span className="truncate text-left">{tg.name}</span>
-                  </div>
-                  <div className="flex items-center shrink-0 ml-2">
-                    <span className={`
-                      text-[11px] px-1.5 py-0.2 rounded font-mono
-                      ${isSelected ? cfg.badge : 'bg-neutral-800 text-neutral-400'}
-                    `}>
-                      {tg.book_count || 0}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-
-            {/* Folders Dedicated Page Option */}
+            {/* Folders Dedicated Page Option & Collapsible Individual Folders */}
             {shelves.length > 0 && (
-              <div className="pt-2">
-                <button
+              <div>
+                <div
                   onClick={() => {
                     onSelectShelf('folders');
                   }}
                   className={`
-                    w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors
-                    ${selectedShelf === 'folders' 
-                      ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' 
+                    w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors group cursor-pointer
+                    ${selectedShelf === 'folders'
+                      ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
                       : 'text-neutral-300 hover:bg-neutral-800 hover:text-white'}
                   `}
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <button
+                      type="button"
+                      onClick={toggleFoldersOpen}
+                      className="p-1 -ml-1 rounded hover:bg-neutral-700/60 text-neutral-400 hover:text-neutral-200 transition cursor-pointer"
+                      title={shouldShowFolders ? t('collapseAll') : t('expandAll')}
+                    >
+                      <ChevronDown
+                        className={`w-3.5 h-3.5 transition-transform duration-200 ${shouldShowFolders ? '' : '-rotate-90'
+                          }`}
+                      />
+                    </button>
                     <Folder className={`w-4 h-4 shrink-0 ${selectedShelf === 'folders' ? 'text-amber-400' : 'text-neutral-400'}`} />
                     <span className="truncate">{t('folders')}</span>
                   </div>
+
                   <span className={`
-                    text-[11px] px-2 py-0.5 rounded-full font-mono font-semibold
+                    text-[11px] px-2 py-0.5 rounded-full font-mono font-semibold shrink-0 ml-2
                     ${selectedShelf === 'folders' ? 'bg-amber-500/20 text-amber-300' : 'bg-neutral-800 text-neutral-400'}
                   `}>
                     {shelves.length}
                   </span>
-                </button>
+                </div>
+
+                {/* Collapsible Children: Individual Folders */}
+                {shouldShowFolders && (
+                  <div className="mt-1 pl-3 border-l border-neutral-800 ml-4 space-y-0.5">
+                    {filteredShelves.map((s) => {
+                      const isSelected = selectedShelf === s.id;
+                      return (
+                        <button
+                          key={s.id}
+                          onClick={() => {
+                            onSelectShelf(s.id);
+                          }}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            if (onShelfContextMenu) {
+                              onShelfContextMenu(e, s);
+                            }
+                          }}
+                          className={`
+                            w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer
+                            ${isSelected
+                              ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                              : 'text-neutral-400 hover:bg-neutral-800 hover:text-white'}
+                          `}
+                          title={s.custom_name ? `${s.name} (${t('originalFolderLabel', { folder: s.folder })})` : s.name}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <ShelfIcon icon={s.icon} className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-amber-400' : 'text-neutral-400'}`} />
+                            <span className="truncate text-left">{s.name}</span>
+                          </div>
+                          <div className="flex items-center shrink-0 ml-2">
+                            <span className={`
+                              text-[10px] px-1.5 py-0.2 rounded font-mono
+                              ${isSelected ? 'bg-amber-500/20 text-amber-300' : 'bg-neutral-800/80 text-neutral-400'}
+                            `}>
+                              {s.book_count}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
-            <div className="pt-2 pb-1 px-3">
-              <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider">
-                {t('categories', { count: filteredShelves.length })}
-              </span>
+            {/* Tags Dedicated Page Option & Collapsible Individual Tags */}
+            <div>
+              <div
+                onClick={() => {
+                  onSelectShelf('tags');
+                }}
+                className={`
+                  w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors group cursor-pointer
+                  ${selectedShelf === 'tags'
+                    ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30'
+                    : 'text-neutral-300 hover:bg-neutral-800 hover:text-white'}
+                `}
+              >
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <button
+                    type="button"
+                    onClick={toggleTagsOpen}
+                    className="p-1 -ml-1 rounded hover:bg-neutral-700/60 text-neutral-400 hover:text-neutral-200 transition cursor-pointer"
+                    title={shouldShowTags ? t('collapseAll') : t('expandAll')}
+                  >
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 transition-transform duration-200 ${shouldShowTags ? '' : '-rotate-90'
+                        }`}
+                    />
+                  </button>
+                  <Tag className={`w-4 h-4 shrink-0 ${selectedShelf === 'tags' ? 'text-indigo-400' : 'text-neutral-400'}`} />
+                  <span className="truncate">{t('tags')}</span>
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0 ml-2">
+                  {onOpenTagManager && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenTagManager();
+                      }}
+                      className="p-1 rounded text-neutral-400 hover:text-indigo-400 hover:bg-neutral-700/60 transition cursor-pointer"
+                      title={t('manageTags')}
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <span className={`
+                    text-[11px] px-2 py-0.5 rounded-full font-mono font-semibold
+                    ${selectedShelf === 'tags' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-neutral-800 text-neutral-400'}
+                  `}>
+                    {tags.length}
+                  </span>
+                </div>
+              </div>
+
+              {/* Collapsible Children: Individual Tags */}
+              {shouldShowTags && (
+                <div className="mt-1 pl-3 border-l border-neutral-800 ml-4 space-y-0.5">
+                  {filteredTags.map((tg) => {
+                    const tagShelfKey = `tag:${tg.id}`;
+                    const isSelected = selectedShelf === tagShelfKey;
+                    const cfg = getTagColorConfig(tg.color);
+
+                    return (
+                      <button
+                        key={tg.id}
+                        onClick={() => {
+                          onSelectShelf(tagShelfKey);
+                        }}
+                        className={`
+                          w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer
+                          ${isSelected
+                            ? `${cfg.activeBg} border`
+                            : 'text-neutral-400 hover:bg-neutral-800 hover:text-white'}
+                        `}
+                        title={tg.name}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`w-2 h-2 rounded-full ${cfg.dot} shrink-0`} />
+                          <span className="truncate text-left">{tg.name}</span>
+                        </div>
+                        <div className="flex items-center shrink-0 ml-2">
+                          <span className={`
+                            text-[10px] px-1.5 py-0.2 rounded font-mono
+                            ${isSelected ? cfg.badge : 'bg-neutral-800/80 text-neutral-400'}
+                          `}>
+                            {tg.book_count || 0}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            {/* Individual Folders */}
-            {filteredShelves.map((s) => {
-              const isSelected = selectedShelf === s.id;
-              return (
-                <button
-                  key={s.id}
-                  onClick={() => {
-                    onSelectShelf(s.id);
-                  }}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    if (onShelfContextMenu) {
-                      onShelfContextMenu(e, s);
-                    }
-                  }}
-                  className={`
-                    w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors
-                    ${isSelected 
-                      ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' 
-                      : 'text-neutral-300 hover:bg-neutral-800 hover:text-white'}
-                  `}
-                  title={s.custom_name ? `${s.name} (${t('originalFolderLabel', { folder: s.folder })})` : s.name}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <ShelfIcon icon={s.icon} className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-amber-400' : 'text-neutral-400'}`} />
-                    <span className="truncate text-left">{s.name}</span>
-                  </div>
-                  <div className="flex items-center shrink-0 ml-2">
-                    <span className={`
-                      text-[11px] px-1.5 py-0.2 rounded font-mono
-                      ${isSelected ? 'bg-amber-500/20 text-amber-300' : 'bg-neutral-800 text-neutral-400'}
-                    `}>
-                      {s.book_count}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
+            {/* All Books Dedicated Page Option */}
+            <button
+              onClick={() => {
+                onSelectShelf('all-books');
+              }}
+              className={`
+                w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer
+                ${selectedShelf === 'all-books'
+                  ? 'bg-sky-500/15 text-sky-300 border border-sky-500/30'
+                  : 'text-neutral-300 hover:bg-neutral-800 hover:text-white'}
+              `}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <BookOpen className={`w-4 h-4 shrink-0 ${selectedShelf === 'all-books' ? 'text-sky-400 fill-sky-400/20' : 'text-neutral-400'}`} />
+                <span className="truncate">{t('allBooksLibrary')}</span>
+              </div>
+              <span className={`
+                text-[11px] px-2 py-0.5 rounded-full font-mono font-semibold
+                ${selectedShelf === 'all-books' ? 'bg-sky-500/20 text-sky-300' : 'bg-neutral-800 text-neutral-400'}
+              `}>
+                {totalBooks}
+              </span>
+            </button>
           </nav>
         </div>
 

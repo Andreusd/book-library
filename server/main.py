@@ -138,6 +138,7 @@ class TranslatePayload(BaseModel):
 class CreateTagPayload(BaseModel):
     name: str
     color: Optional[str] = "amber"
+    library_id: Optional[str] = None
 
 class UpdateTagPayload(BaseModel):
     name: Optional[str] = None
@@ -752,46 +753,51 @@ def toggle_favorite(payload: ToggleFavoritePayload, request: Request):
 
 @app.get("/api/tags")
 def list_tags(request: Request, library_id: Optional[str] = Query(None)):
-    """Returns all virtual tags with book counts (scoped to library and user)."""
+    """Returns all virtual tags with book counts strictly scoped to library and user."""
     user = get_request_user(request)
     tags_mgr = user_mgr.get_tags_mgr(user)
-    lib_val = library_id if isinstance(library_id, str) else None
+    lib_val = library_id if isinstance(library_id, str) and library_id.strip() else None
     if lib_val:
         lib_books = scanner.get_books(library_id=lib_val)
         book_ids = {b["id"] for b in lib_books}
-        return {"tags": tags_mgr.get_tags(book_ids_in_scope=book_ids)}
+        return {"tags": tags_mgr.get_tags(library_id=lib_val, book_ids_in_scope=book_ids)}
     return {"tags": tags_mgr.get_tags()}
 
 @app.post("/api/tags")
 def create_tag(payload: CreateTagPayload, request: Request):
-    """Creates a new virtual tag."""
+    """Creates a new virtual tag scoped to a specific library."""
     user = get_request_user(request)
     tags_mgr = user_mgr.get_tags_mgr(user)
     clean = payload.name.strip()
     if not clean:
         raise HTTPException(status_code=400, detail="Tag name cannot be empty")
-    tag = tags_mgr.create_tag(clean, payload.color or "amber")
-    return {"status": "ok", "tag": tag, "tags": tags_mgr.get_tags()}
+    lib_id = payload.library_id.strip() if payload.library_id and payload.library_id.strip() else "default"
+    tag = tags_mgr.create_tag(clean, payload.color or "amber", library_id=lib_id)
+    return {"status": "ok", "tag": tag, "tags": tags_mgr.get_tags(library_id=lib_id)}
 
 @app.put("/api/tags/{tag_id}")
-def update_tag(tag_id: str, payload: UpdateTagPayload, request: Request):
+def update_tag(tag_id: str, payload: UpdateTagPayload, request: Request, library_id: Optional[str] = Query(None)):
     """Updates an existing tag's name or color."""
     user = get_request_user(request)
     tags_mgr = user_mgr.get_tags_mgr(user)
+    existing_tag = tags_mgr.get_tag(tag_id)
     tag = tags_mgr.update_tag(tag_id, name=payload.name, color=payload.color)
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
-    return {"status": "ok", "tag": tag, "tags": tags_mgr.get_tags()}
+    lib_val = library_id or (existing_tag.get("library_id") if existing_tag else None)
+    return {"status": "ok", "tag": tag, "tags": tags_mgr.get_tags(library_id=lib_val)}
 
 @app.delete("/api/tags/{tag_id}")
-def delete_tag(tag_id: str, request: Request):
+def delete_tag(tag_id: str, request: Request, library_id: Optional[str] = Query(None)):
     """Deletes a virtual tag and untags all books."""
     user = get_request_user(request)
     tags_mgr = user_mgr.get_tags_mgr(user)
+    existing_tag = tags_mgr.get_tag(tag_id)
+    lib_val = library_id or (existing_tag.get("library_id") if existing_tag else None)
     success = tags_mgr.delete_tag(tag_id)
     if not success:
         raise HTTPException(status_code=404, detail="Tag not found")
-    return {"status": "ok", "tags": tags_mgr.get_tags()}
+    return {"status": "ok", "tags": tags_mgr.get_tags(library_id=lib_val)}
 
 @app.get("/api/books/{book_id}/tags")
 def get_book_tags(book_id: str, request: Request):

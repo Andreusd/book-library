@@ -31,7 +31,7 @@ export default function FavoriteBooks({
   const showControls = books.length > 2;
 
   return (
-    <section className="mb-8">
+    <section id="favorite-books-section" className="mb-8">
       {/* Section Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">

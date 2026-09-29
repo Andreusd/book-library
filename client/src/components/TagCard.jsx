@@ -1,57 +1,48 @@
 import React from 'react';
-import { BookOpen } from 'lucide-react';
-import ShelfIcon from './ShelfIcon';
+import { BookOpen, Tag } from 'lucide-react';
 import { useI18n } from '../i18n';
+import { getTagColorConfig } from '../utils/tagColors';
 
-export function getFolderCovers(folder, books = []) {
-  if (folder.sample_covers && folder.sample_covers.length > 0) {
-    return folder.sample_covers;
-  }
+export function getTagCovers(tag, books = []) {
   if (books && books.length > 0) {
-    const matching = books.filter(b => b.shelf === folder.id || b.folder === folder.id);
+    const matching = books.filter(b => b.tags && b.tags.some(t => t.id === tag.id));
     return matching.slice(0, 4).map(b => b.cover_url);
   }
   return [];
 }
 
-export default function FolderCard({
-  folder,
+export default function TagCard({
+  tag,
   covers,
   books = [],
-  onSelectFolder,
-  onContextMenu,
+  onSelectTag,
   className = ''
 }) {
   const { t } = useI18n();
-  const folderCovers = covers !== undefined ? covers : getFolderCovers(folder, books);
+  const cfg = getTagColorConfig(tag.color);
+  const tagCovers = covers !== undefined ? covers : getTagCovers(tag, books);
 
   return (
     <div
-      onClick={() => onSelectFolder && onSelectFolder(folder.id)}
-      onContextMenu={(e) => {
-        if (onContextMenu) {
-          e.preventDefault();
-          onContextMenu(e, folder);
-        }
-      }}
-      className={`group relative cursor-pointer bg-neutral-900/60 hover:bg-neutral-800/90 border border-neutral-800 hover:border-amber-500/40 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 flex flex-col items-center justify-between transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1 select-none isolate ${className}`}
+      onClick={() => onSelectTag && onSelectTag(tag)}
+      className={`group relative cursor-pointer bg-neutral-900/60 hover:bg-neutral-800/90 border border-neutral-800 hover:border-indigo-500/40 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 flex flex-col items-center justify-between transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1 select-none isolate ${className}`}
     >
       {/* Thumbnail Stack Container */}
       <div className="relative w-full h-32 sm:h-36 flex items-center justify-center my-0.5 isolate">
-        {folderCovers.length === 0 ? (
+        {tagCovers.length === 0 ? (
           /* Empty state placeholder */
           <div className="w-15 sm:w-16 aspect-[1/1.45] rounded-md bg-neutral-800/40 border border-neutral-700/40 flex flex-col items-center justify-center text-neutral-500 gap-1 shadow-inner">
-            <ShelfIcon icon={folder.icon} className="w-5 h-5 text-neutral-600" />
+            <Tag className={`w-5 h-5 ${cfg.text}`} />
             <span className="text-[10px] text-neutral-600 font-medium">Empty</span>
           </div>
-        ) : folderCovers.length === 1 ? (
+        ) : tagCovers.length === 1 ? (
           /* Single book cover */
-          <div className="relative w-16 sm:w-18 aspect-[1/1.45] rounded-md overflow-hidden shadow-lg border border-neutral-700/70 group-hover:border-amber-500/50 group-hover:scale-105 transition-all duration-300 bg-neutral-950">
+          <div className="relative w-16 sm:w-18 aspect-[1/1.45] rounded-md overflow-hidden shadow-lg border border-neutral-700/70 group-hover:border-indigo-500/50 group-hover:scale-105 transition-all duration-300 bg-neutral-950">
             <div className="absolute inset-0 flex items-center justify-center bg-neutral-900 text-neutral-600">
               <BookOpen className="w-5 h-5 opacity-30" />
             </div>
             <img
-              src={folderCovers[0]}
+              src={tagCovers[0]}
               alt=""
               loading="lazy"
               className="relative z-10 w-full h-full object-cover"
@@ -60,7 +51,7 @@ export default function FolderCard({
               }}
             />
           </div>
-        ) : folderCovers.length === 2 ? (
+        ) : tagCovers.length === 2 ? (
           /* 2 Books Stack */
           <>
             {/* Back Cover */}
@@ -69,7 +60,7 @@ export default function FolderCard({
                 <BookOpen className="w-4 h-4 opacity-30" />
               </div>
               <img
-                src={folderCovers[1]}
+                src={tagCovers[1]}
                 alt=""
                 loading="lazy"
                 className="relative z-10 w-full h-full object-cover"
@@ -84,7 +75,7 @@ export default function FolderCard({
                 <BookOpen className="w-4 h-4 opacity-30" />
               </div>
               <img
-                src={folderCovers[0]}
+                src={tagCovers[0]}
                 alt=""
                 loading="lazy"
                 className="relative z-10 w-full h-full object-cover"
@@ -103,7 +94,7 @@ export default function FolderCard({
                 <BookOpen className="w-4 h-4 opacity-25" />
               </div>
               <img
-                src={folderCovers[2]}
+                src={tagCovers[2]}
                 alt=""
                 loading="lazy"
                 className="relative z-10 w-full h-full object-cover"
@@ -118,7 +109,7 @@ export default function FolderCard({
                 <BookOpen className="w-4 h-4 opacity-25" />
               </div>
               <img
-                src={folderCovers[1]}
+                src={tagCovers[1]}
                 alt=""
                 loading="lazy"
                 className="relative z-10 w-full h-full object-cover"
@@ -133,7 +124,7 @@ export default function FolderCard({
                 <BookOpen className="w-4 h-4 opacity-30" />
               </div>
               <img
-                src={folderCovers[0]}
+                src={tagCovers[0]}
                 alt=""
                 loading="lazy"
                 className="relative z-10 w-full h-full object-cover"
@@ -146,21 +137,21 @@ export default function FolderCard({
         )}
       </div>
 
-      {/* Folder Details */}
+      {/* Tag Details */}
       <div className="w-full text-center mt-1.5 pt-1.5 border-t border-neutral-800/60">
         <div className="flex items-center justify-center min-h-[2.25rem] mb-0.5 px-1">
           <h3 
-            className="text-xs font-semibold text-neutral-200 group-hover:text-amber-400 transition-colors line-clamp-2 leading-snug break-words text-center"
-            title={folder.name}
+            className="text-xs font-semibold text-neutral-200 group-hover:text-indigo-400 transition-colors line-clamp-2 leading-snug break-words text-center flex items-center justify-center gap-1.5"
+            title={tag.name}
           >
-            <ShelfIcon icon={folder.icon} className="inline-block w-3.5 h-3.5 text-amber-500/90 mr-1.5 -mt-0.5 align-middle shrink-0" />
-            {folder.name}
+            <span className={`w-2.5 h-2.5 rounded-full ${cfg.dot} shrink-0`} />
+            <span className="truncate">{tag.name}</span>
           </h3>
         </div>
         <span className="inline-block text-[11px] text-neutral-400 font-medium">
-          {folder.book_count === 1
-            ? t('folderBooksCount_one')
-            : t('folderBooksCount', { count: folder.book_count })}
+          {tag.book_count === 1
+            ? (t('booksTaggedCount_one') || '1 book')
+            : t('booksTaggedCount', { count: tag.book_count || 0 })}
         </span>
       </div>
     </div>

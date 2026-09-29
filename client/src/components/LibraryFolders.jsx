@@ -18,17 +18,17 @@ export default function LibraryFolders({
 
   const scroll = (direction) => {
     if (!scrollContainerRef.current) return;
-    const scrollAmount = 360;
+    const scrollAmount = Math.max(200, Math.floor(scrollContainerRef.current.clientWidth * 0.75));
     scrollContainerRef.current.scrollBy({
       left: direction === 'left' ? -scrollAmount : scrollAmount,
       behavior: 'smooth'
     });
   };
 
-  const showControls = folders.length > 4;
+  const showControls = folders.length > 2;
 
   return (
-    <section className="mb-10">
+    <section className="mb-8">
       {/* Section Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -98,24 +98,30 @@ export default function LibraryFolders({
         ref={scrollContainerRef}
         className={
           isGridView
-            ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-5'
-            : folders.length <= 4
-              ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 sm:gap-5'
-              : 'flex gap-4 sm:gap-5 overflow-x-auto no-scrollbar scroll-smooth py-1 px-0.5'
+            ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5 sm:gap-6'
+            : 'flex gap-5 sm:gap-6 overflow-x-auto no-scrollbar scroll-smooth py-1 px-0.5'
         }
       >
         {folders.map((folder) => {
           const covers = getFolderCovers(folder, books);
 
           return (
-            <FolderCard
+            <div
               key={folder.id}
-              folder={folder}
-              covers={covers}
-              onSelectFolder={onSelectFolder}
-              onContextMenu={onContextMenu}
-              className={!isGridView && folders.length > 4 ? 'w-44 sm:w-48 shrink-0' : 'w-full'}
-            />
+              className={
+                !isGridView
+                  ? 'w-[calc((100%-1.25rem)/2)] sm:w-[calc((100%-3rem)/3)] md:w-[calc((100%-4.5rem)/4)] lg:w-[calc((100%-6rem)/5)] xl:w-[calc((100%-7.5rem)/6)] shrink-0'
+                  : 'w-full'
+              }
+            >
+              <FolderCard
+                folder={folder}
+                covers={covers}
+                onSelectFolder={onSelectFolder}
+                onContextMenu={onContextMenu}
+                className="w-full h-full"
+              />
+            </div>
           );
         })}
       </div>

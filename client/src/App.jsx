@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Search, SlidersHorizontal, Menu, X, BookOpen, 
   ArrowUpDown, FolderOpen, RefreshCw, PanelLeftClose, PanelLeftOpen,
-  Settings, Heart, Bookmark, Home, Maximize2, Minimize2, Library, Folder, Tag
+  Settings, Heart, Bookmark, Home, Maximize2, Minimize2, Library, Folder, Tag, Plus
 } from 'lucide-react';
 
 import Sidebar from './components/Sidebar';
@@ -11,6 +11,8 @@ import ContinueReading from './components/ContinueReading';
 import FavoriteBooks from './components/FavoriteBooks';
 import LibraryFolders from './components/LibraryFolders';
 import FolderCard from './components/FolderCard';
+import TagCard from './components/TagCard';
+import LibraryTags from './components/LibraryTags';
 import AllBooks from './components/AllBooks';
 import LibrarySelector from './components/LibrarySelector';
 import Reader from './components/Reader';
@@ -60,6 +62,12 @@ function parseRoute() {
   if (segments[0] === 'folders' || segments[0] === 'shelves') {
     return { view: 'folders', libraryId: null, shelfId: 'folders', bookId: null };
   }
+  if (segments[0] === 'all-books' || segments[0] === 'all') {
+    return { view: 'all-books', libraryId: null, shelfId: 'all-books', bookId: null };
+  }
+  if (segments[0] === 'tags') {
+    return { view: 'tags', libraryId: null, shelfId: 'tags', bookId: null };
+  }
   if ((segments[0] === 'folder' || segments[0] === 'shelf') && segments[1]) {
     return { view: 'folder', libraryId: null, shelfId: segments[1], bookId: null };
   }
@@ -101,6 +109,16 @@ function parseRoute() {
     return { view: 'folders', libraryId: libId, shelfId: 'folders', bookId: null };
   }
 
+  // /:libraryId/all-books or /:libraryId/all
+  if (rest[0] === 'all-books' || rest[0] === 'all') {
+    return { view: 'all-books', libraryId: libId, shelfId: 'all-books', bookId: null };
+  }
+
+  // /:libraryId/tags
+  if (rest[0] === 'tags') {
+    return { view: 'tags', libraryId: libId, shelfId: 'tags', bookId: null };
+  }
+
   // /:libraryId/folder/:folderId or /:libraryId/shelf/:folderId
   if ((rest[0] === 'folder' || rest[0] === 'shelf') && rest[1]) {
     return { view: 'folder', libraryId: libId, shelfId: rest[1], bookId: null };
@@ -121,6 +139,8 @@ function getPathForShelf(shelfId, libraryId) {
   if (shelfId === 'continue-reading') return `${base}/continue-reading`;
   if (shelfId === 'favorites') return `${base}/favorites`;
   if (shelfId === 'folders' || shelfId === 'shelves') return `${base}/folders`;
+  if (shelfId === 'all-books' || shelfId === 'all') return `${base}/all-books`;
+  if (shelfId === 'tags') return `${base}/tags`;
   if (shelfId.startsWith('tag:')) return `${base}/tag/${encodeURIComponent(shelfId.slice(4))}`;
   return `${base}/folder/${encodeURIComponent(shelfId)}`;
 }
@@ -355,10 +375,10 @@ export default function App() {
     params.append('library_id', targetLib);
     if (shelfToUse && shelfToUse.startsWith('tag:')) {
       params.append('tag', shelfToUse.slice(4));
-    } else if (shelfToUse && shelfToUse !== 'folders') {
+    } else if (shelfToUse && shelfToUse !== 'folders' && shelfToUse !== 'tags' && shelfToUse !== 'all-books') {
       params.append('shelf', shelfToUse);
     }
-    if (debouncedQuery && shelfToUse !== 'folders') params.append('query', debouncedQuery);
+    if (debouncedQuery && shelfToUse !== 'folders' && shelfToUse !== 'tags') params.append('query', debouncedQuery);
     if (sortBy) params.append('sort', sortBy);
 
     fetch(`/api/books?${params.toString()}`)
@@ -739,6 +759,10 @@ export default function App() {
       document.title = `${t('favorites')} - ${activeLibraryObj?.name || t('appTitle')}`;
     } else if (selectedShelf === 'folders') {
       document.title = `${t('folders')} - ${activeLibraryObj?.name || t('appTitle')}`;
+    } else if (selectedShelf === 'tags') {
+      document.title = `${t('tags')} - ${activeLibraryObj?.name || t('appTitle')}`;
+    } else if (selectedShelf === 'all-books') {
+      document.title = `${t('allBooksLibrary')} - ${activeLibraryObj?.name || t('appTitle')}`;
     } else if (isTagFilter && currentTagObj) {
       document.title = `${currentTagObj.name} - ${activeLibraryObj?.name || t('appTitle')}`;
     } else if (currentShelfObj) {
@@ -868,13 +892,30 @@ export default function App() {
                           <Folder className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" />
                           <span>{t('folders')}</span>
                         </>
+                      ) : selectedShelf === 'all-books' ? (
+                        <>
+                          <BookOpen className="w-4 h-4 text-sky-400 shrink-0" />
+                          <span>{t('allBooksLibrary')}</span>
+                        </>
+                      ) : selectedShelf === 'tags' ? (
+                        <>
+                          <Tag className="w-4 h-4 text-indigo-400 shrink-0" />
+                          <span>{t('tags')}</span>
+                        </>
                       ) : isTagFilter ? (
                         <>
+                          <button
+                            type="button"
+                            onClick={() => navigateToShelf('tags')}
+                            className="hover:text-indigo-400 transition-colors flex items-center gap-1 text-neutral-400 cursor-pointer"
+                          >
+                            <Tag className="w-3.5 h-3.5" />
+                            <span>{t('tags')}</span>
+                          </button>
+                          <span className="text-neutral-600">/</span>
                           {currentTagObj ? (
                             <span className={`w-2.5 h-2.5 rounded-full ${getTagColorConfig(currentTagObj.color).dot} shrink-0`} />
-                          ) : (
-                            <Tag className="w-4 h-4 text-amber-500 shrink-0" />
-                          )}
+                          ) : null}
                           <span>{currentTagObj ? currentTagObj.name : t('tagFilter')}</span>
                         </>
                       ) : (
@@ -990,6 +1031,17 @@ export default function App() {
             />
           )}
 
+          {/* Tags Carousel (displayed when browsing all books without active search) */}
+          {!selectedShelf && !debouncedQuery && tags.length > 0 && (
+            <LibraryTags
+              tags={tags}
+              books={books}
+              onSelectTag={(tg) => navigateToShelf(`tag:${tg.id}`)}
+              onViewAll={() => navigateToShelf('tags')}
+              onOpenTagManager={() => setTagModal({ isOpen: true, book: null })}
+            />
+          )}
+
           {/* Shelf Section Title & Count (displayed when browsing a specific folder, shelf, or search query) */}
           {(selectedShelf || debouncedQuery) && (
             <div className="flex items-center justify-between mb-6 pb-2 border-b border-neutral-800">
@@ -1001,16 +1053,20 @@ export default function App() {
                       ? t('favorites') 
                       : selectedShelf === 'folders'
                         ? t('folders')
-                        : isTagFilter && currentTagObj
-                          ? (
-                            <>
-                              <span className={`w-3 h-3 rounded-full ${getTagColorConfig(currentTagObj.color).dot} shrink-0`} />
-                              <span>{currentTagObj.name}</span>
-                            </>
-                          )
-                          : currentShelfObj 
-                            ? currentShelfObj.name 
-                            : t('allBooksLibrary')}
+                        : selectedShelf === 'all-books'
+                          ? t('allBooksLibrary')
+                          : selectedShelf === 'tags'
+                            ? t('tags')
+                          : isTagFilter && currentTagObj
+                            ? (
+                              <>
+                                <span className={`w-3 h-3 rounded-full ${getTagColorConfig(currentTagObj.color).dot} shrink-0`} />
+                                <span>{currentTagObj.name}</span>
+                              </>
+                            )
+                            : currentShelfObj 
+                              ? currentShelfObj.name 
+                              : t('allBooksLibrary')}
                 </h2>
                 <p className="text-xs text-neutral-400 mt-0.5">
                   {debouncedQuery 
@@ -1018,19 +1074,36 @@ export default function App() {
                         query: debouncedQuery, 
                         count: selectedShelf === 'folders'
                           ? shelves.filter(s => s.name.toLowerCase().includes(debouncedQuery.toLowerCase())).length
-                          : books.length 
+                          : selectedShelf === 'tags'
+                            ? tags.filter(tg => tg.name.toLowerCase().includes(debouncedQuery.toLowerCase())).length
+                            : books.length 
                       })
                     : selectedShelf === 'folders'
                       ? t('foldersCount', { count: shelves.length })
-                      : isTagFilter
-                        ? t('booksTaggedCount', { count: books.length })
-                        : t('booksInShelf', { count: books.length })}
+                      : selectedShelf === 'all-books'
+                        ? t('allBooksCount', { count: totalBooks || books.length })
+                        : selectedShelf === 'tags'
+                          ? (tags.length === 1 ? (t('tagsCount_one') || '(1 tag)') : (t('tagsCount', { count: tags.length }) || `(${tags.length} tags)`))
+                        : isTagFilter
+                          ? t('booksTaggedCount', { count: books.length })
+                          : t('booksInShelf', { count: books.length })}
                 </p>
               </div>
+
+              {selectedShelf === 'tags' && (
+                <button
+                  type="button"
+                  onClick={() => setTagModal({ isOpen: true, book: null })}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-300 text-xs font-medium transition cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{t('manageTags')}</span>
+                </button>
+              )}
             </div>
           )}
 
-          {/* Content: Dedicated Folders Page Grid, Loading Skeletons, AllBooks Carousel, or Books Grid */}
+          {/* Content: Dedicated Folders Page Grid, Dedicated Tags Page Grid, Loading Skeletons, AllBooks Carousel, or Books Grid */}
           {selectedShelf === 'folders' ? (
             (() => {
               const displayFolders = debouncedQuery
@@ -1052,7 +1125,7 @@ export default function App() {
               }
 
               return (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5 sm:gap-6">
                   {displayFolders.map((folder) => (
                     <FolderCard
                       key={folder.id}
@@ -1060,6 +1133,50 @@ export default function App() {
                       books={books}
                       onSelectFolder={(folderId) => navigateToShelf(folderId)}
                       onContextMenu={handleShelfContextMenu}
+                      className="w-full"
+                    />
+                  ))}
+                </div>
+              );
+            })()
+          ) : selectedShelf === 'tags' ? (
+            (() => {
+              const displayTags = debouncedQuery
+                ? tags.filter(tg => tg.name.toLowerCase().includes(debouncedQuery.toLowerCase()))
+                : tags;
+
+              if (displayTags.length === 0) {
+                return (
+                  <div className="text-center py-20 flex flex-col items-center justify-center">
+                    <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-4">
+                      <Tag className="w-8 h-8 text-indigo-400" />
+                    </div>
+                    <h3 className="text-base font-semibold text-neutral-300">
+                      {debouncedQuery ? t('noBooksFound') : (t('noTagsFound') || 'No tags found')}
+                    </h3>
+                    <p className="text-xs text-neutral-500 mt-1 max-w-sm">
+                      {debouncedQuery ? t('noBooksDesc') : (t('noTagsDesc') || 'Create tags to organize and categorize your books across folders.')}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setTagModal({ isOpen: true, book: null })}
+                      className="mt-4 flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-500 text-white font-medium text-xs hover:bg-indigo-600 transition shadow-lg shadow-indigo-500/20 cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>{t('createNewTag')}</span>
+                    </button>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5 sm:gap-6">
+                  {displayTags.map((tag) => (
+                    <TagCard
+                      key={tag.id}
+                      tag={tag}
+                      books={books}
+                      onSelectTag={(tg) => navigateToShelf(`tag:${tg.id}`)}
                       className="w-full"
                     />
                   ))}
@@ -1085,6 +1202,7 @@ export default function App() {
                 onOpenDetails={handleOpenDetails}
                 onContextMenu={handleContextMenu}
                 onToggleFavorite={handleToggleFavorite}
+                onViewAll={() => navigateToShelf('all-books')}
                 onSelectTag={(tg) => navigateToShelf(`tag:${tg.id}`)}
                 showFileExtension={showFileExtension}
               />
@@ -1215,6 +1333,7 @@ export default function App() {
         onClose={() => setTagModal({ isOpen: false, book: null })}
         book={tagModal.book}
         tags={tags}
+        libraryId={activeLibraryId}
         onTagsUpdated={() => loadTags(activeLibraryId)}
         onBookTagsUpdated={handleBookTagsUpdated}
       />

@@ -24,6 +24,7 @@ class TagsManager:
         os.makedirs(os.path.dirname(self.data_path), exist_ok=True)
         self._lock = threading.RLock()
         self._data = self._load()
+        self._migrate_tag_libraries()
 
     def _load(self) -> Dict[str, Any]:
         if os.path.exists(self.data_path):
@@ -35,20 +36,10 @@ class TagsManager:
             except Exception as e:
                 print(f"Error loading tags: {e}")
 
-        # Initialize with default tags
         initial = {
             "tags": {},
             "book_tags": {}
         }
-        for dt in DEFAULT_TAGS:
-            t_id = f"tag_{uuid.uuid4().hex[:8]}"
-            initial["tags"][t_id] = {
-                "id": t_id,
-                "name": dt["name"],
-                "color": dt["color"],
-                "created_at": datetime.now().isoformat()
-            }
-        
         try:
             with open(self.data_path, "w", encoding="utf-8") as f:
                 json.dump(initial, f, indent=2, ensure_ascii=False)
@@ -57,6 +48,37 @@ class TagsManager:
 
         return initial
 
+    def _migrate_tag_libraries(self):
+        """Ensures all existing tags have a library_id by inspecting tagged books or defaulting to 'default'."""
+        with self._lock:
+            modified = False
+            tags = self._data.get("tags", {})
+            book_tags = self._data.get("book_tags", {})
+            scanner = None
+
+            for tag_id, tag in tags.items():
+                if not tag.get("library_id"):
+                    resolved_lib = None
+                    tagged_books = [b_id for b_id, t_ids in book_tags.items() if tag_id in t_ids]
+                    if tagged_books:
+                        try:
+                            from .scanner import LibraryScanner
+                            if scanner is None:
+                                scanner = LibraryScanner()
+                            for b_id in tagged_books:
+                                b = scanner.find_book(b_id)
+                                if b and b.get("library_id"):
+                                    resolved_lib = b["library_id"]
+                                    break
+                        except Exception as e:
+                            print(f"Could not resolve library for tag {tag_id}: {e}")
+
+                    tag["library_id"] = resolved_lib or "default"
+                    modified = True
+
+            if modified:
+                self._save()
+
     def _save(self):
         try:
             with open(self.data_path, "w", encoding="utf-8") as f:
@@ -64,13 +86,19 @@ class TagsManager:
         except Exception as e:
             print(f"Error saving tags: {e}")
 
-    def get_tags(self, book_ids_in_scope: Optional[set] = None) -> List[Dict[str, Any]]:
-        """Returns all tags sorted alphabetically by name, with book counts (scoped to library if provided)."""
+    def get_tags(self, library_id: Optional[str] = None, book_ids_in_scope: Optional[set] = None) -> List[Dict[str, Any]]:
+        """Returns all tags strictly scoped to library, sorted alphabetically by name with book counts."""
         with self._lock:
             tags_list = []
             book_tags = self._data.get("book_tags", {})
 
             for tag_id, tag in self._data.get("tags", {}).items():
+                tag_lib = tag.get("library_id") or "default"
+
+                # If library_id is provided, strictly isolate to that library
+                if library_id is not None and tag_lib != library_id:
+                    continue
+
                 if book_ids_in_scope is not None:
                     count = sum(
                         1 for b_id, t_ids in book_tags.items()
@@ -91,15 +119,18 @@ class TagsManager:
             tag = self._data.get("tags", {}).get(tag_id)
             return dict(tag) if tag else None
 
-    def create_tag(self, name: str, color: str = "amber") -> Dict[str, Any]:
+    def create_tag(self, name: str, color: str = "amber", library_id: Optional[str] = None) -> Dict[str, Any]:
         with self._lock:
             clean_name = name.strip()
             if not clean_name:
                 raise ValueError("Tag name cannot be empty")
             
-            # Check for duplicate name (case-insensitive)
+            lib_id = library_id.strip() if library_id and library_id.strip() else "default"
+
+            # Check for duplicate name strictly within the same library (case-insensitive)
             for existing in self._data.get("tags", {}).values():
-                if existing.get("name", "").lower() == clean_name.lower():
+                existing_lib = existing.get("library_id") or "default"
+                if existing_lib == lib_id and existing.get("name", "").lower() == clean_name.lower():
                     return dict(existing)
 
             color_val = color if color in VALID_COLORS else "amber"
@@ -108,6 +139,7 @@ class TagsManager:
                 "id": tag_id,
                 "name": clean_name,
                 "color": color_val,
+                "library_id": lib_id,
                 "created_at": datetime.now().isoformat()
             }
             self._data.setdefault("tags", {})[tag_id] = tag

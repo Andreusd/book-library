@@ -10,6 +10,7 @@ export default function AllBooks({
   onOpenDetails,
   onContextMenu,
   onToggleFavorite,
+  onViewAll,
   onSelectTag,
   showFileExtension
 }) {
@@ -45,8 +46,18 @@ export default function AllBooks({
       {/* Section Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <BookOpen className="w-5 h-5 text-sky-500 fill-sky-500" />
-          <h2 className="text-base font-semibold text-neutral-100">{t('allBooksLibrary')}</h2>
+          <BookOpen className="w-5 h-5 text-sky-500 fill-sky-500 shrink-0" />
+          {onViewAll ? (
+            <button
+              onClick={onViewAll}
+              className="text-base font-semibold text-neutral-100 hover:text-sky-400 transition-colors cursor-pointer text-left"
+              title={t('allBooksLibrary')}
+            >
+              <h2>{t('allBooksLibrary')}</h2>
+            </button>
+          ) : (
+            <h2 className="text-base font-semibold text-neutral-100">{t('allBooksLibrary')}</h2>
+          )}
           <span className="text-xs text-neutral-500 font-normal">
             {t('allBooksCount', { count: books.length })}
           </span>

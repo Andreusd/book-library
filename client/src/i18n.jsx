@@ -43,10 +43,10 @@ export const translations = {
     collapseFolders: 'Show carousel',
     showCarousel: 'Show carousel',
 
-    // All books in library
-    allBooksLibrary: 'All books in library',
-    booksInLibrary: '{count} books in library',
-    allBooksCount: '({count} books in library)',
+    // All books
+    allBooksLibrary: 'All books',
+    booksInLibrary: '{count} books',
+    allBooksCount: '({count} books)',
 
     // Favorites
     favorites: 'Favorites',
@@ -232,6 +232,10 @@ export const translations = {
     noTagsCreated: 'No tags created yet. Create your first tag above!',
     deleteTagConfirm: 'Delete tag "{name}"? It will be removed from all books.',
     tagFilter: 'Tag',
+    tagsCount: '({count} tags)',
+    tagsCount_one: '(1 tag)',
+    noTagsFound: 'No tags found',
+    noTagsDesc: 'Create tags to organize and categorize your books across folders.',
     booksTaggedCount: '{count} books with this tag',
     booksTaggedCount_one: '1 book with this tag',
     bookCountOne: 'book',
@@ -370,10 +374,10 @@ export const translations = {
     collapseFolders: 'Mostrar carrossel',
     showCarousel: 'Mostrar carrossel',
 
-    // All books in library
-    allBooksLibrary: 'Todos os livros na biblioteca',
-    booksInLibrary: '{count} livros na biblioteca',
-    allBooksCount: '({count} livros na biblioteca)',
+    // All books
+    allBooksLibrary: 'Todos os livros',
+    booksInLibrary: '{count} livros',
+    allBooksCount: '({count} livros)',
 
     // Favorites
     favorites: 'Favoritos',
@@ -559,6 +563,10 @@ export const translations = {
     noTagsCreated: 'Nenhuma tag criada ainda. Crie sua primeira tag acima!',
     deleteTagConfirm: 'Excluir tag "{name}"? Ela será removida de todos os livros.',
     tagFilter: 'Tag',
+    tagsCount: '({count} tags)',
+    tagsCount_one: '(1 tag)',
+    noTagsFound: 'Nenhuma tag encontrada',
+    noTagsDesc: 'Crie tags para organizar e categorizar seus livros entre pastas.',
     booksTaggedCount: '{count} livros com esta tag',
     booksTaggedCount_one: '1 livro com esta tag',
     bookCountOne: 'livro',
@@ -697,10 +705,10 @@ export const translations = {
     collapseFolders: 'Ver carrusel',
     showCarousel: 'Ver carrusel',
 
-    // All books in library
-    allBooksLibrary: 'Todos los libros de la biblioteca',
-    booksInLibrary: '{count} libros en la biblioteca',
-    allBooksCount: '({count} libros en la biblioteca)',
+    // All books
+    allBooksLibrary: 'Todos los libros',
+    booksInLibrary: '{count} libros',
+    allBooksCount: '({count} libros)',
 
     // Favorites
     favorites: 'Favoritos',
@@ -886,6 +894,10 @@ export const translations = {
     noTagsCreated: 'No hay etiquetas creadas. ¡Crea tu primera etiqueta arriba!',
     deleteTagConfirm: '¿Eliminar la etiqueta "{name}"? Se eliminará de todos los libros.',
     tagFilter: 'Etiqueta',
+    tagsCount: '({count} etiquetas)',
+    tagsCount_one: '(1 etiqueta)',
+    noTagsFound: 'No se encontraron etiquetas',
+    noTagsDesc: 'Crea etiquetas para organizar y clasificar tus libros en diferentes carpetas.',
     booksTaggedCount: '{count} libros con esta etiqueta',
     booksTaggedCount_one: '1 libro con esta etiqueta',
     bookCountOne: 'libro',
@@ -1024,10 +1036,10 @@ export const translations = {
     collapseFolders: 'Afficher le carrousel',
     showCarousel: 'Afficher le carrousel',
 
-    // All books in library
-    allBooksLibrary: 'Tous les livres de la bibliothèque',
-    booksInLibrary: '{count} livres dans la bibliothèque',
-    allBooksCount: '({count} livres dans la bibliothèque)',
+    // All books
+    allBooksLibrary: 'Tous les livres',
+    booksInLibrary: '{count} livres',
+    allBooksCount: '({count} livres)',
 
     // Favorites
     favorites: 'Favoris',
@@ -1213,6 +1225,10 @@ export const translations = {
     noTagsCreated: 'Aucune étiquette créée. Créez votre première étiquette ci-dessus !',
     deleteTagConfirm: 'Supprimer l’étiquette "{name}" ? Elle sera retirée de tous les livres.',
     tagFilter: 'Étiquette',
+    tagsCount: '({count} étiquettes)',
+    tagsCount_one: '(1 étiquette)',
+    noTagsFound: 'Aucune étiquette trouvée',
+    noTagsDesc: 'Créez des étiquettes pour organiser et catégoriser vos livres à travers vos dossiers.',
     booksTaggedCount: '{count} livres avec cette étiquette',
     booksTaggedCount_one: '1 livre avec cette étiquette',
     bookCountOne: 'livre',
