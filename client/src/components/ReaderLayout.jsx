@@ -43,7 +43,10 @@ export default function ReaderLayout({
   onUpdateComment,
   onDeleteAnnotation,
   book,
-  // Search bar
+  // Consolidated search & TTS controllers (optional)
+  search,
+  tts,
+  // Legacy Search bar props
   searchOpen,
   searchQuery,
   matchesCount = { current: 0, total: 0 },
@@ -56,7 +59,7 @@ export default function ReaderLayout({
   onFindPrev,
   onToggleCaseSensitive,
   onToggleEntireWord,
-  // TTS bar
+  // Legacy TTS bar props
   ttsOpen,
   setTtsOpen,
   ttsText,
@@ -72,6 +75,49 @@ export default function ReaderLayout({
   showBottomProgress,
 }) {
   const { t } = useI18n();
+
+  const searchController = search || {
+    isOpen: searchOpen,
+    searchOpen,
+    query: searchQuery,
+    searchQuery,
+    currentIndex: matchesCount?.current ?? 0,
+    totalMatches: matchesCount?.total ?? 0,
+    matchesCount,
+    isSearching,
+    caseSensitive,
+    entireWord,
+    onClose: onCloseSearch,
+    handleCloseSearch: onCloseSearch,
+    onQueryChange: onSearchQueryChange,
+    handleSearchQueryChange: onSearchQueryChange,
+    onNext: onFindNext,
+    handleFindNext: onFindNext,
+    onPrev: onFindPrev,
+    handleFindPrev: onFindPrev,
+    onToggleCaseSensitive,
+    handleToggleCaseSensitive: onToggleCaseSensitive,
+    onToggleEntireWord,
+    handleToggleEntireWord: onToggleEntireWord,
+    theme: invertColors ? 'dark' : 'light',
+  };
+
+  const ttsController = tts || {
+    isOpen: ttsOpen,
+    ttsOpen,
+    onClose: () => (setTtsOpen ? setTtsOpen(false) : null),
+    text: ttsText,
+    ttsText,
+    mode: ttsMode,
+    ttsMode,
+    pageNumber: ttsPageNumber,
+    ttsPageNumber,
+    totalPages,
+    onNextPage: goToNextPage,
+    onPrevPage: goToPrevPage,
+    theme: invertColors ? 'dark' : 'light',
+    bookTitle: book?.title || '',
+  };
 
   const floatingBtnClass = invertColors
     ? 'bg-neutral-900/80 hover:bg-neutral-800 border-neutral-700 hover:border-amber-500/60 text-neutral-300 hover:text-white'
@@ -161,34 +207,14 @@ export default function ReaderLayout({
 
         {/* Floating In-Book Search Bar */}
         <BookSearchBar
-          isOpen={searchOpen}
-          onClose={onCloseSearch}
-          query={searchQuery}
-          onQueryChange={onSearchQueryChange}
-          onNext={onFindNext}
-          onPrev={onFindPrev}
-          currentIndex={matchesCount.current}
-          totalMatches={matchesCount.total}
-          isSearching={isSearching}
-          caseSensitive={caseSensitive}
-          onToggleCaseSensitive={onToggleCaseSensitive}
-          entireWord={entireWord}
-          onToggleEntireWord={onToggleEntireWord}
+          search={searchController}
           theme={invertColors ? 'dark' : 'light'}
         />
 
         {/* Text-to-Speech (Read Aloud) Player Bar */}
         <TtsPlayerBar
-          isOpen={ttsOpen}
-          onClose={() => setTtsOpen(false)}
-          text={ttsText}
-          mode={ttsMode}
-          pageNumber={ttsPageNumber}
-          totalPages={totalPages}
-          onNextPage={goToNextPage}
-          onPrevPage={goToPrevPage}
+          tts={ttsController}
           theme={invertColors ? 'dark' : 'light'}
-          bookTitle={book?.title || ''}
         />
       </div>
 

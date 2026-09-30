@@ -1,34 +1,48 @@
 import React, { useState } from 'react';
 import { BookOpen, CheckCircle, Heart, Info } from 'lucide-react';
 import { useI18n } from '../i18n';
+import { useBookActions } from '../hooks/useBookActions';
 import { getTagColorConfig } from '../utils/tagColors';
 
 export default function BookCard({ 
   book, 
   isFavorite, 
   onSelectBook, 
-  onOpenDetails,
+  onOpenDetails, 
   onContextMenu, 
-  onToggleFavorite,
-  onSelectTag,
-  showFileExtension
+  onToggleFavorite, 
+  onSelectTag, 
+  showFileExtension 
 }) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const { t } = useI18n();
+  const actions = useBookActions();
 
-  const isFav = isFavorite !== undefined ? isFavorite : Boolean(book.is_favorite);
+  const selectBook = onSelectBook || actions.openReader;
+  const openDetails = onOpenDetails || actions.openDetails;
+  const contextMenu = onContextMenu || actions.openContextMenu;
+  const toggleFav = onToggleFavorite || actions.toggleFavorite;
+  const selectTag = onSelectTag || actions.selectTag;
+
+  const isFav = isFavorite !== undefined 
+    ? isFavorite 
+    : (actions.isFavorite && book ? actions.isFavorite(book.id) : Boolean(book?.is_favorite));
+
   const isEpub = book.format === 'epub' || book.filename?.toLowerCase().endsWith('.epub');
   const isPdf = book.format === 'pdf' || book.filename?.toLowerCase().endsWith('.pdf') || !isEpub;
   const shouldShowExtension = showFileExtension !== undefined 
     ? Boolean(showFileExtension) 
-    : (() => {
-        try {
-          return localStorage.getItem('show_file_extension') !== 'false';
-        } catch {
-          return true;
-        }
-      })();
+    : (actions.showFileExtension !== undefined 
+        ? actions.showFileExtension 
+        : (() => {
+            try {
+              return localStorage.getItem('show_file_extension') !== 'false';
+            } catch {
+              return true;
+            }
+          })());
+
   const isFinished = Boolean(book.progress && (book.progress.percent >= 100 || book.progress.status === 'completed'));
   const hasReadingProgress = Boolean(
     book.progress && (
@@ -46,15 +60,15 @@ export default function BookCard({
   const percent = Math.min(100, Math.max(0, calcPercent));
 
   const handleContextMenu = (e) => {
-    if (onContextMenu) {
+    if (contextMenu) {
       e.preventDefault();
-      onContextMenu(e, book);
+      contextMenu(e, book);
     }
   };
 
   return (
     <div 
-      onClick={() => onSelectBook(book)}
+      onClick={() => selectBook(book)}
       onContextMenu={handleContextMenu}
       className="book-card group cursor-pointer flex flex-col items-center select-none text-left"
     >
@@ -94,7 +108,7 @@ export default function BookCard({
         <button
           onClick={(e) => {
             e.stopPropagation();
-            if (onToggleFavorite) onToggleFavorite(book);
+            if (toggleFav) toggleFav(book);
           }}
           className={`absolute top-2 left-2 p-1.5 rounded-full backdrop-blur-md transition-all duration-200 z-20 cursor-pointer ${
             isFav 
@@ -132,12 +146,12 @@ export default function BookCard({
 
         {/* Quick Hover Action Buttons */}
         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-2.5 pointer-events-none">
-          {onOpenDetails && (
+          {openDetails && (
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                onOpenDetails(book);
+                openDetails(book);
               }}
               className="p-1.5 rounded-lg bg-neutral-900/90 hover:bg-neutral-800 text-neutral-300 hover:text-sky-300 border border-neutral-750 shadow-lg pointer-events-auto transition cursor-pointer active:scale-95"
               title={t('viewDetails')}
@@ -201,9 +215,9 @@ export default function BookCard({
                 <span
                   key={tg.id}
                   onClick={(e) => {
-                    if (onSelectTag) {
+                    if (selectTag) {
                       e.stopPropagation();
-                      onSelectTag(tg);
+                      selectTag(tg);
                     }
                   }}
                   className={`text-[9px] px-1.5 py-0.5 rounded-md font-medium border ${cfg.badge} truncate max-w-[90px] hover:brightness-125 transition cursor-pointer`}

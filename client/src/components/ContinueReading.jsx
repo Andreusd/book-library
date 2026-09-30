@@ -1,21 +1,44 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Bookmark, ChevronLeft, ChevronRight, LayoutGrid, Layers, Info } from 'lucide-react';
 import { useI18n } from '../i18n';
+import { useBookActions } from '../hooks/useBookActions';
 import { getTagColorConfig } from '../utils/tagColors';
 
+/**
+ * ContinueReading carousel and grid view component.
+ * Book interactions are provided via BookActionsContext or optional explicit props.
+ */
 export default function ContinueReading({ 
   books = [], 
   onSelectBook, 
-  onOpenDetails,
+  onOpenDetails, 
   onContextMenu, 
   onViewAll, 
-  onSelectTag,
+  onSelectTag, 
   showFileExtension 
 }) {
   const { t } = useI18n();
+  const actions = useBookActions();
   const scrollContainerRef = useRef(null);
   const [isGridView, setIsGridView] = useState(false);
   const [targetHeight, setTargetHeight] = useState(null);
+
+  const selectBook = onSelectBook || actions.openReader;
+  const openDetails = onOpenDetails || actions.openDetails;
+  const contextMenu = onContextMenu || actions.openContextMenu;
+  const selectTag = onSelectTag || actions.selectTag;
+
+  const shouldShowExtension = showFileExtension !== undefined 
+    ? Boolean(showFileExtension) 
+    : (actions.showFileExtension !== undefined 
+        ? actions.showFileExtension 
+        : (() => {
+            try {
+              return localStorage.getItem('show_file_extension') !== 'false';
+            } catch {
+              return true;
+            }
+          })());
 
   useEffect(() => {
     let observer;
@@ -43,30 +66,15 @@ export default function ContinueReading({
           }
           if (!observer) {
             observedEl = coverEl;
-            observer = new ResizeObserver(() => {
-              const currentCover = getFavoriteCoverEl();
-              if (currentCover) {
-                const currentH = currentCover.getBoundingClientRect().height;
-                if (currentH > 0) {
-                  setTargetHeight(Math.round(currentH));
+            observer = new ResizeObserver((entries) => {
+              for (const entry of entries) {
+                const boxHeight = entry.contentRect?.height || entry.target.getBoundingClientRect().height;
+                if (boxHeight > 0) {
+                  setTargetHeight(Math.round(boxHeight));
                 }
               }
             });
             observer.observe(coverEl);
-          }
-        }
-      } else {
-        const container = scrollContainerRef.current;
-        if (container) {
-          const w = container.clientWidth;
-          if (w > 0) {
-            let cardWidth;
-            if (w >= 1280) cardWidth = (w - 5 * 24) / 6;
-            else if (w >= 1024) cardWidth = (w - 4 * 24) / 5;
-            else if (w >= 768) cardWidth = (w - 3 * 24) / 4;
-            else if (w >= 640) cardWidth = (w - 2 * 24) / 3;
-            else cardWidth = (w - 20) / 2;
-            setTargetHeight(Math.round(cardWidth * 1.45));
           }
         }
       }
@@ -74,9 +82,9 @@ export default function ContinueReading({
 
     updateHeight();
 
-    const t1 = setTimeout(updateHeight, 50);
-    const t2 = setTimeout(updateHeight, 200);
-    const t3 = setTimeout(updateHeight, 500);
+    const t1 = setTimeout(updateHeight, 150);
+    const t2 = setTimeout(updateHeight, 400);
+    const t3 = setTimeout(updateHeight, 1000);
 
     window.addEventListener('resize', updateHeight);
 
@@ -88,16 +96,6 @@ export default function ContinueReading({
       clearTimeout(t3);
     };
   }, [books]);
-
-  const shouldShowExtension = showFileExtension !== undefined 
-    ? Boolean(showFileExtension) 
-    : (() => {
-        try {
-          return localStorage.getItem('show_file_extension') !== 'false';
-        } catch {
-          return true;
-        }
-      })();
 
   const inProgressBooks = (books || []).filter(
     b => b.progress && 
@@ -138,7 +136,7 @@ export default function ContinueReading({
             <h2 className="text-base font-semibold text-neutral-100">{t('continueReading')}</h2>
           )}
           <span className="text-xs text-neutral-500 font-normal">
-            {t('booksInProgress', { count: inProgressBooks.length })}
+            {t('continueReadingCount', { count: inProgressBooks.length })}
           </span>
         </div>
 
@@ -186,12 +184,12 @@ export default function ContinueReading({
         )}
       </div>
 
-      {/* Books Container */}
+      {/* Cards Container */}
       <div
         ref={scrollContainerRef}
         className={
           isGridView
-            ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 sm:gap-6'
+            ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-5 sm:gap-6'
             : 'flex gap-5 sm:gap-6 overflow-x-auto no-scrollbar scroll-smooth py-1 px-0.5'
         }
       >
@@ -204,11 +202,11 @@ export default function ContinueReading({
           return (
             <div
               key={book.id}
-              onClick={() => onSelectBook(book)}
+              onClick={() => selectBook(book)}
               onContextMenu={(e) => {
-                if (onContextMenu) {
+                if (contextMenu) {
                   e.preventDefault();
-                  onContextMenu(e, book);
+                  contextMenu(e, book);
                 }
               }}
               style={{ 
@@ -262,9 +260,9 @@ export default function ContinueReading({
                           <span
                             key={tg.id}
                             onClick={(e) => {
-                              if (onSelectTag) {
+                              if (selectTag) {
                                 e.stopPropagation();
-                                onSelectTag(tg);
+                                selectTag(tg);
                               }
                             }}
                             className={`text-[8px] px-1.5 py-0.5 rounded font-medium border ${cfg.badge} truncate max-w-[80px] hover:brightness-125 transition cursor-pointer`}
@@ -275,12 +273,12 @@ export default function ContinueReading({
                         );
                       })}
                     </div>
-                    {onOpenDetails && (
+                    {openDetails && (
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onOpenDetails(book);
+                          openDetails(book);
                         }}
                         className="p-1 rounded-md text-neutral-400 hover:text-sky-300 hover:bg-neutral-800 transition opacity-0 group-hover:opacity-100 cursor-pointer shrink-0"
                         title={t('viewDetails')}

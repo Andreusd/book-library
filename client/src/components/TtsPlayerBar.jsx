@@ -11,17 +11,31 @@ import { splitTextIntoReadableChunks, getAvailableVoices } from '../utils/textTo
 const RATE_OPTIONS = [0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 
 export default function TtsPlayerBar({
-  isOpen,
-  onClose,
-  text = '',
-  mode = 'page', // 'page' | 'selection'
-  pageNumber = 1,
-  _totalPages = 1,
-  onNextPage,
-  onPrevPage,
-  theme = 'dark', // 'dark' | 'light' | 'sepia'
-  _bookTitle = '',
+  tts,
+  isOpen: propIsOpen,
+  onClose: propOnClose,
+  text: propText,
+  mode: propMode,
+  pageNumber: propPageNumber,
+  _totalPages: propTotalPages,
+  totalPages: propTotalPagesAlt,
+  onNextPage: propOnNextPage,
+  onPrevPage: propOnPrevPage,
+  theme: propTheme,
+  _bookTitle: propBookTitle,
+  bookTitle: propBookTitleAlt,
 }) {
+  const isOpen = tts?.isOpen ?? tts?.ttsOpen ?? propIsOpen;
+  const onClose = tts?.onClose ?? (tts?.setTtsOpen ? () => tts.setTtsOpen(false) : propOnClose);
+  const text = tts?.text ?? tts?.ttsText ?? propText ?? '';
+  const mode = tts?.mode ?? tts?.ttsMode ?? propMode ?? 'page';
+  const pageNumber = tts?.pageNumber ?? tts?.ttsPageNumber ?? propPageNumber ?? 1;
+  const _totalPages = tts?.totalPages ?? tts?._totalPages ?? propTotalPages ?? propTotalPagesAlt ?? 1;
+  const onNextPage = tts?.onNextPage ?? propOnNextPage;
+  const onPrevPage = tts?.onPrevPage ?? propOnPrevPage;
+  const theme = tts?.theme ?? propTheme ?? 'dark';
+  const _bookTitle = tts?.bookTitle ?? tts?._bookTitle ?? propBookTitle ?? propBookTitleAlt ?? '';
+
   const { t, lang: uiLang } = useI18n();
 
   const chunks = useMemo(() => splitTextIntoReadableChunks(text), [text]);

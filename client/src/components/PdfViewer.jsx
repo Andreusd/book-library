@@ -7,6 +7,7 @@ import 'pdfjs-dist/web/pdf_viewer.css';
 import PdfPageView from './PdfPageView';
 import ReaderToolbar from './ReaderToolbar';
 import ReaderLayout from './ReaderLayout';
+import { PdfViewerContext } from '../contexts/pdfViewerContext';
 import { useZoomControls } from '../hooks/useZoomControls';
 import { usePageNavigation } from '../hooks/usePageNavigation';
 import { usePdfSearch } from '../hooks/usePdfSearch';
@@ -856,6 +857,32 @@ export default function PdfViewer({
 
   const isHeaderShowing = headerPinned || isHeaderVisible || readerSettingsOpen || annotations.commentsDrawerOpen || outlineOpen || search.searchOpen;
 
+  const pdfViewerContextValue = useMemo(() => ({
+    pdfDoc,
+    scale: zoom.scale,
+    invertColors,
+    linkService,
+    findController,
+    eventBus,
+    annotations: annotations.annotations,
+    onUpdateComment: annotations.handleUpdateComment,
+    onDeleteAnnotation: annotations.handleDeleteAnnotation,
+    showBookTexture: bookTextureEnabled,
+    onDimensionsLoaded: handlePageDimensionsLoaded,
+  }), [
+    pdfDoc,
+    zoom.scale,
+    invertColors,
+    linkService,
+    findController,
+    eventBus,
+    annotations.annotations,
+    annotations.handleUpdateComment,
+    annotations.handleDeleteAnnotation,
+    bookTextureEnabled,
+    handlePageDimensionsLoaded,
+  ]);
+
   const renderContinuousPage = (p, pageSide = 'single') => {
     const isVisible = visiblePageNumbers.has(p);
     const dims = pageDimsMap[p] || estimatedPageDims;
@@ -876,19 +903,8 @@ export default function PdfViewer({
       >
         {isVisible ? (
           <PdfPageView
-            pdfDoc={pdfDoc}
             pageNum={p}
-            scale={zoom.scale}
-            invertColors={invertColors}
-            linkService={linkService}
-            findController={findController}
-            eventBus={eventBus}
-            annotations={annotations.annotations.filter(a => a.page === p)}
-            onUpdateComment={annotations.handleUpdateComment}
-            onDeleteAnnotation={annotations.handleDeleteAnnotation}
             pageSide={pageSide}
-            showBookTexture={bookTextureEnabled}
-            onDimensionsLoaded={handlePageDimensionsLoaded}
             initialDims={dims}
           />
         ) : (
@@ -998,115 +1014,76 @@ export default function PdfViewer({
       onUpdateComment={annotations.handleUpdateComment}
       onDeleteAnnotation={annotations.handleDeleteAnnotation}
       book={book}
-      searchOpen={search.searchOpen}
-      searchQuery={search.searchQuery}
-      matchesCount={search.matchesCount}
-      isSearching={search.isSearching}
-      caseSensitive={search.caseSensitive}
-      entireWord={search.entireWord}
-      onCloseSearch={search.handleCloseSearch}
-      onSearchQueryChange={search.handleSearchQueryChange}
-      onFindNext={search.handleFindNext}
-      onFindPrev={search.handleFindPrev}
-      onToggleCaseSensitive={search.handleToggleCaseSensitive}
-      onToggleEntireWord={search.handleToggleEntireWord}
-      ttsOpen={tts.ttsOpen}
-      setTtsOpen={tts.setTtsOpen}
-      ttsText={tts.ttsText}
-      ttsMode={tts.ttsMode}
-      ttsPageNumber={tts.ttsPageNumber}
-      totalPages={nav.totalPages}
+      search={search}
+      tts={{
+        ...tts,
+        pageNumber: tts.ttsPageNumber,
+        totalPages: nav.totalPages,
+        onNextPage: nav.goToNextPage,
+        onPrevPage: nav.goToPrevPage,
+        theme: invertColors ? 'dark' : 'light',
+        bookTitle: book?.title || '',
+      }}
       selectionMenu={annotations.selectionMenu}
       onHighlight={annotations.handleCreateHighlight}
       onCloseSelectionMenu={() => annotations.setSelectionMenu({ isOpen: false, x: 0, y: 0, text: '', rects: [], page: 1 })}
       onReadAloud={tts.handleReadSelection}
       showBottomProgress={showBottomProgress}
     >
-      <div className="min-h-full flex justify-center items-start">
-        {nav.isContinuous ? (
-          nav.isDualPage ? (
-            <div className={`w-full flex flex-col items-center ${continuousPageSpacing ? 'gap-6' : 'gap-0'} pb-24`}>
-              {nav.allSpreads.map((sp) => (
-                <div
-                  key={sp.currentBase}
-                  id={`pdf-spread-${sp.currentBase}`}
-                  className={`flex items-start justify-center ${bookTextureEnabled && sp.left && sp.right ? 'shadow-2xl' : 'shadow-md'}`}
-                >
-                  {sp.left && renderContinuousPage(sp.left, sp.right ? 'left' : 'single')}
-                  {sp.right && renderContinuousPage(sp.right, sp.left ? 'right' : 'single')}
-                </div>
-              ))}
+      <PdfViewerContext.Provider value={pdfViewerContextValue}>
+        <div className="min-h-full flex justify-center items-start">
+          {nav.isContinuous ? (
+            nav.isDualPage ? (
+              <div className={`w-full flex flex-col items-center ${continuousPageSpacing ? 'gap-6' : 'gap-0'} pb-24`}>
+                {nav.allSpreads.map((sp) => (
+                  <div
+                    key={sp.currentBase}
+                    id={`pdf-spread-${sp.currentBase}`}
+                    className={`flex items-start justify-center ${bookTextureEnabled && sp.left && sp.right ? 'shadow-2xl' : 'shadow-md'}`}
+                  >
+                    {sp.left && renderContinuousPage(sp.left, sp.right ? 'left' : 'single')}
+                    {sp.right && renderContinuousPage(sp.right, sp.left ? 'right' : 'single')}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className={`w-full flex flex-col items-center ${continuousPageSpacing ? 'gap-6' : 'gap-0'} pb-24`}>
+                {Array.from({ length: nav.totalPages }, (_, i) => i + 1).map((p) => (
+                  renderContinuousPage(p, 'single')
+                ))}
+              </div>
+            )
+          ) : nav.isDualPage ? (
+            <div className={`flex items-start justify-center ${bookTextureEnabled ? 'shadow-2xl' : 'shadow-md'} ${centerVertically ? 'my-auto' : ''}`}>
+              {nav.spread.left && (
+                <PdfPageView
+                  key={`dual-left-${nav.spread.left}`}
+                  pageNum={nav.spread.left}
+                  pageSide={nav.spread.right ? 'left' : 'single'}
+                  initialDims={pageDimsMap[nav.spread.left] || estimatedPageDims}
+                />
+              )}
+              {nav.spread.right && (
+                <PdfPageView
+                  key={`dual-right-${nav.spread.right}`}
+                  pageNum={nav.spread.right}
+                  pageSide={nav.spread.left ? 'right' : 'single'}
+                  initialDims={pageDimsMap[nav.spread.right] || estimatedPageDims}
+                />
+              )}
             </div>
           ) : (
-            <div className={`w-full flex flex-col items-center ${continuousPageSpacing ? 'gap-6' : 'gap-0'} pb-24`}>
-              {Array.from({ length: nav.totalPages }, (_, i) => i + 1).map((p) => (
-                renderContinuousPage(p, 'single')
-              ))}
+            <div className={`relative ${centerVertically ? 'my-auto' : ''}`}>
+              <PdfPageView
+                key={`single-${nav.currentPage}`}
+                pageNum={nav.currentPage}
+                pageSide="single"
+                initialDims={pageDimsMap[nav.currentPage] || estimatedPageDims}
+              />
             </div>
-          )
-        ) : nav.isDualPage ? (
-          <div className={`flex items-start justify-center ${bookTextureEnabled ? 'shadow-2xl' : 'shadow-md'} ${centerVertically ? 'my-auto' : ''}`}>
-            {nav.spread.left && (
-              <PdfPageView
-                key={`dual-left-${nav.spread.left}`}
-                pdfDoc={pdfDoc}
-                pageNum={nav.spread.left}
-                scale={zoom.scale}
-                invertColors={invertColors}
-                linkService={linkService}
-                findController={findController}
-                eventBus={eventBus}
-                annotations={annotations.annotations.filter(a => a.page === nav.spread.left)}
-                onUpdateComment={annotations.handleUpdateComment}
-                onDeleteAnnotation={annotations.handleDeleteAnnotation}
-                pageSide={nav.spread.right ? 'left' : 'single'}
-                showBookTexture={bookTextureEnabled}
-                onDimensionsLoaded={handlePageDimensionsLoaded}
-                initialDims={pageDimsMap[nav.spread.left] || estimatedPageDims}
-              />
-            )}
-            {nav.spread.right && (
-              <PdfPageView
-                key={`dual-right-${nav.spread.right}`}
-                pdfDoc={pdfDoc}
-                pageNum={nav.spread.right}
-                scale={zoom.scale}
-                invertColors={invertColors}
-                linkService={linkService}
-                findController={findController}
-                eventBus={eventBus}
-                annotations={annotations.annotations.filter(a => a.page === nav.spread.right)}
-                onUpdateComment={annotations.handleUpdateComment}
-                onDeleteAnnotation={annotations.handleDeleteAnnotation}
-                pageSide={nav.spread.left ? 'right' : 'single'}
-                showBookTexture={bookTextureEnabled}
-                onDimensionsLoaded={handlePageDimensionsLoaded}
-                initialDims={pageDimsMap[nav.spread.right] || estimatedPageDims}
-              />
-            )}
-          </div>
-        ) : (
-          <div className={`relative ${centerVertically ? 'my-auto' : ''}`}>
-            <PdfPageView
-              key={`single-${nav.currentPage}`}
-              pdfDoc={pdfDoc}
-              pageNum={nav.currentPage}
-              scale={zoom.scale}
-              invertColors={invertColors}
-              linkService={linkService}
-              findController={findController}
-              eventBus={eventBus}
-              annotations={annotations.annotations.filter(a => a.page === nav.currentPage)}
-              onUpdateComment={annotations.handleUpdateComment}
-              onDeleteAnnotation={annotations.handleDeleteAnnotation}
-              pageSide="single"
-              showBookTexture={bookTextureEnabled}
-              onDimensionsLoaded={handlePageDimensionsLoaded}
-              initialDims={pageDimsMap[nav.currentPage] || estimatedPageDims}
-            />
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      </PdfViewerContext.Provider>
     </ReaderLayout>
   );
 }

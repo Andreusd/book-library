@@ -3,6 +3,10 @@ import { BookOpen, ChevronLeft, ChevronRight, LayoutGrid, Layers } from 'lucide-
 import BookCard from './BookCard';
 import { useI18n } from '../i18n';
 
+/**
+ * AllBooks carousel and grid view component.
+ * Book interactions are provided via BookActionsContext or optional explicit props.
+ */
 export default function AllBooks({
   books = [],
   favoriteIds,
@@ -32,6 +36,7 @@ export default function AllBooks({
   const showControls = books.length > 2;
 
   const isFavoriteBook = (bookId) => {
+    if (favoriteIds === undefined) return undefined;
     if (favoriteIds instanceof Set) {
       return favoriteIds.has(bookId);
     }

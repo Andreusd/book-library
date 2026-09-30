@@ -10,6 +10,7 @@ import {
   setCachedPageCanvas,
   inFlightPreloads,
 } from '../utils/pdfPageUtils';
+import { usePdfViewerContext } from '../hooks/usePdfViewerContext';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
@@ -18,22 +19,36 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
  * annotation layer (hyperlinks), and highlight overlay.
  */
 export default function PdfPageView({
-  pdfDoc,
+  pdfDoc: propPdfDoc,
   pageNum,
-  scale,
-  invertColors,
-  linkService,
-  findController = null,
-  eventBus = null,
-  annotations = [],
-  onUpdateComment,
-  onDeleteAnnotation,
+  scale: propScale,
+  invertColors: propInvertColors,
+  linkService: propLinkService,
+  findController: propFindController = null,
+  eventBus: propEventBus = null,
+  annotations: propAnnotations,
+  onUpdateComment: propOnUpdateComment,
+  onDeleteAnnotation: propOnDeleteAnnotation,
   pageSide = 'single', // 'single' | 'left' | 'right'
-  showBookTexture = true,
-  onDimensionsLoaded = null,
+  showBookTexture: propShowBookTexture,
+  onDimensionsLoaded: propOnDimensionsLoaded,
   initialDims = null,
   hasPageSpacing = true,
 }) {
+  const ctx = usePdfViewerContext();
+
+  const pdfDoc = propPdfDoc ?? ctx.pdfDoc;
+  const scale = propScale ?? ctx.scale ?? 1;
+  const invertColors = propInvertColors ?? ctx.invertColors ?? false;
+  const linkService = propLinkService ?? ctx.linkService ?? null;
+  const findController = propFindController ?? ctx.findController ?? null;
+  const eventBus = propEventBus ?? ctx.eventBus ?? null;
+  const annotations = propAnnotations ?? (ctx.annotations ? ctx.annotations.filter(a => a.page === pageNum) : (ctx.annotationsList ? ctx.annotationsList.filter(a => a.page === pageNum) : []));
+  const onUpdateComment = propOnUpdateComment ?? ctx.onUpdateComment;
+  const onDeleteAnnotation = propOnDeleteAnnotation ?? ctx.onDeleteAnnotation;
+  const showBookTexture = propShowBookTexture ?? ctx.showBookTexture ?? ctx.bookTextureEnabled ?? true;
+  const onDimensionsLoaded = propOnDimensionsLoaded ?? ctx.onDimensionsLoaded ?? null;
+
   const { t } = useI18n();
   const canvasRef = useRef(null);
   const textLayerRef = useRef(null);
