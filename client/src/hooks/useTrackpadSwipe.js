@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 
 /**
  * Handles two-finger horizontal trackpad gestures with velocity debounce,
@@ -9,23 +9,31 @@ export function useTrackpadSwipe({ onNext, onPrev, enabled = true, threshold = 2
   const lastSwipeTimeRef = useRef(0);
   const clearSwipeTimerRef = useRef(null);
 
+  const onNextRef = useRef(onNext);
+  const onPrevRef = useRef(onPrev);
+  const enabledRef = useRef(enabled);
+
+  useEffect(() => {
+    onNextRef.current = onNext;
+    onPrevRef.current = onPrev;
+    enabledRef.current = enabled;
+  }, [onNext, onPrev, enabled]);
+
   const handleTrackpadWheel = useCallback((e, container) => {
     const absX = Math.abs(e.deltaX);
     const absY = Math.abs(e.deltaY);
 
     if (absX > absY && absX > 2) {
-      if (!container) return false;
-
-      const isHorizScrollable = container.scrollWidth > container.clientWidth + 10;
-      const atRightEdge = container.scrollLeft + container.clientWidth >= container.scrollWidth - 10;
-      const atLeftEdge = container.scrollLeft <= 10;
+      const isHorizScrollable = container ? container.scrollWidth > container.clientWidth + 10 : false;
+      const atRightEdge = container ? container.scrollLeft + container.clientWidth >= container.scrollWidth - 10 : true;
+      const atLeftEdge = container ? container.scrollLeft <= 10 : true;
 
       // Prevent native browser back/forward page navigation gesture
-      if (!isHorizScrollable || (e.deltaX > 0 && atRightEdge) || (e.deltaX < 0 && atLeftEdge)) {
+      if (e.cancelable && (!isHorizScrollable || (e.deltaX > 0 && atRightEdge) || (e.deltaX < 0 && atLeftEdge))) {
         e.preventDefault();
       }
 
-      if (enabled) {
+      if (enabledRef.current) {
         const now = Date.now();
         if (now - lastSwipeTimeRef.current > cooldownMs) {
           accumulatedDeltaXRef.current += e.deltaX;
@@ -41,9 +49,9 @@ export function useTrackpadSwipe({ onNext, onPrev, enabled = true, threshold = 2
               const dir = accumulatedDeltaXRef.current;
               accumulatedDeltaXRef.current = 0;
               if (dir > 0) {
-                onNext();
+                onNextRef.current?.();
               } else {
-                onPrev();
+                onPrevRef.current?.();
               }
               return true;
             }
@@ -53,7 +61,8 @@ export function useTrackpadSwipe({ onNext, onPrev, enabled = true, threshold = 2
       return true;
     }
     return false;
-  }, [enabled, onNext, onPrev, threshold, cooldownMs]);
+  }, [threshold, cooldownMs]);
 
   return { handleTrackpadWheel };
 }
+

@@ -78,7 +78,7 @@ export default function ReaderLayout({
     : 'bg-white/90 hover:bg-white border-neutral-300 hover:border-amber-500/60 text-neutral-700 hover:text-neutral-900 shadow-xl';
 
   return (
-    <div className={`relative h-screen w-screen overflow-hidden flex flex-col font-sans select-none overscroll-none touch-none ${invertColors ? 'bg-black text-neutral-200' : 'bg-white text-neutral-800'}`}>
+    <div className={`fixed inset-0 z-50 flex flex-col font-sans select-none overscroll-none touch-none transition-colors duration-300 ${invertColors ? 'bg-black text-neutral-200' : 'bg-white text-neutral-800'}`}>
       {/* Top Header Toolbar Slot */}
       {toolbar}
 

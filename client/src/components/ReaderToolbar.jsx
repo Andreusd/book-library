@@ -99,9 +99,17 @@ export default function ReaderToolbar({
     : 'bg-rose-50 text-rose-700 border-rose-200';
 
   return (
-    <header 
-      onMouseEnter={onMouseEnterHeader}
-      onMouseLeave={onMouseLeaveHeader}
+    <>
+      {/* Invisible top hover zone to trigger header when hidden and unpinned */}
+      {!headerPinned && !isHeaderShowing && (
+        <div 
+          onMouseEnter={onMouseEnterHeader}
+          className="fixed top-0 left-0 right-0 h-4 z-40 bg-transparent pointer-events-auto"
+        />
+      )}
+      <header 
+        onMouseEnter={onMouseEnterHeader}
+        onMouseLeave={onMouseLeaveHeader}
       className={`fixed top-0 left-0 right-0 z-40 h-14 border-b flex items-center px-3 sm:px-4 transition-all duration-300 select-none ${
         invertColors 
           ? 'bg-neutral-900/95 border-neutral-800 backdrop-blur shadow-md' 
@@ -407,10 +415,10 @@ export default function ReaderToolbar({
                   <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
                     <div className="min-w-0 flex-1">
                       <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
-                        {t('floatingButtons')}
+                        {t('floatingSideButtons')}
                       </span>
                       <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
-                        {t('floatingButtonsDesc')}
+                        {t('floatingSideButtonsDesc')}
                       </span>
                     </div>
                     <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
@@ -434,10 +442,10 @@ export default function ReaderToolbar({
                   <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
                     <div className="min-w-0 flex-1">
                       <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
-                        {t('verticalKeysFlip')}
+                        {t('upDownPageFlip')}
                       </span>
                       <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
-                        {t('verticalKeysFlipDesc')}
+                        {t('upDownPageFlipDesc')}
                       </span>
                     </div>
                     <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
@@ -461,10 +469,10 @@ export default function ReaderToolbar({
                   <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
                     <div className="min-w-0 flex-1">
                       <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
-                        {t('dualPageMode')}
+                        {t('dualPageSetting')}
                       </span>
                       <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
-                        {t('dualPageModeDesc')}
+                        {t('dualPageSettingDesc')}
                       </span>
                     </div>
                     <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
@@ -505,10 +513,10 @@ export default function ReaderToolbar({
                   <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
                     <div className="min-w-0 flex-1">
                       <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
-                        {t('paperTexture')}
+                        {t('bookTexture')}
                       </span>
                       <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
-                        {t('paperTextureDesc')}
+                        {t('bookTextureDesc')}
                       </span>
                     </div>
                     <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
@@ -526,10 +534,10 @@ export default function ReaderToolbar({
                   <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
                     <div className="min-w-0 flex-1">
                       <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
-                        {t('continuousScroll')}
+                        {t('verticalScrollMode')}
                       </span>
                       <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
-                        {t('continuousScrollDesc')}
+                        {t('verticalScrollDesc')}
                       </span>
                     </div>
                     <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
@@ -548,10 +556,10 @@ export default function ReaderToolbar({
                     <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group pl-6 ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
                       <div className="min-w-0 flex-1">
                         <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
-                          {t('pageSpacing')}
+                          {t('continuousPageSpacing')}
                         </span>
                         <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
-                          {t('pageSpacingDesc')}
+                          {t('continuousPageSpacingDesc')}
                         </span>
                       </div>
                       <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
@@ -570,10 +578,10 @@ export default function ReaderToolbar({
                   <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
                     <div className="min-w-0 flex-1">
                       <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
-                        {t('pinHeader')}
+                        {t('keepHeaderPinned')}
                       </span>
                       <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
-                        {t('pinHeaderDesc')}
+                        {t('keepHeaderPinnedDesc')}
                       </span>
                     </div>
                     <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
@@ -593,5 +601,6 @@ export default function ReaderToolbar({
         </div>
       </div>
     </header>
+    </>
   );
 }

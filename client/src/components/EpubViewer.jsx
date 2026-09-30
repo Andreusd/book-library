@@ -339,6 +339,7 @@ export default function EpubViewer({
   const handleTouchEndRef = useRef(null);
   const handleNativeWheelRef = useRef(null);
   const attachListenersToIframeRef = useRef(null);
+  const handleKeyDownRef = useRef(null);
 
   // Safety refs to prevent premature locations usage and state race conditions
   const isLocationsReadyRef = useRef(false);
@@ -364,6 +365,11 @@ export default function EpubViewer({
     } catch {}
     return 100;
   });
+
+  const fontSizeRef = useRef(fontSize);
+  useEffect(() => {
+    fontSizeRef.current = fontSize;
+  }, [fontSize]);
 
   // Preferences: Theme ('dark' | 'light' | 'sepia')
   const [theme, setTheme] = useState(() => {

@@ -573,7 +573,7 @@ export default function App() {
           }
         }}
         onShelfContextMenu={modals.openShelfContextMenu}
-        isOpen={sidebarOpen}
+        isOpen={!activeBook && sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         libraries={libraries}
         activeLibraryId={activeLibraryId}

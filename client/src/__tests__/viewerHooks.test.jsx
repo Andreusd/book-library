@@ -7,6 +7,7 @@ import { usePageNavigation } from '../hooks/usePageNavigation';
 import { usePdfSearch } from '../hooks/usePdfSearch';
 import { usePdfTts } from '../hooks/usePdfTts';
 import { usePdfAnnotations } from '../hooks/usePdfAnnotations';
+import { useTrackpadSwipe } from '../hooks/useTrackpadSwipe';
 import ReaderToolbar from '../components/ReaderToolbar';
 import ReaderLayout from '../components/ReaderLayout';
 
@@ -321,6 +322,47 @@ describe('Reader Sub-System Isolated Components', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('renders ReaderToolbar settings popover with translated labels', () => {
+    render(
+      <I18nProvider>
+        <ReaderToolbar
+          book={{ title: 'Test Book Title' }}
+          format="pdf"
+          onClose={vi.fn()}
+          isHeaderShowing={true}
+          headerPinned={true}
+          readerSettingsOpen={true}
+          setReaderSettingsOpen={vi.fn()}
+          isDualPage={true}
+          isContinuous={true}
+          toggleCenterVertically={vi.fn()}
+          toggleBottomProgress={vi.fn()}
+          toggleDualPage={vi.fn()}
+          toggleDualCover={vi.fn()}
+          toggleBookTexture={vi.fn()}
+          toggleScrollMode={vi.fn()}
+          toggleContinuousPageSpacing={vi.fn()}
+          toggleHeaderPinned={vi.fn()}
+        />
+      </I18nProvider>
+    );
+
+    // Verify translated labels appear and raw keys do not appear
+    expect(screen.getByText('Floating Side Buttons')).toBeInTheDocument();
+    expect(screen.getByText('Up/Down Page Flip')).toBeInTheDocument();
+    expect(screen.getByText('Dual Page Mode')).toBeInTheDocument();
+    expect(screen.getByText('Book Spine Texture')).toBeInTheDocument();
+    expect(screen.getByText('Continuous Vertical Scroll')).toBeInTheDocument();
+    expect(screen.getByText('Space Between Pages')).toBeInTheDocument();
+    expect(screen.getAllByText('Keep Header Pinned').length).toBeGreaterThan(0);
+
+    // Ensure raw untranslated keys are NOT present
+    expect(screen.queryByText('floatingButtons')).not.toBeInTheDocument();
+    expect(screen.queryByText('verticalKeysFlip')).not.toBeInTheDocument();
+    expect(screen.queryByText('paperTexture')).not.toBeInTheDocument();
+    expect(screen.queryByText('continuousScroll')).not.toBeInTheDocument();
+  });
+
   it('renders ReaderLayout container with children', () => {
     const { container } = render(
       <I18nProvider>
@@ -339,6 +381,206 @@ describe('Reader Sub-System Isolated Components', () => {
     );
 
     expect(screen.getByTestId('test-content')).toBeInTheDocument();
-    expect(container.querySelector('.relative')).toBeInTheDocument();
+    expect(container.querySelector('.fixed.inset-0.z-50')).toBeInTheDocument();
+  });
+
+  it('renders top hover zone when unpinned and hidden, calling onMouseEnterHeader', () => {
+    const handleMouseEnter = vi.fn();
+    const handleMouseLeave = vi.fn();
+
+    const { container, rerender } = render(
+      <I18nProvider>
+        <ReaderToolbar
+          book={{ title: 'Hover Test Book' }}
+          format="pdf"
+          onClose={vi.fn()}
+          isHeaderShowing={false}
+          headerPinned={false}
+          onMouseEnterHeader={handleMouseEnter}
+          onMouseLeaveHeader={handleMouseLeave}
+        />
+      </I18nProvider>
+    );
+
+    // Hover hot-zone should exist at top-0
+    const hotZone = container.querySelector('.fixed.top-0.left-0.right-0.h-4');
+    expect(hotZone).toBeInTheDocument();
+
+    fireEvent.mouseEnter(hotZone);
+    expect(handleMouseEnter).toHaveBeenCalledTimes(1);
+
+    // When header is pinned, hotZone should not be rendered
+    rerender(
+      <I18nProvider>
+        <ReaderToolbar
+          book={{ title: 'Hover Test Book' }}
+          format="pdf"
+          onClose={vi.fn()}
+          isHeaderShowing={true}
+          headerPinned={true}
+          onMouseEnterHeader={handleMouseEnter}
+          onMouseLeaveHeader={handleMouseLeave}
+        />
+      </I18nProvider>
+    );
+    expect(container.querySelector('.fixed.top-0.left-0.right-0.h-4')).not.toBeInTheDocument();
+  });
+
+  describe('useTrackpadSwipe', () => {
+    it('triggers onNext on swipe left (positive deltaX > threshold)', () => {
+      const onNext = vi.fn();
+      const onPrev = vi.fn();
+      const { result } = renderHook(() =>
+        useTrackpadSwipe({ onNext, onPrev, enabled: true, threshold: 28, cooldownMs: 350 })
+      );
+
+      const mockEvent = {
+        deltaX: 35,
+        deltaY: 0,
+        cancelable: true,
+        preventDefault: vi.fn(),
+      };
+      const mockContainer = {
+        scrollWidth: 800,
+        clientWidth: 800,
+        scrollLeft: 0,
+      };
+
+      let handled;
+      act(() => {
+        handled = result.current.handleTrackpadWheel(mockEvent, mockContainer);
+      });
+
+      expect(handled).toBe(true);
+      expect(mockEvent.preventDefault).toHaveBeenCalled();
+      expect(onNext).toHaveBeenCalledTimes(1);
+      expect(onPrev).not.toHaveBeenCalled();
+    });
+
+    it('triggers onPrev on swipe right (negative deltaX < -threshold)', () => {
+      const onNext = vi.fn();
+      const onPrev = vi.fn();
+      const { result } = renderHook(() =>
+        useTrackpadSwipe({ onNext, onPrev, enabled: true, threshold: 28, cooldownMs: 350 })
+      );
+
+      const mockEvent = {
+        deltaX: -35,
+        deltaY: 2,
+        cancelable: true,
+        preventDefault: vi.fn(),
+      };
+      const mockContainer = {
+        scrollWidth: 800,
+        clientWidth: 800,
+        scrollLeft: 0,
+      };
+
+      let handled;
+      act(() => {
+        handled = result.current.handleTrackpadWheel(mockEvent, mockContainer);
+      });
+
+      expect(handled).toBe(true);
+      expect(mockEvent.preventDefault).toHaveBeenCalled();
+      expect(onPrev).toHaveBeenCalledTimes(1);
+      expect(onNext).not.toHaveBeenCalled();
+    });
+
+    it('does not trigger onNext/onPrev when below threshold', () => {
+      const onNext = vi.fn();
+      const onPrev = vi.fn();
+      const { result } = renderHook(() =>
+        useTrackpadSwipe({ onNext, onPrev, enabled: true, threshold: 28, cooldownMs: 350 })
+      );
+
+      const mockEvent = {
+        deltaX: 15,
+        deltaY: 0,
+        cancelable: true,
+        preventDefault: vi.fn(),
+      };
+
+      let handled;
+      act(() => {
+        handled = result.current.handleTrackpadWheel(mockEvent, null);
+      });
+
+      expect(handled).toBe(true);
+      expect(onNext).not.toHaveBeenCalled();
+      expect(onPrev).not.toHaveBeenCalled();
+    });
+
+    it('does not trigger navigation when disabled, but prevents default at edge', () => {
+      const onNext = vi.fn();
+      const onPrev = vi.fn();
+      const { result } = renderHook(() =>
+        useTrackpadSwipe({ onNext, onPrev, enabled: false, threshold: 28, cooldownMs: 350 })
+      );
+
+      const mockEvent = {
+        deltaX: 50,
+        deltaY: 0,
+        cancelable: true,
+        preventDefault: vi.fn(),
+      };
+
+      let handled;
+      act(() => {
+        handled = result.current.handleTrackpadWheel(mockEvent, null);
+      });
+
+      expect(handled).toBe(true);
+      expect(mockEvent.preventDefault).toHaveBeenCalled();
+      expect(onNext).not.toHaveBeenCalled();
+      expect(onPrev).not.toHaveBeenCalled();
+    });
+
+    it('ignores vertical wheel gestures (absY >= absX)', () => {
+      const onNext = vi.fn();
+      const onPrev = vi.fn();
+      const { result } = renderHook(() =>
+        useTrackpadSwipe({ onNext, onPrev, enabled: true, threshold: 28, cooldownMs: 350 })
+      );
+
+      const mockEvent = {
+        deltaX: 0,
+        deltaY: 50,
+        cancelable: true,
+        preventDefault: vi.fn(),
+      };
+
+      let handled;
+      act(() => {
+        handled = result.current.handleTrackpadWheel(mockEvent, null);
+      });
+
+      expect(handled).toBe(false);
+      expect(mockEvent.preventDefault).not.toHaveBeenCalled();
+      expect(onNext).not.toHaveBeenCalled();
+    });
+
+    it('enforces cooldown period between successive swipes', () => {
+      const onNext = vi.fn();
+      const { result } = renderHook(() =>
+        useTrackpadSwipe({ onNext, onPrev: vi.fn(), enabled: true, threshold: 28, cooldownMs: 350 })
+      );
+
+      const mockEvent1 = { deltaX: 40, deltaY: 0, cancelable: true, preventDefault: vi.fn() };
+      const mockEvent2 = { deltaX: 40, deltaY: 0, cancelable: true, preventDefault: vi.fn() };
+
+      act(() => {
+        result.current.handleTrackpadWheel(mockEvent1, null);
+      });
+      expect(onNext).toHaveBeenCalledTimes(1);
+
+      // Rapid second swipe within cooldownMs should be ignored
+      act(() => {
+        result.current.handleTrackpadWheel(mockEvent2, null);
+      });
+      expect(onNext).toHaveBeenCalledTimes(1);
+    });
   });
 });
+
+

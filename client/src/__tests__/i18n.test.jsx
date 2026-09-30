@@ -84,4 +84,54 @@ describe('i18n', () => {
 
     console.error = originalError;
   });
+
+  it('translates reader settings keys properly in en and pt without fallback to key', () => {
+    let i18nInstance;
+    render(
+      <I18nProvider>
+        <TestConsumer onReady={(inst) => { i18nInstance = inst; }} />
+      </I18nProvider>
+    );
+
+    const readerKeys = [
+      'floatingSideButtons',
+      'floatingSideButtonsDesc',
+      'upDownPageFlip',
+      'upDownPageFlipDesc',
+      'dualPageSetting',
+      'dualPageSettingDesc',
+      'bookTexture',
+      'bookTextureDesc',
+      'verticalScrollMode',
+      'verticalScrollDesc',
+      'continuousPageSpacing',
+      'continuousPageSpacingDesc',
+      'keepHeaderPinned',
+      'keepHeaderPinnedDesc',
+      'floatingButtons',
+      'verticalKeysFlip',
+      'paperTexture',
+      'continuousScroll',
+      'pageSpacing',
+      'pinHeader',
+    ];
+
+    // English
+    readerKeys.forEach(k => {
+      const translated = i18nInstance.t(k);
+      expect(translated).not.toBe(k);
+      expect(translated.length).toBeGreaterThan(0);
+    });
+
+    // Portuguese
+    act(() => {
+      i18nInstance.setLang('pt');
+    });
+
+    readerKeys.forEach(k => {
+      const translated = i18nInstance.t(k);
+      expect(translated).not.toBe(k);
+      expect(translated.length).toBeGreaterThan(0);
+    });
+  });
 });

@@ -103,4 +103,13 @@ describe('Sidebar component', () => {
     renderSidebar({ currentUser: 'Alex' });
     expect(screen.getByText('Alex')).toBeInTheDocument();
   });
+
+  it('collapses and hides sidebar when isOpen is false', () => {
+    const { container } = renderSidebar({ isOpen: false });
+    const aside = container.querySelector('aside');
+    expect(aside).toHaveClass('-translate-x-full');
+    expect(aside).toHaveClass('opacity-0');
+    expect(aside).toHaveClass('pointer-events-none');
+    expect(aside).toHaveClass('lg:w-0');
+  });
 });

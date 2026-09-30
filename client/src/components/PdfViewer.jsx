@@ -13,6 +13,7 @@ import { usePdfSearch } from '../hooks/usePdfSearch';
 import { usePdfTts } from '../hooks/usePdfTts';
 import { usePdfAnnotations } from '../hooks/usePdfAnnotations';
 import { useFullscreen } from '../hooks/useFullscreen';
+import { useTrackpadSwipe } from '../hooks/useTrackpadSwipe';
 import { queuePreloadPages, clearPageRenderCache, getDualPageSpread, getNextSpreadPage, getPrevSpreadPage } from '../utils/pdfPageUtils';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
@@ -371,6 +372,15 @@ export default function PdfViewer({
     setVisiblePageNumbers,
   });
 
+  // Extracted Sub-system 3: Trackpad swipe gesture hook
+  const { handleTrackpadWheel } = useTrackpadSwipe({
+    onNext: nav.goToNextPage,
+    onPrev: nav.goToPrevPage,
+    enabled: trackpadSwipeEnabled,
+    threshold: 28,
+    cooldownMs: 350,
+  });
+
   // Center Page Vertically helper
   const centerPageVertically = useCallback(() => {
     if (nav.isContinuous || !containerRef.current) return;
@@ -453,6 +463,42 @@ export default function PdfViewer({
   const annotations = usePdfAnnotations({
     bookId: book?.id,
   });
+
+  // Window mousemove / touchstart listener to re-show header on hover
+  useEffect(() => {
+    if (headerPinned) return;
+
+    const handleMouseMove = (e) => {
+      if (e.clientY <= 60) {
+        showHeader();
+      }
+    };
+
+    const handleTouchStart = (e) => {
+      const touch = e.touches[0];
+      if (touch && touch.clientY <= 60) {
+        showHeader();
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('touchstart', handleTouchStart);
+    };
+  }, [headerPinned, showHeader]);
+
+  // Initial auto-hide timer when opening reader in unpinned mode
+  useEffect(() => {
+    if (headerPinned) return;
+    const timer = setTimeout(() => {
+      if (!isMouseOverHeaderRef.current) {
+        setIsHeaderVisible(false);
+      }
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [headerPinned]);
 
   // Link service configuration
   useEffect(() => {
@@ -695,6 +741,28 @@ export default function PdfViewer({
         } else {
           nav.goToPrevPage();
         }
+      } else if (e.key === 'ArrowDown') {
+        if (isScrollable) {
+          const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 10;
+          if (atBottom && upDownFlipEnabled) {
+            nav.goToNextPage();
+          } else {
+            container.scrollBy({ top: 120, behavior: 'smooth' });
+          }
+        } else if (upDownFlipEnabled) {
+          nav.goToNextPage();
+        }
+      } else if (e.key === 'ArrowUp') {
+        if (isScrollable) {
+          const atTop = container.scrollTop <= 10;
+          if (atTop && upDownFlipEnabled) {
+            nav.goToPrevPage();
+          } else {
+            container.scrollBy({ top: -120, behavior: 'smooth' });
+          }
+        } else if (upDownFlipEnabled) {
+          nav.goToPrevPage();
+        }
       } else if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
         e.preventDefault();
         search.openSearch();
@@ -725,7 +793,63 @@ export default function PdfViewer({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nav, search, tts, zoom, onClose]);
+  }, [nav, search, tts, zoom, onClose, upDownFlipEnabled]);
+
+  // Native wheel listener for two-finger trackpad swipe gestures, edge-flipping, and Ctrl+Wheel PDF zoom
+  const lastWheelTimeRef = useRef(0);
+
+  const { isContinuous, goToNextPage, goToPrevPage } = nav;
+
+  useEffect(() => {
+    const handleNativeWheel = (e) => {
+      // 1. Ctrl + Scroll Wheel (or Touchpad pinch gesture) -> Zoom PDF viewer
+      if (e.ctrlKey || e.metaKey) {
+        if (e.cancelable) e.preventDefault();
+        if (e.deltaY < 0) {
+          zoom.handleZoomIn();
+        } else if (e.deltaY > 0) {
+          zoom.handleZoomOut();
+        }
+        return;
+      }
+
+      // Do not intercept wheel when interacting with scrollable drawers, menus, or header
+      if (e.target && typeof e.target.closest === 'function') {
+        if (e.target.closest('aside, header, [role="dialog"]')) {
+          return;
+        }
+      }
+
+      // 2. Two-finger horizontal trackpad swipe to flip pages
+      const handled = handleTrackpadWheel(e, containerRef.current);
+      if (handled) return;
+
+      const container = containerRef.current;
+      if (!container) return;
+
+      // 3. Normal Wheel on non-scrollable page to flip pages (flip mode only)
+      if (!isContinuous) {
+        const isScrollable = container.scrollHeight > container.clientHeight + 10;
+        if (!isScrollable) {
+          const now = Date.now();
+          if (now - lastWheelTimeRef.current < 450) return;
+
+          if (e.deltaY > 25) {
+            lastWheelTimeRef.current = now;
+            goToNextPage();
+          } else if (e.deltaY < -25) {
+            lastWheelTimeRef.current = now;
+            goToPrevPage();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('wheel', handleNativeWheel, { passive: false });
+    return () => {
+      window.removeEventListener('wheel', handleNativeWheel);
+    };
+  }, [handleTrackpadWheel, isContinuous, goToNextPage, goToPrevPage, zoom]);
 
   const currentProgressPage = nav.isDualPage && nav.spread.right ? nav.spread.right : nav.currentPage;
   const progressPercent = nav.totalPages > 0 ? Math.round((currentProgressPage / nav.totalPages) * 100) : 0;
