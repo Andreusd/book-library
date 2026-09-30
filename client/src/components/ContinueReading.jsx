@@ -204,7 +204,20 @@ export default function ContinueReading({
           return (
             <div
               key={book.id}
-              onClick={() => selectBook(book)}
+              data-book-id={book.id}
+              onClick={(e) => {
+                const coverEl = e.currentTarget.querySelector('.continue-reading-cover') || e.currentTarget;
+                const rect = coverEl.getBoundingClientRect();
+                const originRect = {
+                  top: Math.round(rect.top),
+                  left: Math.round(rect.left),
+                  width: Math.round(rect.width),
+                  height: Math.round(rect.height),
+                  right: Math.round(rect.right),
+                  bottom: Math.round(rect.bottom),
+                };
+                selectBook(book, originRect);
+              }}
               onContextMenu={(e) => {
                 if (contextMenu) {
                   e.preventDefault();

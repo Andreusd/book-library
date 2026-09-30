@@ -631,5 +631,13 @@ html[data-mode="light"][data-theme="linen"] ::selection {
   color: #16110c;
 }
 
+/* Book Reader Zoom Opening & Closing Transitions */
+.book-zoom-aperture {
+  will-change: top, left, width, height, border-radius;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+
 
 

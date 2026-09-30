@@ -247,9 +247,9 @@ export function useLibraryData({ setCurrentUser, modals, router }) {
   }, [activeLibraryId, routerNavigateToShelf]);
 
   // Open reader and update browser route
-  const openReader = useCallback((targetBook) => {
+  const openReader = useCallback((targetBook, originRect = null) => {
     if (!targetBook) return;
-    setActiveBook(targetBook);
+    setActiveBook({ ...targetBook, _originRect: originRect });
     const targetLib = activeLibraryId || targetBook.library_id || 'default';
     if (!activeLibraryId && targetBook.library_id) {
       setActiveLibraryId(targetBook.library_id);

@@ -28,6 +28,15 @@ export function SettingsProvider({ children }) {
     }
   });
 
+  const [bookAnimations, setBookAnimationsState] = useState(() => {
+    try {
+      const saved = localStorage.getItem('book_animations');
+      return saved !== null ? saved === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
+
   const [sidebarOpen, setSidebarOpenState] = useState(() => {
     try {
       const saved = localStorage.getItem('sidebar_open');
@@ -62,6 +71,13 @@ export function SettingsProvider({ children }) {
     setShowFileExtensionState(enabled);
     try {
       localStorage.setItem('show_file_extension', String(enabled));
+    } catch {}
+  }, []);
+
+  const setBookAnimations = useCallback((enabled) => {
+    setBookAnimationsState(enabled);
+    try {
+      localStorage.setItem('book_animations', String(enabled));
     } catch {}
   }, []);
 
@@ -114,6 +130,8 @@ export function SettingsProvider({ children }) {
     setMode,
     showFileExtension,
     setShowFileExtension,
+    bookAnimations,
+    setBookAnimations,
     sidebarOpen,
     setSidebarOpen: setSidebarOpenState,
     toggleSidebar,

@@ -321,6 +321,8 @@ const translations = {
     displayPreferences: 'Display Preferences',
     showFileExtension: 'Show file extension',
     showFileExtensionDesc: 'Display format badges (EPUB, PDF) on book cards',
+    bookAnimations: 'Book open/close animations',
+    bookAnimationsDesc: 'Smooth zoom-in and zoom-out transitions when opening and closing books',
 
     // Library Selection Screen
     selectLibraryTitle: 'Select a Library',
@@ -727,6 +729,8 @@ const translations = {
     displayPreferences: 'Preferências de Exibição',
     showFileExtension: 'Mostrar extensão do arquivo',
     showFileExtensionDesc: 'Exibir tags de formato (EPUB, PDF) nos cards dos livros',
+    bookAnimations: 'Animações de abertura e fechamento',
+    bookAnimationsDesc: 'Transições suaves de zoom ao abrir e fechar livros',
 
     // Library Selection Screen
     selectLibraryTitle: 'Selecione uma Biblioteca',
@@ -1133,6 +1137,8 @@ const translations = {
     displayPreferences: 'Preferencias de visualización',
     showFileExtension: 'Mostrar extensión de archivo',
     showFileExtensionDesc: 'Mostrar etiquetas de formato (EPUB, PDF) en las tarjetas de libros',
+    bookAnimations: 'Animaciones de apertura y cierre',
+    bookAnimationsDesc: 'Transiciones suaves de zoom al abrir y cerrar libros',
 
     // Library Selection Screen
     selectLibraryTitle: 'Selecciona una Biblioteca',
@@ -1539,6 +1545,8 @@ const translations = {
     displayPreferences: 'Préférences d’affichage',
     showFileExtension: 'Afficher l’extension des fichiers',
     showFileExtensionDesc: 'Afficher les badges de format (EPUB, PDF) sur les cartes de livres',
+    bookAnimations: 'Animations d’ouverture et fermeture',
+    bookAnimationsDesc: 'Transitions fluides de zoom lors de l’ouverture et la fermeture des livres',
 
     // Library Selection Screen
     selectLibraryTitle: 'Sélectionnez une Bibliothèque',

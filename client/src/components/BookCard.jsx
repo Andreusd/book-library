@@ -66,9 +66,24 @@ export default function BookCard({
     }
   };
 
+  const handleClick = (e) => {
+    const coverEl = e.currentTarget.querySelector('.book-cover-container') || e.currentTarget;
+    const rect = coverEl.getBoundingClientRect();
+    const originRect = {
+      top: Math.round(rect.top),
+      left: Math.round(rect.left),
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+      right: Math.round(rect.right),
+      bottom: Math.round(rect.bottom),
+    };
+    selectBook(book, originRect);
+  };
+
   return (
     <div 
-      onClick={() => selectBook(book)}
+      data-book-id={book?.id}
+      onClick={handleClick}
       onContextMenu={handleContextMenu}
       className="book-card group cursor-pointer flex flex-col items-center select-none text-left"
     >

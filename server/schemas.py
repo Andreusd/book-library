@@ -41,7 +41,8 @@ class SettingsPayload(BaseModel):
     library_path: str
 
 class DisplaySettingsPayload(BaseModel):
-    show_file_extension: bool
+    show_file_extension: Optional[bool] = None
+    book_animations: Optional[bool] = None
 
 class ValidatePathPayload(BaseModel):
     path: str

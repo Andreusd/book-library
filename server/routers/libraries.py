@@ -141,13 +141,24 @@ def get_settings(library_id: Optional[str] = Query(None), scanner: LibraryScanne
         "libraries": scanner.config_mgr.get_libraries(),
         "validation": validation,
         "show_file_extension": scanner.config_mgr.get_show_file_extension(),
+        "book_animations": scanner.config_mgr.get_book_animations(),
     }
 
 @router.post("/api/settings/display")
 def update_display_settings(payload: DisplaySettingsPayload, scanner: LibraryScanner = Depends(get_scanner)):
-    """Updates display preferences such as showing/hiding file extension tags."""
-    val = scanner.config_mgr.set_show_file_extension(payload.show_file_extension)
-    return {"status": "ok", "show_file_extension": val}
+    """Updates display preferences such as showing/hiding file extension tags or book animations."""
+    res = {"status": "ok"}
+    if payload.show_file_extension is not None:
+        res["show_file_extension"] = scanner.config_mgr.set_show_file_extension(payload.show_file_extension)
+    else:
+        res["show_file_extension"] = scanner.config_mgr.get_show_file_extension()
+
+    if payload.book_animations is not None:
+        res["book_animations"] = scanner.config_mgr.set_book_animations(payload.book_animations)
+    else:
+        res["book_animations"] = scanner.config_mgr.get_book_animations()
+
+    return res
 
 @router.post("/api/settings/validate")
 def validate_settings_path(payload: ValidatePathPayload, scanner: LibraryScanner = Depends(get_scanner)):

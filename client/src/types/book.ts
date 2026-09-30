@@ -23,6 +23,15 @@ export interface BookTag {
   book_count?: number;
 }
 
+export interface BookRect {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+  right?: number;
+  bottom?: number;
+}
+
 export interface Book {
   id: string;
   library_id: string;
@@ -50,6 +59,7 @@ export interface Book {
   creator?: string;
   creation_date?: string;
   total_pages?: number;
+  _originRect?: BookRect | null;
 }
 
 export interface Shelf {

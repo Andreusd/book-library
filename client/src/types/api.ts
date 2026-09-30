@@ -53,7 +53,8 @@ export interface SettingsPayload {
 }
 
 export interface DisplaySettingsPayload {
-  show_file_extension: boolean;
+  show_file_extension?: boolean;
+  book_animations?: boolean;
 }
 
 export interface ValidatePathPayload {
@@ -202,6 +203,8 @@ export interface SetFolderIconResponse {
 export interface LibrariesResponse {
   libraries: Library[];
   active_library_id: string;
+  show_file_extension?: boolean;
+  book_animations?: boolean;
 }
 
 export interface AddLibraryResponse {

@@ -40,6 +40,8 @@ export default function AppModals({
 
   const showFileExtension = propShowFileExtension !== undefined ? propShowFileExtension : settings.showFileExtension;
   const onToggleFileExtension = propOnToggleFileExtension || settings.setShowFileExtension;
+  const bookAnimations = settings.bookAnimations;
+  const onToggleBookAnimations = settings.setBookAnimations;
 
   const onOpenReader = propOnOpenReader || libraryData?.openReader;
   const onToggleFavorite = propOnToggleFavorite || libraryData?.handleToggleFavorite;
@@ -163,6 +165,8 @@ export default function AppModals({
         onClose={() => modals?.setSettingsOpen && modals.setSettingsOpen(false)}
         showFileExtension={showFileExtension}
         onToggleFileExtension={onToggleFileExtension}
+        bookAnimations={bookAnimations}
+        onToggleBookAnimations={onToggleBookAnimations}
         onLibraryChanged={onLibraryChanged}
       />
     </>

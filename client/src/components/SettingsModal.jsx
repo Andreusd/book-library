@@ -11,7 +11,9 @@ export default function SettingsModal({
   onClose, 
   onLibraryChanged,
   showFileExtension,
-  onToggleFileExtension
+  onToggleFileExtension,
+  bookAnimations,
+  onToggleBookAnimations
 }) {
   const { t, lang, setLang } = useI18n();
   const [libraries, setLibraries] = useState([]);
@@ -43,6 +45,34 @@ export default function SettingsModal({
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ show_file_extension: val })
+    }).catch(() => {});
+  };
+
+  // Local fallback for bookAnimations
+  const [localBookAnimations, setLocalBookAnimations] = useState(() => {
+    try {
+      const saved = localStorage.getItem('book_animations');
+      return saved !== null ? saved === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
+
+  const isAnimations = bookAnimations !== undefined ? bookAnimations : localBookAnimations;
+
+  const handleToggleBookAnimations = (e) => {
+    const val = e.target.checked;
+    setLocalBookAnimations(val);
+    try {
+      localStorage.setItem('book_animations', String(val));
+    } catch {}
+    if (onToggleBookAnimations) {
+      onToggleBookAnimations(val);
+    }
+    fetch('/api/settings/display', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ book_animations: val })
     }).catch(() => {});
   };
 
@@ -402,6 +432,26 @@ export default function SettingsModal({
                   type="checkbox"
                   checked={isShowExt}
                   onChange={handleToggleShowFileExtension}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500" />
+              </label>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-neutral-950/60 border border-neutral-800 flex items-center justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <span className="text-xs font-semibold text-neutral-200 block">
+                  {t('bookAnimations')}
+                </span>
+                <span className="text-[11px] text-neutral-400 block mt-0.5">
+                  {t('bookAnimationsDesc')}
+                </span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  checked={isAnimations}
+                  onChange={handleToggleBookAnimations}
                   className="sr-only peer"
                 />
                 <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500" />

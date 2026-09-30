@@ -86,6 +86,10 @@ class ConfigManager:
         if "show_file_extension" not in config:
             config["show_file_extension"] = True
 
+        # Display preference: book opening and closing zoom animations
+        if "book_animations" not in config:
+            config["book_animations"] = True
+
         return config
 
     def _save(self):
@@ -235,6 +239,19 @@ class ConfigManager:
             self._config["show_file_extension"] = bool(show)
             self._save()
             return self._config["show_file_extension"]
+
+    def get_book_animations(self) -> bool:
+        """Returns whether book opening and closing zoom animations are enabled."""
+        with self._lock:
+            self._reload_if_changed()
+            return bool(self._config.get("book_animations", True))
+
+    def set_book_animations(self, enabled: bool) -> bool:
+        """Saves whether book opening and closing zoom animations are enabled."""
+        with self._lock:
+            self._config["book_animations"] = bool(enabled)
+            self._save()
+            return self._config["book_animations"]
 
     @staticmethod
     def validate_path(path: str) -> Dict[str, Any]:

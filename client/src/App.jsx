@@ -1,7 +1,8 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import LibrarySelector from './components/LibrarySelector';
 import Reader from './components/Reader';
+import ReaderTransition from './components/ReaderTransition';
 import AppModals from './components/AppModals';
 import AppNavbar from './components/AppNavbar';
 import ShelfHeader from './components/ShelfHeader';
@@ -27,6 +28,7 @@ export default function App() {
     mode,
     setMode,
     showFileExtension,
+    bookAnimations,
     sidebarOpen,
     toggleSidebar,
     setSidebarOpen,
@@ -67,12 +69,15 @@ export default function App() {
     handleUserChange,
   } = libraryData;
 
+  const [isTransitionActive, setIsTransitionActive] = useState(false);
+  const isReaderActive = Boolean(activeBook || isTransitionActive);
+
   const searchInputRef = useRef(null);
 
   // Global Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (activeBook) return;
+      if (isReaderActive) return;
 
       if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
         e.preventDefault();
@@ -84,7 +89,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeBook, toggleSidebar]);
+  }, [isReaderActive, toggleSidebar]);
 
   const handleOpenDetails = useCallback((book) => {
     modals.openDetailsModal(book);
@@ -139,7 +144,7 @@ export default function App() {
             }
           }}
           onShelfContextMenu={modals.openShelfContextMenu}
-          isOpen={!activeBook && sidebarOpen}
+          isOpen={!isReaderActive && sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           libraries={libraries}
           activeLibraryId={activeLibraryId}
@@ -202,28 +207,35 @@ export default function App() {
         </div>
 
         {/* Route Loading Fullscreen State */}
-        {routeLoading && !activeBook && (
+        {routeLoading && !isReaderActive && (
           <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-neutral-950 text-neutral-400 gap-3 select-none">
             <div className="w-9 h-9 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
             <p className="text-sm font-medium text-neutral-300">{t('loadingBook')}</p>
           </div>
         )}
 
-        {/* Embedded Fullscreen Reader */}
-        {activeBook && (
-          <Reader
-            book={activeBook}
-            isFavorite={favoriteIds.has(activeBook.id)}
-            onClose={closeReader}
-            onProgressUpdate={handleProgressUpdate}
-            onToggleFavorite={handleToggleFavorite}
-            showFileExtension={showFileExtension}
-            theme={theme}
-            onThemeChange={setTheme}
-            mode={mode}
-            onModeChange={setMode}
-          />
-        )}
+        {/* Embedded Fullscreen Reader with Zoom Transitions */}
+        <ReaderTransition
+          book={activeBook}
+          enabled={bookAnimations}
+          onClose={closeReader}
+          onTransitionStateChange={setIsTransitionActive}
+        >
+          {(transitionBook, handleClose) => (
+            <Reader
+              book={transitionBook}
+              isFavorite={favoriteIds.has(transitionBook.id)}
+              onClose={handleClose}
+              onProgressUpdate={handleProgressUpdate}
+              onToggleFavorite={handleToggleFavorite}
+              showFileExtension={showFileExtension}
+              theme={theme}
+              onThemeChange={setTheme}
+              mode={mode}
+              onModeChange={setMode}
+            />
+          )}
+        </ReaderTransition>
 
         {/* Encapsulated Modals and Context Menus */}
         <AppModals modals={modals} libraryData={libraryData} />
