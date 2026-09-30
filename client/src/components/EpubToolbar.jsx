@@ -2,10 +2,11 @@ import React from 'react';
 import {
   ArrowLeft, ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
   Maximize2, Minimize2, Moon, Sun, ListTree,
-  Heart, X, PanelTopClose, PanelTopOpen, Palette,
-  MessageSquare, Search, Headphones, Settings, SlidersHorizontal
+  Heart, PanelTopClose, PanelTopOpen, Palette,
+  MessageSquare, Search, Headphones, Settings
 } from 'lucide-react';
 import { useI18n } from '../i18n';
+import ReaderSettingsPopover from './ReaderSettingsPopover';
 
 /**
  * Dedicated top navigation and controls toolbar for the EPUB reader.
@@ -218,7 +219,7 @@ export default function EpubToolbar({
           <button
             onClick={() => changeFontSize(-10)}
             className={`p-1 rounded transition cursor-pointer ${ht.toolBtn}`}
-            title="Decrease Font Size (-)"
+            title={t('decreaseFontSize')}
           >
             <ZoomOut className="w-3.5 h-3.5" />
           </button>
@@ -231,14 +232,14 @@ export default function EpubToolbar({
                 ? 'text-[#433422] hover:text-amber-700'
                 : 'text-neutral-700 hover:text-amber-600'
             }`}
-            title="Reset Font Size"
+            title={t('resetFontSize')}
           >
             {fontSize}%
           </button>
           <button
             onClick={() => changeFontSize(10)}
             className={`p-1 rounded transition cursor-pointer ${ht.toolBtn}`}
-            title="Increase Font Size (+)"
+            title={t('increaseFontSize')}
           >
             <ZoomIn className="w-3.5 h-3.5" />
           </button>
@@ -255,7 +256,7 @@ export default function EpubToolbar({
                 ? 'text-[#7c6a53] hover:text-[#292014]'
                 : 'text-neutral-500 hover:text-neutral-900'
             }`}
-            title="Dark Mode"
+            title={t('darkMode')}
           >
             <Moon className="w-3.5 h-3.5" />
           </button>
@@ -268,7 +269,7 @@ export default function EpubToolbar({
                 ? 'text-neutral-400 hover:text-white'
                 : 'text-neutral-500 hover:text-neutral-900'
             }`}
-            title="Sepia Mode"
+            title={t('sepiaMode')}
           >
             <Palette className="w-3.5 h-3.5" />
           </button>
@@ -281,7 +282,7 @@ export default function EpubToolbar({
                 ? 'text-[#7c6a53] hover:text-[#292014]'
                 : 'text-neutral-400 hover:text-white'
             }`}
-            title="Light Mode"
+            title={t('lightMode')}
           >
             <Sun className="w-3.5 h-3.5" />
           </button>
@@ -386,181 +387,21 @@ export default function EpubToolbar({
             <Settings className="w-4 h-4" />
           </button>
 
-          {readerSettingsOpen && (
-            <>
-              <div
-                className="fixed inset-0 z-40 bg-transparent"
-                onClick={() => setReaderSettingsOpen(false)}
-              />
-              <div className={`absolute right-0 top-full mt-2 w-72 sm:w-80 max-h-[calc(100vh-5.5rem)] flex flex-col rounded-2xl p-3.5 z-50 text-left select-none animate-in fade-in zoom-in-95 duration-150 border ${
-                theme === 'dark'
-                  ? 'bg-neutral-900 border-neutral-700 shadow-2xl shadow-black/80 text-neutral-100'
-                  : theme === 'sepia'
-                  ? 'bg-[#fbf0d9] border-[#d8c5a0] shadow-2xl shadow-neutral-900/15 text-[#292014]'
-                  : 'bg-white border-neutral-200 shadow-2xl shadow-neutral-900/15 text-neutral-800'
-              }`}>
-                <div className={`flex items-center justify-between pb-2.5 mb-2.5 border-b shrink-0 ${
-                  theme === 'dark' ? 'border-neutral-800' : theme === 'sepia' ? 'border-[#d8c5a0]' : 'border-neutral-200'
-                }`}>
-                  <div className="flex items-center gap-2">
-                    <SlidersHorizontal className="w-4 h-4 text-amber-500" />
-                    <h3 className={`text-xs font-bold uppercase tracking-wider ${
-                      theme === 'dark' ? 'text-neutral-100' : theme === 'sepia' ? 'text-[#292014]' : 'text-neutral-900'
-                    }`}>{t('readerSettings')}</h3>
-                  </div>
-                  <button
-                    onClick={() => setReaderSettingsOpen(false)}
-                    className={`p-1 rounded-md transition cursor-pointer ${
-                      theme === 'dark'
-                        ? 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800'
-                        : theme === 'sepia'
-                        ? 'text-[#7c6a53] hover:text-[#292014] hover:bg-[#efe0c2]'
-                        : 'text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100'
-                    }`}
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                <div className="space-y-1.5 reader-settings-scroll flex-1 pr-1">
-                  {/* Toggle Bottom Progress Bar */}
-                  <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${
-                    theme === 'dark' ? 'hover:bg-neutral-800/60' : theme === 'sepia' ? 'hover:bg-[#efe0c2]/60' : 'hover:bg-neutral-100'
-                  }`}>
-                    <div className="min-w-0 flex-1">
-                      <span className={`text-xs font-semibold block transition-colors ${
-                        theme === 'dark' ? 'text-neutral-100 group-hover:text-amber-300' : theme === 'sepia' ? 'text-[#292014] group-hover:text-amber-700' : 'text-neutral-900 group-hover:text-amber-600'
-                      }`}>
-                        {t('bottomProgressBar')}
-                      </span>
-                      <span className={`text-[11px] leading-snug block mt-0.5 ${
-                        theme === 'dark' ? 'text-neutral-300' : theme === 'sepia' ? 'text-[#7c6a53]' : 'text-neutral-500'
-                      }`}>
-                        {t('bottomProgressBarDesc')}
-                      </span>
-                    </div>
-                    <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-                      <input
-                        type="checkbox"
-                        checked={showBottomProgress}
-                        onChange={toggleBottomProgress}
-                        className="sr-only peer"
-                      />
-                      <div className={`w-9 h-5 ${theme === 'dark' ? 'bg-neutral-800 border-neutral-700' : 'bg-neutral-300 border-neutral-300'} border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500`}></div>
-                    </div>
-                  </label>
-
-                  {/* Toggle Trackpad Swipe */}
-                  <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${
-                    theme === 'dark' ? 'hover:bg-neutral-800/60' : theme === 'sepia' ? 'hover:bg-[#efe0c2]/60' : 'hover:bg-neutral-100'
-                  }`}>
-                    <div className="min-w-0 flex-1">
-                      <span className={`text-xs font-semibold block transition-colors ${
-                        theme === 'dark' ? 'text-neutral-100 group-hover:text-amber-300' : theme === 'sepia' ? 'text-[#292014] group-hover:text-amber-700' : 'text-neutral-900 group-hover:text-amber-600'
-                      }`}>
-                        {t('trackpadSwipe')}
-                      </span>
-                      <span className={`text-[11px] leading-snug block mt-0.5 ${
-                        theme === 'dark' ? 'text-neutral-300' : theme === 'sepia' ? 'text-[#7c6a53]' : 'text-neutral-500'
-                      }`}>
-                        {t('trackpadSwipeDesc')}
-                      </span>
-                    </div>
-                    <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-                      <input
-                        type="checkbox"
-                        checked={trackpadSwipeEnabled}
-                        onChange={toggleTrackpadSwipe}
-                        className="sr-only peer"
-                      />
-                      <div className={`w-9 h-5 ${theme === 'dark' ? 'bg-neutral-800 border-neutral-700' : 'bg-neutral-300 border-neutral-300'} border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500`}></div>
-                    </div>
-                  </label>
-
-                  {/* Toggle Floating Side Buttons */}
-                  <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${
-                    theme === 'dark' ? 'hover:bg-neutral-800/60' : theme === 'sepia' ? 'hover:bg-[#efe0c2]/60' : 'hover:bg-neutral-100'
-                  }`}>
-                    <div className="min-w-0 flex-1">
-                      <span className={`text-xs font-semibold block transition-colors ${
-                        theme === 'dark' ? 'text-neutral-100 group-hover:text-amber-300' : theme === 'sepia' ? 'text-[#292014] group-hover:text-amber-700' : 'text-neutral-900 group-hover:text-amber-600'
-                      }`}>
-                        {t('floatingSideButtons')}
-                      </span>
-                      <span className={`text-[11px] leading-snug block mt-0.5 ${
-                        theme === 'dark' ? 'text-neutral-300' : theme === 'sepia' ? 'text-[#7c6a53]' : 'text-neutral-500'
-                      }`}>
-                        {t('floatingSideButtonsDesc')}
-                      </span>
-                    </div>
-                    <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-                      <input
-                        type="checkbox"
-                        checked={floatingButtonsEnabled}
-                        onChange={toggleFloatingButtons}
-                        className="sr-only peer"
-                      />
-                      <div className={`w-9 h-5 ${theme === 'dark' ? 'bg-neutral-800 border-neutral-700' : 'bg-neutral-300 border-neutral-300'} border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500`}></div>
-                    </div>
-                  </label>
-
-                  {/* Toggle Up/Down Arrow Page Flip */}
-                  <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${
-                    theme === 'dark' ? 'hover:bg-neutral-800/60' : theme === 'sepia' ? 'hover:bg-[#efe0c2]/60' : 'hover:bg-neutral-100'
-                  }`}>
-                    <div className="min-w-0 flex-1">
-                      <span className={`text-xs font-semibold block transition-colors ${
-                        theme === 'dark' ? 'text-neutral-100 group-hover:text-amber-300' : theme === 'sepia' ? 'text-[#292014] group-hover:text-amber-700' : 'text-neutral-900 group-hover:text-amber-600'
-                      }`}>
-                        {t('upDownPageFlip')}
-                      </span>
-                      <span className={`text-[11px] leading-snug block mt-0.5 ${
-                        theme === 'dark' ? 'text-neutral-300' : theme === 'sepia' ? 'text-[#7c6a53]' : 'text-neutral-500'
-                      }`}>
-                        {t('upDownPageFlipDesc')}
-                      </span>
-                    </div>
-                    <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-                      <input
-                        type="checkbox"
-                        checked={upDownFlipEnabled}
-                        onChange={toggleUpDownFlip}
-                        className="sr-only peer"
-                      />
-                      <div className={`w-9 h-5 ${theme === 'dark' ? 'bg-neutral-800 border-neutral-700' : 'bg-neutral-300 border-neutral-300'} border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500`}></div>
-                    </div>
-                  </label>
-
-                  {/* Toggle Keep Header Pinned */}
-                  <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${
-                    theme === 'dark' ? 'hover:bg-neutral-800/60' : theme === 'sepia' ? 'hover:bg-[#efe0c2]/60' : 'hover:bg-neutral-100'
-                  }`}>
-                    <div className="min-w-0 flex-1">
-                      <span className={`text-xs font-semibold block transition-colors ${
-                        theme === 'dark' ? 'text-neutral-100 group-hover:text-amber-300' : theme === 'sepia' ? 'text-[#292014] group-hover:text-amber-700' : 'text-neutral-900 group-hover:text-amber-600'
-                      }`}>
-                        {t('keepHeaderPinned')}
-                      </span>
-                      <span className={`text-[11px] leading-snug block mt-0.5 ${
-                        theme === 'dark' ? 'text-neutral-300' : theme === 'sepia' ? 'text-[#7c6a53]' : 'text-neutral-500'
-                      }`}>
-                        {t('keepHeaderPinnedDesc')}
-                      </span>
-                    </div>
-                    <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-                      <input
-                        type="checkbox"
-                        checked={headerPinned}
-                        onChange={toggleHeaderPinned}
-                        className="sr-only peer"
-                      />
-                      <div className={`w-9 h-5 ${theme === 'dark' ? 'bg-neutral-800 border-neutral-700' : 'bg-neutral-300 border-neutral-300'} border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500`}></div>
-                    </div>
-                  </label>
-                </div>
-              </div>
-            </>
-          )}
+          <ReaderSettingsPopover
+            isOpen={readerSettingsOpen}
+            onClose={() => setReaderSettingsOpen(false)}
+            theme={theme}
+            showBottomProgress={showBottomProgress}
+            toggleBottomProgress={toggleBottomProgress}
+            trackpadSwipeEnabled={trackpadSwipeEnabled}
+            toggleTrackpadSwipe={toggleTrackpadSwipe}
+            floatingButtonsEnabled={floatingButtonsEnabled}
+            toggleFloatingButtons={toggleFloatingButtons}
+            upDownFlipEnabled={upDownFlipEnabled}
+            toggleUpDownFlip={toggleUpDownFlip}
+            headerPinned={headerPinned}
+            toggleHeaderPinned={toggleHeaderPinned}
+          />
         </div>
       </div>
     </header>

@@ -25,7 +25,7 @@ export default function TagCard({
           /* Empty state placeholder */
           <div className="w-15 sm:w-16 aspect-[1/1.45] rounded-md bg-neutral-800/40 border border-neutral-700/40 flex flex-col items-center justify-center text-neutral-500 gap-1 shadow-inner">
             <Tag className={`w-5 h-5 ${cfg.text}`} />
-            <span className="text-[10px] text-neutral-600 font-medium">Empty</span>
+            <span className="text-[10px] text-neutral-600 font-medium">{t('empty')}</span>
           </div>
         ) : tagCovers.length === 1 ? (
           /* Single book cover */

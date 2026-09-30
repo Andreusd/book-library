@@ -2,11 +2,12 @@ import React from 'react';
 import { 
   ArrowLeft, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, 
   Maximize2, Minimize2, Moon, Sun, ListTree,
-  MessageSquare, Heart, Settings, SlidersHorizontal, X,
+  MessageSquare, Heart, Settings,
   RotateCcw, StretchHorizontal,
   Search, Headphones
 } from 'lucide-react';
 import { useI18n } from '../i18n';
+import ReaderSettingsPopover from './ReaderSettingsPopover';
 
 /**
  * Isolated Reader Toolbar component containing all navigation,
@@ -317,287 +318,51 @@ export default function ReaderToolbar({
             <Settings className="w-4 h-4" />
           </button>
 
-          {readerSettingsOpen && (
-            <>
-              <div 
-                className="fixed inset-0 z-40 bg-transparent" 
-                onClick={() => setReaderSettingsOpen(false)}
-              />
-              <div className={`absolute right-0 top-full mt-2 w-72 sm:w-80 max-h-[calc(100vh-5.5rem)] flex flex-col rounded-2xl p-3.5 z-50 text-left select-none animate-in fade-in zoom-in-95 duration-150 border ${
-                invertColors 
-                  ? 'bg-neutral-900 border-neutral-700 shadow-2xl shadow-black/80 text-neutral-100' 
-                  : 'bg-white border-neutral-200 shadow-2xl shadow-neutral-900/15 text-neutral-800'
-              }`}>
-                <div className={`flex items-center justify-between pb-2.5 mb-2.5 border-b shrink-0 ${invertColors ? 'border-neutral-800' : 'border-neutral-200'}`}>
-                  <div className="flex items-center gap-2">
-                    <SlidersHorizontal className="w-4 h-4 text-amber-500" />
-                    <h3 className={`text-xs font-bold uppercase tracking-wider ${invertColors ? 'text-neutral-100' : 'text-neutral-900'}`}>{t('readerSettings')}</h3>
-                  </div>
-                  <button 
-                    onClick={() => setReaderSettingsOpen(false)}
-                    className={`p-1 rounded-md transition cursor-pointer ${invertColors ? 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800' : 'text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100'}`}
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                <div className="space-y-1.5 reader-settings-scroll flex-1 pr-1 overflow-y-auto">
-                  {/* Centralize Page Vertically */}
-                  <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
-                    <div className="min-w-0 flex-1">
-                      <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
-                        {t('centerVertically')}
-                      </span>
-                      <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
-                        {t('centerVerticallyDesc')}
-                      </span>
-                    </div>
-                    <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-                      <input 
-                        type="checkbox"
-                        checked={centerVertically}
-                        onChange={toggleCenterVertically}
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
-                    </div>
-                  </label>
-
-                  {/* Bottom Progress Bar */}
-                  <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
-                    <div className="min-w-0 flex-1">
-                      <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
-                        {t('bottomProgressBar')}
-                      </span>
-                      <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
-                        {t('bottomProgressBarDesc')}
-                      </span>
-                    </div>
-                    <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-                      <input 
-                        type="checkbox"
-                        checked={showBottomProgress}
-                        onChange={toggleBottomProgress}
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
-                    </div>
-                  </label>
-
-                  {/* Trackpad Swipe */}
-                  <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
-                    <div className="min-w-0 flex-1">
-                      <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
-                        {t('trackpadSwipe')}
-                      </span>
-                      <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
-                        {t('trackpadSwipeDesc')}
-                      </span>
-                    </div>
-                    <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-                      <input 
-                        type="checkbox"
-                        checked={trackpadSwipeEnabled}
-                        onChange={() => {
-                          setTrackpadSwipeEnabled((prev) => {
-                            const next = !prev;
-                            try { localStorage.setItem('reader_trackpad_swipe', String(next)); } catch {}
-                            return next;
-                          });
-                        }}
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
-                    </div>
-                  </label>
-
-                  {/* Floating Buttons */}
-                  <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
-                    <div className="min-w-0 flex-1">
-                      <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
-                        {t('floatingSideButtons')}
-                      </span>
-                      <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
-                        {t('floatingSideButtonsDesc')}
-                      </span>
-                    </div>
-                    <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-                      <input 
-                        type="checkbox"
-                        checked={floatingButtonsEnabled}
-                        onChange={() => {
-                          setFloatingButtonsEnabled((prev) => {
-                            const next = !prev;
-                            try { localStorage.setItem('reader_floating_buttons', String(next)); } catch {}
-                            return next;
-                          });
-                        }}
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
-                    </div>
-                  </label>
-
-                  {/* Vertical Keys Page Flip */}
-                  <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
-                    <div className="min-w-0 flex-1">
-                      <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
-                        {t('upDownPageFlip')}
-                      </span>
-                      <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
-                        {t('upDownPageFlipDesc')}
-                      </span>
-                    </div>
-                    <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-                      <input 
-                        type="checkbox"
-                        checked={upDownFlipEnabled}
-                        onChange={() => {
-                          setUpDownFlipEnabled((prev) => {
-                            const next = !prev;
-                            try { localStorage.setItem('reader_up_down_flip', String(next)); } catch {}
-                            return next;
-                          });
-                        }}
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
-                    </div>
-                  </label>
-
-                  {/* Dual Page Mode */}
-                  <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
-                    <div className="min-w-0 flex-1">
-                      <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
-                        {t('dualPageSetting')}
-                      </span>
-                      <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
-                        {t('dualPageSettingDesc')}
-                      </span>
-                    </div>
-                    <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-                      <input 
-                        type="checkbox"
-                        checked={isDualPage}
-                        onChange={toggleDualPage}
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
-                    </div>
-                  </label>
-
-                  {/* Dual Cover Standalone */}
-                  {isDualPage && (
-                    <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group pl-6 ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
-                      <div className="min-w-0 flex-1">
-                        <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
-                          {t('dualCoverStandalone')}
-                        </span>
-                        <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
-                          {t('dualCoverStandaloneDesc')}
-                        </span>
-                      </div>
-                      <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-                        <input 
-                          type="checkbox"
-                          checked={dualCoverStandalone}
-                          onChange={toggleDualCover}
-                          className="sr-only peer"
-                        />
-                        <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
-                      </div>
-                    </label>
-                  )}
-
-                  {/* Paper Book Texture */}
-                  <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
-                    <div className="min-w-0 flex-1">
-                      <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
-                        {t('bookTexture')}
-                      </span>
-                      <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
-                        {t('bookTextureDesc')}
-                      </span>
-                    </div>
-                    <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-                      <input 
-                        type="checkbox"
-                        checked={bookTextureEnabled}
-                        onChange={toggleBookTexture}
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
-                    </div>
-                  </label>
-
-                  {/* Continuous Scroll Mode */}
-                  <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
-                    <div className="min-w-0 flex-1">
-                      <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
-                        {t('verticalScrollMode')}
-                      </span>
-                      <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
-                        {t('verticalScrollDesc')}
-                      </span>
-                    </div>
-                    <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-                      <input 
-                        type="checkbox"
-                        checked={isContinuous}
-                        onChange={toggleScrollMode}
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
-                    </div>
-                  </label>
-
-                  {/* Spacing between continuous pages */}
-                  {isContinuous && (
-                    <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group pl-6 ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
-                      <div className="min-w-0 flex-1">
-                        <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
-                          {t('continuousPageSpacing')}
-                        </span>
-                        <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
-                          {t('continuousPageSpacingDesc')}
-                        </span>
-                      </div>
-                      <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-                        <input 
-                          type="checkbox"
-                          checked={continuousPageSpacing}
-                          onChange={toggleContinuousPageSpacing}
-                          className="sr-only peer"
-                        />
-                        <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
-                      </div>
-                    </label>
-                  )}
-
-                  {/* Pin Header */}
-                  <label className={`flex items-start justify-between gap-3 p-2.5 rounded-xl transition-colors cursor-pointer group ${invertColors ? 'hover:bg-neutral-800/60' : 'hover:bg-neutral-100'}`}>
-                    <div className="min-w-0 flex-1">
-                      <span className={`text-xs font-semibold block transition-colors ${invertColors ? 'text-neutral-100 group-hover:text-amber-300' : 'text-neutral-900 group-hover:text-amber-600'}`}>
-                        {t('keepHeaderPinned')}
-                      </span>
-                      <span className={`text-[11px] leading-snug block mt-0.5 ${invertColors ? 'text-neutral-300' : 'text-neutral-500'}`}>
-                        {t('keepHeaderPinnedDesc')}
-                      </span>
-                    </div>
-                    <div className="relative inline-flex items-center cursor-pointer shrink-0 mt-0.5">
-                      <input 
-                        type="checkbox"
-                        checked={headerPinned}
-                        onChange={toggleHeaderPinned}
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-neutral-800 border border-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500 peer-checked:border-amber-500"></div>
-                    </div>
-                  </label>
-                </div>
-              </div>
-            </>
-          )}
+          <ReaderSettingsPopover
+            isOpen={readerSettingsOpen}
+            onClose={() => setReaderSettingsOpen(false)}
+            invertColors={invertColors}
+            centerVertically={centerVertically}
+            toggleCenterVertically={toggleCenterVertically}
+            showBottomProgress={showBottomProgress}
+            toggleBottomProgress={toggleBottomProgress}
+            trackpadSwipeEnabled={trackpadSwipeEnabled}
+            toggleTrackpadSwipe={() => {
+              setTrackpadSwipeEnabled((prev) => {
+                const next = !prev;
+                try { localStorage.setItem('reader_trackpad_swipe', String(next)); } catch {}
+                return next;
+              });
+            }}
+            floatingButtonsEnabled={floatingButtonsEnabled}
+            toggleFloatingButtons={() => {
+              setFloatingButtonsEnabled((prev) => {
+                const next = !prev;
+                try { localStorage.setItem('reader_floating_buttons', String(next)); } catch {}
+                return next;
+              });
+            }}
+            upDownFlipEnabled={upDownFlipEnabled}
+            toggleUpDownFlip={() => {
+              setUpDownFlipEnabled((prev) => {
+                const next = !prev;
+                try { localStorage.setItem('reader_up_down_flip', String(next)); } catch {}
+                return next;
+              });
+            }}
+            isDualPage={isDualPage}
+            toggleDualPage={toggleDualPage}
+            dualCoverStandalone={dualCoverStandalone}
+            toggleDualCover={toggleDualCover}
+            bookTextureEnabled={bookTextureEnabled}
+            toggleBookTexture={toggleBookTexture}
+            isContinuous={isContinuous}
+            toggleScrollMode={toggleScrollMode}
+            continuousPageSpacing={continuousPageSpacing}
+            toggleContinuousPageSpacing={toggleContinuousPageSpacing}
+            headerPinned={headerPinned}
+            toggleHeaderPinned={toggleHeaderPinned}
+          />
         </div>
       </div>
     </header>

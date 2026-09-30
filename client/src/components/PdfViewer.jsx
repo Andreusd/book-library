@@ -4,9 +4,9 @@ import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { EventBus, PDFFindController } from 'pdfjs-dist/web/pdf_viewer.mjs';
 import 'pdfjs-dist/web/pdf_viewer.css';
 
-import PdfPageView from './PdfPageView';
 import ReaderToolbar from './ReaderToolbar';
 import ReaderLayout from './ReaderLayout';
+import PdfDocumentStage from './PdfDocumentStage';
 import { PdfViewerContext } from '../contexts/pdfViewerContext';
 import { useZoomControls } from '../hooks/useZoomControls';
 import { usePageNavigation } from '../hooks/usePageNavigation';
@@ -15,103 +15,12 @@ import { usePdfTts } from '../hooks/usePdfTts';
 import { usePdfAnnotations } from '../hooks/usePdfAnnotations';
 import { useFullscreen } from '../hooks/useFullscreen';
 import { useTrackpadSwipe } from '../hooks/useTrackpadSwipe';
+import { useReaderHeaderPin } from '../hooks/useReaderHeaderPin';
+import { usePdfKeyboardGestures } from '../hooks/usePdfKeyboardGestures';
+import { SimpleLinkService } from '../utils/SimpleLinkService';
 import { queuePreloadPages, clearPageRenderCache, getDualPageSpread, getNextSpreadPage, getPrevSpreadPage } from '../utils/pdfPageUtils';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
-
-/**
- * Lightweight link service to handle PDF internal links (e.g. Table of Contents)
- * and external hyperlinks.
- */
-class SimpleLinkService {
-  constructor() {
-    this.pdfDoc = null;
-    this.onNavigate = null;
-    this._page = 1;
-    this.rotation = 0;
-  }
-
-  setDocument(pdfDoc) {
-    this.pdfDoc = pdfDoc;
-  }
-
-  setNavigate(onNavigate) {
-    this.onNavigate = onNavigate;
-  }
-
-  get page() {
-    return this._page;
-  }
-
-  setPage(val) {
-    this._page = val;
-  }
-
-  set page(val) {
-    this._page = val;
-    if (this.onNavigate && typeof val === 'number') {
-      this.onNavigate(val);
-    }
-  }
-
-  get pagesCount() {
-    return this.pdfDoc ? this.pdfDoc.numPages : 0;
-  }
-
-  getDestinationHash(_dest) {
-    return '#';
-  }
-
-  getAnchorUrl(hash) {
-    return hash || '#';
-  }
-
-  setHash(_hash) {}
-
-  executeNamedAction(action) {
-    if (!this.onNavigate) return;
-    if (action === 'NextPage') {
-      this.onNavigate('next');
-    } else if (action === 'PrevPage') {
-      this.onNavigate('prev');
-    } else if (action === 'FirstPage') {
-      this.onNavigate(1);
-    } else if (action === 'LastPage' && this.pdfDoc) {
-      this.onNavigate(this.pdfDoc.numPages);
-    }
-  }
-
-  addLinkAttributes(link, url, newWindow = true) {
-    link.href = url;
-    link.target = newWindow ? '_blank' : '_self';
-    link.rel = 'noopener noreferrer nofollow';
-  }
-
-  async goToDestination(dest) {
-    if (!this.pdfDoc || !this.onNavigate) return;
-    try {
-      let explicitDest = dest;
-      if (typeof dest === 'string') {
-        explicitDest = await this.pdfDoc.getDestination(dest);
-      }
-      if (!explicitDest) return;
-
-      const destRef = explicitDest[0];
-      let pageIndex = -1;
-      if (typeof destRef === 'object' && destRef !== null) {
-        pageIndex = await this.pdfDoc.getPageIndex(destRef);
-      } else if (typeof destRef === 'number') {
-        pageIndex = destRef;
-      }
-
-      if (typeof pageIndex === 'number' && pageIndex >= 0) {
-        this.onNavigate(pageIndex + 1);
-      }
-    } catch (e) {
-      console.error('Failed to navigate to destination:', e);
-    }
-  }
-}
 
 export default function PdfViewer({ 
   book, 
@@ -290,60 +199,15 @@ export default function PdfViewer({
     centerVerticallyRef.current = centerVertically;
   }, [centerVertically]);
 
-  // Header auto-hide / pin
-  const [headerPinned, setHeaderPinned] = useState(() => {
-    try {
-      const saved = localStorage.getItem('reader_header_pinned');
-      return saved !== null ? saved === 'true' : false;
-    } catch {
-      return false;
-    }
-  });
-  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
-
-  const hideTimerRef = useRef(null);
-  const isMouseOverHeaderRef = useRef(false);
-
-  const clearHideTimer = useCallback(() => {
-    if (hideTimerRef.current) {
-      clearTimeout(hideTimerRef.current);
-      hideTimerRef.current = null;
-    }
-  }, []);
-
-  const showHeader = useCallback(() => {
-    clearHideTimer();
-    setIsHeaderVisible(true);
-  }, [clearHideTimer]);
-
-  const startHideTimer = useCallback((delay = 3000, reset = false) => {
-    if (hideTimerRef.current && !reset) return;
-    clearHideTimer();
-    hideTimerRef.current = setTimeout(() => {
-      if (isMouseOverHeaderRef.current) return;
-      setIsHeaderVisible(false);
-      hideTimerRef.current = null;
-    }, delay);
-  }, [clearHideTimer]);
-
-  const toggleHeaderPinned = useCallback(() => {
-    setHeaderPinned(prev => {
-      const next = !prev;
-      try {
-        localStorage.setItem('reader_header_pinned', String(next));
-      } catch {}
-      if (next) {
-        clearHideTimer();
-        setIsHeaderVisible(true);
-      } else {
-        showHeader();
-        if (!isMouseOverHeaderRef.current) {
-          startHideTimer(3000, true);
-        }
-      }
-      return next;
-    });
-  }, [clearHideTimer, showHeader, startHideTimer]);
+  // Header auto-hide / pin hook
+  const {
+    headerPinned,
+    isHeaderVisible,
+    showHeader,
+    startHideTimer,
+    toggleHeaderPinned,
+    isMouseOverHeaderRef,
+  } = useReaderHeaderPin();
 
   // Page dimensions map & visible pages
   const [visiblePageNumbers, setVisiblePageNumbers] = useState(() => new Set([book?.progress?.page || 1]));
@@ -351,15 +215,15 @@ export default function PdfViewer({
   const [pageDimsMap, setPageDimsMap] = useState({});
   const pageRefsMap = useRef(new Map());
 
-  // Extracted Sub-system 1: Zoom controls hook
+  // Zoom controls hook
   const zoom = useZoomControls({
     book,
     pdfDoc,
     containerRef,
-    isDualPage: false, // updated below
+    isDualPage: false,
   });
 
-  // Extracted Sub-system 2: Page navigation hook
+  // Page navigation hook
   const nav = usePageNavigation({
     book,
     pdfDoc,
@@ -373,7 +237,7 @@ export default function PdfViewer({
     setVisiblePageNumbers,
   });
 
-  // Extracted Sub-system 3: Trackpad swipe gesture hook
+  // Trackpad swipe gesture hook
   const { handleTrackpadWheel } = useTrackpadSwipe({
     onNext: nav.goToNextPage,
     onPrev: nav.goToPrevPage,
@@ -445,14 +309,14 @@ export default function PdfViewer({
     eventBus,
   }), [linkService, eventBus]);
 
-  // Extracted Sub-system 3: Search hook
+  // Search hook
   const search = usePdfSearch({
     eventBus,
     findController,
     showHeader,
   });
 
-  // Extracted Sub-system 4: TTS hook
+  // TTS hook
   const tts = usePdfTts({
     pdfDoc,
     currentPage: nav.currentPage,
@@ -460,46 +324,22 @@ export default function PdfViewer({
     spread: nav.spread,
   });
 
-  // Extracted Sub-system 5: Annotations hook
+  // Annotations hook
   const annotations = usePdfAnnotations({
     bookId: book?.id,
   });
 
-  // Window mousemove / touchstart listener to re-show header on hover
-  useEffect(() => {
-    if (headerPinned) return;
-
-    const handleMouseMove = (e) => {
-      if (e.clientY <= 60) {
-        showHeader();
-      }
-    };
-
-    const handleTouchStart = (e) => {
-      const touch = e.touches[0];
-      if (touch && touch.clientY <= 60) {
-        showHeader();
-      }
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('touchstart', handleTouchStart, { passive: true });
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('touchstart', handleTouchStart);
-    };
-  }, [headerPinned, showHeader]);
-
-  // Initial auto-hide timer when opening reader in unpinned mode
-  useEffect(() => {
-    if (headerPinned) return;
-    const timer = setTimeout(() => {
-      if (!isMouseOverHeaderRef.current) {
-        setIsHeaderVisible(false);
-      }
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, [headerPinned]);
+  // Keyboard navigation & native wheel gesture listener hook
+  usePdfKeyboardGestures({
+    containerRef,
+    nav,
+    zoom,
+    search,
+    tts,
+    onClose,
+    upDownFlipEnabled,
+    handleTrackpadWheel,
+  });
 
   // Link service configuration
   useEffect(() => {
@@ -706,152 +546,6 @@ export default function PdfViewer({
     };
   }, [nav.isContinuous, pdfDoc, nav.totalPages, zoom.scale, nav.isDualPage]);
 
-  // Keyboard navigation & smart scrolling
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-
-      const container = containerRef.current;
-      const isScrollable = container && container.scrollHeight > container.clientHeight + 10;
-
-      if (e.key === 'ArrowRight') {
-        nav.goToNextPage();
-      } else if (e.key === 'ArrowLeft') {
-        nav.goToPrevPage();
-      } else if (e.key === 'PageDown' || e.key === ' ') {
-        e.preventDefault();
-        if (isScrollable) {
-          const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 30;
-          if (atBottom) {
-            nav.goToNextPage();
-          } else {
-            container.scrollBy({ top: container.clientHeight * 0.8, behavior: 'smooth' });
-          }
-        } else {
-          nav.goToNextPage();
-        }
-      } else if (e.key === 'PageUp') {
-        e.preventDefault();
-        if (isScrollable) {
-          const atTop = container.scrollTop <= 2;
-          if (atTop) {
-            nav.goToPrevPage();
-          } else {
-            container.scrollBy({ top: -container.clientHeight * 0.8, behavior: 'smooth' });
-          }
-        } else {
-          nav.goToPrevPage();
-        }
-      } else if (e.key === 'ArrowDown') {
-        if (isScrollable) {
-          const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 10;
-          if (atBottom && upDownFlipEnabled) {
-            nav.goToNextPage();
-          } else {
-            container.scrollBy({ top: 120, behavior: 'smooth' });
-          }
-        } else if (upDownFlipEnabled) {
-          nav.goToNextPage();
-        }
-      } else if (e.key === 'ArrowUp') {
-        if (isScrollable) {
-          const atTop = container.scrollTop <= 10;
-          if (atTop && upDownFlipEnabled) {
-            nav.goToPrevPage();
-          } else {
-            container.scrollBy({ top: -120, behavior: 'smooth' });
-          }
-        } else if (upDownFlipEnabled) {
-          nav.goToPrevPage();
-        }
-      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) {
-        e.preventDefault();
-        search.openSearch();
-      } else if (e.altKey && (e.key === 'r' || e.key === 'R')) {
-        e.preventDefault();
-        tts.toggleTts();
-      } else if (e.key === 'Escape') {
-        if (tts.ttsOpen) {
-          tts.setTtsOpen(false);
-          return;
-        }
-        if (search.searchOpen) {
-          search.handleCloseSearch();
-          return;
-        }
-        onClose();
-      } else if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+' || e.key === 'Add')) {
-        e.preventDefault();
-        zoom.handleZoomIn();
-      } else if ((e.ctrlKey || e.metaKey) && (e.key === '-' || e.key === 'Subtract')) {
-        e.preventDefault();
-        zoom.handleZoomOut();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
-        e.preventDefault();
-        zoom.handleResetZoom(nav.currentPage);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [nav, search, tts, zoom, onClose, upDownFlipEnabled]);
-
-  // Native wheel listener for two-finger trackpad swipe gestures, edge-flipping, and Ctrl+Wheel PDF zoom
-  const lastWheelTimeRef = useRef(0);
-
-  const { isContinuous, goToNextPage, goToPrevPage } = nav;
-
-  useEffect(() => {
-    const handleNativeWheel = (e) => {
-      // 1. Ctrl + Scroll Wheel (or Touchpad pinch gesture) -> Zoom PDF viewer
-      if (e.ctrlKey || e.metaKey) {
-        if (e.cancelable) e.preventDefault();
-        if (e.deltaY < 0) {
-          zoom.handleZoomIn();
-        } else if (e.deltaY > 0) {
-          zoom.handleZoomOut();
-        }
-        return;
-      }
-
-      // Do not intercept wheel when interacting with scrollable drawers, menus, or header
-      if (e.target && typeof e.target.closest === 'function') {
-        if (e.target.closest('aside, header, [role="dialog"]')) {
-          return;
-        }
-      }
-
-      // 2. Two-finger horizontal trackpad swipe to flip pages
-      const handled = handleTrackpadWheel(e, containerRef.current);
-      if (handled) return;
-
-      const container = containerRef.current;
-      if (!container) return;
-
-      // 3. Normal Wheel on non-scrollable page to flip pages (flip mode only)
-      if (!isContinuous) {
-        const isScrollable = container.scrollHeight > container.clientHeight + 10;
-        if (!isScrollable) {
-          const now = Date.now();
-          if (now - lastWheelTimeRef.current < 450) return;
-
-          if (e.deltaY > 25) {
-            lastWheelTimeRef.current = now;
-            goToNextPage();
-          } else if (e.deltaY < -25) {
-            lastWheelTimeRef.current = now;
-            goToPrevPage();
-          }
-        }
-      }
-    };
-
-    window.addEventListener('wheel', handleNativeWheel, { passive: false });
-    return () => {
-      window.removeEventListener('wheel', handleNativeWheel);
-    };
-  }, [handleTrackpadWheel, isContinuous, goToNextPage, goToPrevPage, zoom]);
-
   const currentProgressPage = nav.isDualPage && nav.spread.right ? nav.spread.right : nav.currentPage;
   const progressPercent = nav.totalPages > 0 ? Math.round((currentProgressPage / nav.totalPages) * 100) : 0;
 
@@ -882,42 +576,6 @@ export default function PdfViewer({
     bookTextureEnabled,
     handlePageDimensionsLoaded,
   ]);
-
-  const renderContinuousPage = (p, pageSide = 'single') => {
-    const isVisible = visiblePageNumbers.has(p);
-    const dims = pageDimsMap[p] || estimatedPageDims;
-    return (
-      <div
-        key={p}
-        id={`pdf-page-${p}`}
-        data-page-number={p}
-        ref={(el) => {
-          if (el) pageRefsMap.current.set(p, el);
-          else pageRefsMap.current.delete(p);
-        }}
-        style={{
-          minHeight: dims.height ? `${dims.height}px` : `${estimatedPageDims.height}px`,
-          width: dims.width ? `${dims.width}px` : `${estimatedPageDims.width}px`,
-        }}
-        className="pdf-page-container relative flex justify-center items-center select-text"
-      >
-        {isVisible ? (
-          <PdfPageView
-            pageNum={p}
-            pageSide={pageSide}
-            initialDims={dims}
-          />
-        ) : (
-          <div 
-            style={{ width: `${dims.width}px`, height: `${dims.height}px` }} 
-            className="flex items-center justify-center text-xs text-neutral-600 font-mono"
-          >
-            {p}
-          </div>
-        )}
-      </div>
-    );
-  };
 
   const toolbarElement = (
     <ReaderToolbar
@@ -1031,58 +689,16 @@ export default function PdfViewer({
       showBottomProgress={showBottomProgress}
     >
       <PdfViewerContext.Provider value={pdfViewerContextValue}>
-        <div className="min-h-full flex justify-center items-start">
-          {nav.isContinuous ? (
-            nav.isDualPage ? (
-              <div className={`w-full flex flex-col items-center ${continuousPageSpacing ? 'gap-6' : 'gap-0'} pb-24`}>
-                {nav.allSpreads.map((sp) => (
-                  <div
-                    key={sp.currentBase}
-                    id={`pdf-spread-${sp.currentBase}`}
-                    className={`flex items-start justify-center ${bookTextureEnabled && sp.left && sp.right ? 'shadow-2xl' : 'shadow-md'}`}
-                  >
-                    {sp.left && renderContinuousPage(sp.left, sp.right ? 'left' : 'single')}
-                    {sp.right && renderContinuousPage(sp.right, sp.left ? 'right' : 'single')}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className={`w-full flex flex-col items-center ${continuousPageSpacing ? 'gap-6' : 'gap-0'} pb-24`}>
-                {Array.from({ length: nav.totalPages }, (_, i) => i + 1).map((p) => (
-                  renderContinuousPage(p, 'single')
-                ))}
-              </div>
-            )
-          ) : nav.isDualPage ? (
-            <div className={`flex items-start justify-center ${bookTextureEnabled ? 'shadow-2xl' : 'shadow-md'} ${centerVertically ? 'my-auto' : ''}`}>
-              {nav.spread.left && (
-                <PdfPageView
-                  key={`dual-left-${nav.spread.left}`}
-                  pageNum={nav.spread.left}
-                  pageSide={nav.spread.right ? 'left' : 'single'}
-                  initialDims={pageDimsMap[nav.spread.left] || estimatedPageDims}
-                />
-              )}
-              {nav.spread.right && (
-                <PdfPageView
-                  key={`dual-right-${nav.spread.right}`}
-                  pageNum={nav.spread.right}
-                  pageSide={nav.spread.left ? 'right' : 'single'}
-                  initialDims={pageDimsMap[nav.spread.right] || estimatedPageDims}
-                />
-              )}
-            </div>
-          ) : (
-            <div className={`relative ${centerVertically ? 'my-auto' : ''}`}>
-              <PdfPageView
-                key={`single-${nav.currentPage}`}
-                pageNum={nav.currentPage}
-                pageSide="single"
-                initialDims={pageDimsMap[nav.currentPage] || estimatedPageDims}
-              />
-            </div>
-          )}
-        </div>
+        <PdfDocumentStage
+          nav={nav}
+          continuousPageSpacing={continuousPageSpacing}
+          bookTextureEnabled={bookTextureEnabled}
+          centerVertically={centerVertically}
+          pageDimsMap={pageDimsMap}
+          estimatedPageDims={estimatedPageDims}
+          visiblePageNumbers={visiblePageNumbers}
+          pageRefsMap={pageRefsMap}
+        />
       </PdfViewerContext.Provider>
     </ReaderLayout>
   );

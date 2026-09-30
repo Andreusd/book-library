@@ -147,8 +147,8 @@ export default function BookSearchBar({
           onClick={onPrev}
           disabled={totalMatches === 0}
           className={`p-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${buttonHover}`}
-          title={t('prevMatch') || 'Previous match (Shift+Enter)'}
-          aria-label="Previous match"
+          title={t('prevMatch')}
+          aria-label={t('prevMatch')}
         >
           <ChevronUp className="w-4 h-4" />
         </button>
@@ -159,8 +159,8 @@ export default function BookSearchBar({
           onClick={onNext}
           disabled={totalMatches === 0}
           className={`p-1.5 rounded-lg transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${buttonHover}`}
-          title={t('nextMatch') || 'Next match (Enter)'}
-          aria-label="Next match"
+          title={t('nextMatch')}
+          aria-label={t('nextMatch')}
         >
           <ChevronDown className="w-4 h-4" />
         </button>
@@ -170,8 +170,8 @@ export default function BookSearchBar({
           type="button"
           onClick={onClose}
           className={`p-1.5 rounded-lg transition-colors cursor-pointer ${buttonHover}`}
-          title={t('closeSearch') || 'Close search (Esc)'}
-          aria-label="Close search"
+          title={t('closeSearch')}
+          aria-label={t('closeSearch')}
         >
           <X className="w-4 h-4" />
         </button>
@@ -183,20 +183,20 @@ export default function BookSearchBar({
           {isSearching ? (
             <span className="flex items-center gap-1.5 text-amber-500 font-semibold animate-pulse">
               <Loader2 className="w-3 h-3 animate-spin" />
-              <span>{t('searching') || 'Searching...'}</span>
+              <span>{t('searching')}</span>
             </span>
           ) : query ? (
             totalMatches > 0 ? (
               <span>
-                {t('matchCount', { current: currentIndex + 1, total: totalMatches }) || `${currentIndex + 1} of ${totalMatches}`}
+                {t('matchCount', { current: currentIndex + 1, total: totalMatches })}
               </span>
             ) : (
               <span className="text-rose-500 font-medium">
-                {t('noMatchesFound') || 'No matches'}
+                {t('noMatchesFound')}
               </span>
             )
           ) : (
-            <span className="opacity-60">{t('typeToSearch') || 'Type to search'}</span>
+            <span className="opacity-60">{t('typeToSearch')}</span>
           )}
         </div>
 
@@ -206,7 +206,7 @@ export default function BookSearchBar({
             type="button"
             onClick={onToggleCaseSensitive}
             className={`px-1.5 py-0.5 rounded-md border text-[10px] font-semibold transition-all cursor-pointer flex items-center gap-0.5 ${caseSensitive ? badgeActive : badgeInactive}`}
-            title={t('matchCase') || 'Match Case (Aa)'}
+            title={t('matchCase')}
           >
             <CaseSensitive className="w-3 h-3" />
             <span className="hidden sm:inline">Aa</span>
@@ -216,10 +216,10 @@ export default function BookSearchBar({
             type="button"
             onClick={onToggleEntireWord}
             className={`px-1.5 py-0.5 rounded-md border text-[10px] font-semibold transition-all cursor-pointer flex items-center gap-0.5 ${entireWord ? badgeActive : badgeInactive}`}
-            title={t('wholeWord') || 'Match Whole Word (\\b)'}
+            title={t('wholeWord')}
           >
             <WholeWord className="w-3 h-3" />
-            <span className="hidden sm:inline">Word</span>
+            <span className="hidden sm:inline">{t('wholeWordLabel') || 'Word'}</span>
           </button>
         </div>
       </div>

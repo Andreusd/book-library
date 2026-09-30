@@ -329,7 +329,7 @@ export default function TextSelectionMenu({
             <button
               onClick={() => setView('main')}
               className="p-1 -ml-1 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-md transition cursor-pointer"
-              title="Back"
+              title={t('back')}
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -440,7 +440,7 @@ export default function TextSelectionMenu({
             <button
               onClick={() => setView('main')}
               className="p-1 -ml-1 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-md transition cursor-pointer"
-              title="Back"
+              title={t('back')}
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -551,7 +551,7 @@ export default function TextSelectionMenu({
               type="button"
               onClick={() => setView('main')}
               className="p-1 -ml-1 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-md transition cursor-pointer"
-              title="Back"
+              title={t('back')}
             >
               <ChevronLeft className="w-4 h-4" />
             </button>

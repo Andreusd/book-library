@@ -136,7 +136,9 @@ export default function ContinueReading({
             <h2 className="text-base font-semibold text-neutral-100">{t('continueReading')}</h2>
           )}
           <span className="text-xs text-neutral-500 font-normal">
-            {t('continueReadingCount', { count: inProgressBooks.length })}
+            {inProgressBooks.length === 1
+              ? (t('continueReadingCount_one') || t('continueReadingCount', { count: 1 }))
+              : t('continueReadingCount', { count: inProgressBooks.length })}
           </span>
         </div>
 
@@ -167,14 +169,14 @@ export default function ContinueReading({
                 <button
                   onClick={() => scroll('left')}
                   className="p-1 rounded-lg text-neutral-400 hover:text-neutral-200 bg-neutral-900/60 hover:bg-neutral-800 border border-neutral-800 transition-colors cursor-pointer"
-                  aria-label="Scroll left"
+                  aria-label={t('scrollLeft')}
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => scroll('right')}
                   className="p-1 rounded-lg text-neutral-400 hover:text-neutral-200 bg-neutral-900/60 hover:bg-neutral-800 border border-neutral-800 transition-colors cursor-pointer"
-                  aria-label="Scroll right"
+                  aria-label={t('scrollRight')}
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>

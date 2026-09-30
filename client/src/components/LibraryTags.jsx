@@ -92,14 +92,14 @@ export default function LibraryTags({
                   <button
                     onClick={() => scroll('left')}
                     className="p-1 rounded-lg text-neutral-400 hover:text-neutral-200 bg-neutral-900/60 hover:bg-neutral-800 border border-neutral-800 transition-colors cursor-pointer"
-                    aria-label="Scroll left"
+                    aria-label={t('scrollLeft')}
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => scroll('right')}
                     className="p-1 rounded-lg text-neutral-400 hover:text-neutral-200 bg-neutral-900/60 hover:bg-neutral-800 border border-neutral-800 transition-colors cursor-pointer"
-                    aria-label="Scroll right"
+                    aria-label={t('scrollRight')}
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>

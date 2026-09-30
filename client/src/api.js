@@ -2,6 +2,8 @@
  * API client utilities, centralized service modules, and fetch interceptor.
  */
 
+export * from './types';
+
 export const USER_STORAGE_KEY = 'book_library_user';
 
 export function getCurrentUser() {

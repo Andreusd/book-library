@@ -381,7 +381,7 @@ export default function TtsPlayerBar({
         <button
           onClick={() => setIsMinimized(false)}
           className={`p-1.5 rounded-lg transition-colors cursor-pointer ${btnHover}`}
-          title="Expand Player"
+          title={t('expandPlayer')}
         >
           <Maximize2 className="w-3.5 h-3.5" />
         </button>
@@ -441,7 +441,7 @@ export default function TtsPlayerBar({
           <button
             onClick={() => setIsMinimized(true)}
             className={`p-1.5 rounded-lg transition-colors cursor-pointer ${btnHover}`}
-            title="Minimize"
+            title={t('minimize')}
           >
             <Minimize2 className="w-3.5 h-3.5" />
           </button>
