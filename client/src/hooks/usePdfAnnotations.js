@@ -54,6 +54,15 @@ export function usePdfAnnotations({ bookId }) {
     const clientRects = Array.from(range.getClientRects());
     if (clientRects.length === 0) return;
 
+    // Verify right-click is on or near the selected text
+    const isInside = clientRects.some(r => 
+      e.clientX >= r.left - 12 && 
+      e.clientX <= r.right + 12 && 
+      e.clientY >= r.top - 8 && 
+      e.clientY <= r.bottom + 8
+    );
+    if (!isInside) return;
+
     // Intercept default browser context menu
     e.preventDefault();
 

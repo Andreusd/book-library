@@ -488,14 +488,24 @@ export function useEpubNavigation({
       const text = selection ? selection.toString().trim() : '';
       if (!text || selection.rangeCount === 0) return;
 
+      const range = selection.getRangeAt(0);
+      const clientRects = Array.from(range.getClientRects());
+      const isInside = clientRects.length === 0 || clientRects.some(r => 
+        e.clientX >= r.left - 12 && 
+        e.clientX <= r.right + 12 && 
+        e.clientY >= r.top - 8 && 
+        e.clientY <= r.bottom + 8
+      );
+      if (!isInside) return;
+
       e.preventDefault();
       const iframe = targetDoc.defaultView?.frameElement || viewerRef?.current?.querySelector('iframe');
       const iframeRect = iframe ? iframe.getBoundingClientRect() : { left: 0, top: 0 };
-      const range = selection.getRangeAt(0);
       let cfiRange = null;
       try {
-        if (contents?.cfiBase) {
-          cfiRange = new EpubCFI(range, contents.cfiBase).toString();
+        const cfiBase = contents?.cfiBase || contents?.section?.cfiBase;
+        if (cfiBase) {
+          cfiRange = new EpubCFI(range, cfiBase).toString();
         }
       } catch {}
 
@@ -508,8 +518,10 @@ export function useEpubNavigation({
       }));
     });
 
-    targetDoc.addEventListener('mousedown', () => {
-      setSelectionMenu(prev => prev.isOpen ? { isOpen: false, x: 0, y: 0, text: '', cfi: null } : prev);
+    targetDoc.addEventListener('mousedown', (e) => {
+      if (e.button === 0) {
+        setSelectionMenu(prev => prev.isOpen ? { isOpen: false, x: 0, y: 0, text: '', cfi: null } : prev);
+      }
     });
   }, [showHeader, themeRef, viewerRef, setSelectionMenu]);
 

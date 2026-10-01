@@ -608,35 +608,19 @@ export default function EpubViewer({
           console.warn('Navigation TOC notice:', e);
         });
 
-        // Selection
+        // Selection tracking (save selection state without opening menu by default; menu opens on right-click)
         rendition.on('selected', (cfiRange, contents) => {
           if (!cfiRange || !contents || !contents.window) return;
           const selection = contents.window.getSelection();
           const text = selection ? selection.toString().trim() : '';
           if (!text || selection.rangeCount === 0) return;
 
-          const range = selection.getRangeAt(0);
-          let rect = range.getBoundingClientRect();
-          if (!rect || (rect.width === 0 && rect.height === 0)) {
-            const clientRects = range.getClientRects();
-            if (clientRects && clientRects.length > 0) {
-              rect = clientRects[0];
-            }
-          }
-
-          const iframe = contents.document?.defaultView?.frameElement || viewerRef.current?.querySelector('iframe');
-          const iframeRect = iframe ? iframe.getBoundingClientRect() : { left: 0, top: 0 };
-
-          const posX = rect ? (iframeRect.left + rect.left + rect.width / 2) : (window.innerWidth / 2);
-          const posY = rect ? (iframeRect.top + rect.bottom + 8) : (window.innerHeight / 2);
-
-          setSelectionMenu({
-            isOpen: true,
-            x: posX,
-            y: posY,
+          setSelectionMenu(prev => ({
+            ...prev,
+            isOpen: false,
             text,
             cfi: cfiRange
-          });
+          }));
         });
 
         // Rendered view hook
