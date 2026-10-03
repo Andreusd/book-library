@@ -809,7 +809,6 @@ export default function EpubViewer({
         toggleFloatingButtons={navSystem.toggleFloatingButtons}
         upDownFlipEnabled={navSystem.upDownFlipEnabled}
         toggleUpDownFlip={navSystem.toggleUpDownFlip}
-        onResizeRendition={() => renditionRef.current?.resize()}
       />
 
       {/* Main EPUB Reader Stage + Side Drawers */}
@@ -839,12 +838,7 @@ export default function EpubViewer({
         <CommentsDrawer
           annotations={annotationsSystem.annotations}
           isOpen={annotationsSystem.commentsDrawerOpen}
-          onClose={() => {
-            annotationsSystem.setCommentsDrawerOpen(false);
-            setTimeout(() => {
-              renditionRef.current?.resize();
-            }, 150);
-          }}
+          onClose={() => annotationsSystem.setCommentsDrawerOpen(false)}
           onJumpToAnnotation={annotationsSystem.handleJumpToAnnotation}
           onUpdateComment={annotationsSystem.handleUpdateComment}
           onDeleteAnnotation={annotationsSystem.handleDeleteAnnotation}

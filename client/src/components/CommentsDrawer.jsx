@@ -119,16 +119,15 @@ export default function CommentsDrawer({
 
   return (
     <>
-      {/* Mobile Backdrop */}
+      {/* Backdrop - transparent click-catcher so background stays unblurred, clicking outside closes it */}
       <div 
         onClick={onClose}
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 md:hidden"
+        className="fixed inset-0 z-30 bg-transparent"
       />
 
-      {/* Slide-out Right Sidebar Drawer */}
+      {/* Slide-out Right Sidebar Drawer - floating overlay on top of the book */}
       <aside className={`
-        fixed top-14 bottom-1 right-0 z-40 w-72 sm:w-80 bg-neutral-900 border-l border-neutral-800 flex flex-col shadow-2xl transition-all duration-300 ease-in-out
-        md:static md:h-full md:z-10
+        fixed top-14 bottom-0 right-0 z-40 w-72 sm:w-80 bg-neutral-900 border-l border-neutral-800 flex flex-col shadow-2xl shadow-black/80 transition-all duration-300 ease-in-out animate-slide-in-right
       `}>
         {/* Header */}
         <div className="h-12 px-4 border-b border-neutral-800 flex items-center justify-between shrink-0 bg-neutral-900/50">

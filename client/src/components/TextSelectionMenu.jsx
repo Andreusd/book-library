@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { 
   MessageSquare, Copy, Check, X, BookOpen, Languages, 
   Volume2, ChevronLeft, Loader2, ExternalLink,
@@ -94,22 +94,47 @@ export default function TextSelectionMenu({
   }, [onClose]);
 
   // Adjust coordinates dynamically based on current view size
-  const getMenuDimensions = () => {
+  const getMenuDimensions = useCallback(() => {
     switch (view) {
       case 'define':
-        return { width: 330, height: 350 };
+        return { width: 330, height: 380 };
       case 'translate':
-        return { width: 330, height: 310 };
+        return { width: 330, height: 360 };
       case 'comment':
-        return { width: 280, height: 230 };
+        return { width: 280, height: 260 };
       default:
-        return { width: 240, height: 195 };
+        return { width: 240, height: onReadAloud ? 295 : 255 };
     }
-  };
+  }, [view, onReadAloud]);
 
   const { width: menuWidth, height: menuHeight } = getMenuDimensions();
-  const posX = Math.min(Math.max(10, x), window.innerWidth - menuWidth - 10);
-  const posY = Math.min(Math.max(10, y), window.innerHeight - menuHeight - 10);
+  const winW = typeof window !== 'undefined' ? window.innerWidth : 1024;
+  const winH = typeof window !== 'undefined' ? window.innerHeight : 768;
+
+  // Move menu up if it extends past the bottom margin of the screen, and clamp horizontally
+  const posX = Math.max(12, Math.min(x, winW - menuWidth - 12));
+  const posY = Math.max(12, Math.min(y, winH - menuHeight - 12));
+
+  // Ensure DOM element stays strictly within viewport boundaries even if dynamic content expands
+  useLayoutEffect(() => {
+    if (menuRef.current && typeof window !== 'undefined') {
+      const rect = menuRef.current.getBoundingClientRect();
+      const bottomOverflow = rect.bottom - (window.innerHeight - 12);
+      if (bottomOverflow > 0) {
+        menuRef.current.style.top = `${Math.max(12, rect.top - bottomOverflow)}px`;
+      }
+      const rightOverflow = rect.right - (window.innerWidth - 12);
+      if (rightOverflow > 0) {
+        menuRef.current.style.left = `${Math.max(12, rect.left - rightOverflow)}px`;
+      }
+      if (rect.top < 12) {
+        menuRef.current.style.top = '12px';
+      }
+      if (rect.left < 12) {
+        menuRef.current.style.left = '12px';
+      }
+    }
+  });
 
   const handleSearchWeb = () => {
     if (selectedText && selectedText.trim()) {
@@ -233,7 +258,7 @@ export default function TextSelectionMenu({
     <div
       ref={menuRef}
       style={{ left: `${posX}px`, top: `${posY}px` }}
-      className={`fixed z-50 bg-neutral-900/95 backdrop-blur-xl border border-neutral-750 rounded-xl shadow-2xl p-2.5 text-xs text-neutral-200 select-none animate-in fade-in zoom-in-95 duration-100 ${
+      className={`fixed z-50 bg-neutral-900/95 backdrop-blur-xl border border-neutral-750 rounded-xl shadow-2xl p-2.5 text-xs text-neutral-200 select-none animate-in fade-in zoom-in-95 duration-100 max-h-[calc(100vh-24px)] overflow-y-auto reader-settings-scroll ${
         view === 'define' || view === 'translate' ? 'w-[330px]' : view === 'comment' ? 'w-[280px]' : 'w-60'
       }`}
       onClick={(e) => e.stopPropagation()}

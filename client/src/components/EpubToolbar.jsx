@@ -56,7 +56,6 @@ export default function EpubToolbar({
   toggleFloatingButtons,
   upDownFlipEnabled,
   toggleUpDownFlip,
-  onResizeRendition,
 }) {
   const { t } = useI18n();
 
@@ -332,13 +331,7 @@ export default function EpubToolbar({
         {/* Comments & Highlights Drawer Toggle */}
         <button
           onClick={() => {
-            setCommentsDrawerOpen(prev => {
-              const next = !prev;
-              if (onResizeRendition) {
-                setTimeout(onResizeRendition, 150);
-              }
-              return next;
-            });
+            setCommentsDrawerOpen(prev => !prev);
           }}
           className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
             commentsDrawerOpen ? ht.iconBtnActive : ht.iconBtn
