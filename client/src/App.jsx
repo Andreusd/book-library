@@ -14,6 +14,7 @@ import { useSettings } from './hooks/useSettings';
 import { useBookModals } from './hooks/useBookModals';
 import { useLibraryRouter } from './hooks/useLibraryRouter';
 import { useLibraryData } from './hooks/useLibraryData';
+import { useLibraryKeyboardNavigation } from './hooks/useLibraryKeyboardNavigation';
 
 /**
  * Root Application Component.
@@ -74,10 +75,92 @@ export default function App() {
 
   const searchInputRef = useRef(null);
 
+  const [isFoldersOpen, setIsFoldersOpen] = useState(() => {
+    try {
+      const saved = localStorage.getItem('sidebar_folders_open');
+      return saved !== null ? saved === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
+
+  const [isTagsOpen, setIsTagsOpen] = useState(() => {
+    try {
+      const saved = localStorage.getItem('sidebar_tags_open');
+      return saved !== null ? saved === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
+
+  const handleSetFoldersOpen = useCallback((val) => {
+    setIsFoldersOpen((prev) => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      try {
+        localStorage.setItem('sidebar_folders_open', String(next));
+      } catch {}
+      return next;
+    });
+  }, []);
+
+  const handleSetTagsOpen = useCallback((val) => {
+    setIsTagsOpen((prev) => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      try {
+        localStorage.setItem('sidebar_tags_open', String(next));
+      } catch {}
+      return next;
+    });
+  }, []);
+
+  const [isLibraryDropdownOpen, setIsLibraryDropdownOpen] = useState(false);
+
+  const keyboardNav = useLibraryKeyboardNavigation({
+    isReaderActive,
+    modals,
+    libraryData,
+    openReader,
+    closeReader,
+    activeBook,
+    selectedShelf,
+    debouncedQuery,
+    sidebarOpen,
+    setSidebarOpen,
+    searchInputRef,
+    isFoldersOpen,
+    setIsFoldersOpen: handleSetFoldersOpen,
+    isTagsOpen,
+    setIsTagsOpen: handleSetTagsOpen,
+    isLibraryDropdownOpen,
+    setIsLibraryDropdownOpen,
+    activeLibraryId,
+    onSelectShelf: (id) => {
+      navigateToShelf(id);
+      if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+        setSidebarOpen(false);
+      }
+    },
+  });
+
   // Global Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (isReaderActive) return;
+      if (isReaderActive) {
+        if (e.key === 'Backspace') {
+          const target = e.target;
+          const isInput =
+            target &&
+            (target.tagName === 'INPUT' ||
+              target.tagName === 'TEXTAREA' ||
+              target.isContentEditable ||
+              target.getAttribute?.('contenteditable') === 'true');
+          if (!isInput) {
+            e.preventDefault();
+            closeReader();
+          }
+        }
+        return;
+      }
 
       if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
         e.preventDefault();
@@ -89,7 +172,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isReaderActive, toggleSidebar]);
+  }, [isReaderActive, toggleSidebar, closeReader]);
 
   const handleOpenDetails = useCallback((book) => {
     modals.openDetailsModal(book);
@@ -128,6 +211,8 @@ export default function App() {
       selectTag={selectTagAction}
       favoriteIds={favoriteIds}
       showFileExtension={showFileExtension}
+      highlightedCardId={keyboardNav.highlightedCardId}
+      setHighlightedCardId={keyboardNav.setHighlightedCardId}
     >
       <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col lg:flex-row">
         {/* Sidebar */}
@@ -154,6 +239,13 @@ export default function App() {
           tags={tags}
           onOpenTagManager={() => modals.openTagModal(null)}
           currentUser={currentUser}
+          highlightedMenuItemId={keyboardNav.highlightedMenuItemId}
+          isFoldersOpen={isFoldersOpen}
+          setIsFoldersOpen={handleSetFoldersOpen}
+          isTagsOpen={isTagsOpen}
+          setIsTagsOpen={handleSetTagsOpen}
+          isLibraryDropdownOpen={isLibraryDropdownOpen}
+          setIsLibraryDropdownOpen={setIsLibraryDropdownOpen}
         />
 
         {/* Main Content Area */}

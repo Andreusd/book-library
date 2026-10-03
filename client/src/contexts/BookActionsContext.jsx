@@ -14,6 +14,8 @@ export function BookActionsProvider({
   selectTag,
   favoriteIds,
   showFileExtension,
+  highlightedCardId,
+  setHighlightedCardId,
 }) {
   const value = useMemo(() => {
     const isFavorite = (bookId) => {
@@ -35,6 +37,8 @@ export function BookActionsProvider({
       selectTag: selectTag || (() => {}),
       isFavorite,
       showFileExtension: Boolean(showFileExtension),
+      highlightedCardId: highlightedCardId || null,
+      setHighlightedCardId: setHighlightedCardId || (() => {}),
     };
   }, [
     openReader,
@@ -44,6 +48,8 @@ export function BookActionsProvider({
     selectTag,
     favoriteIds,
     showFileExtension,
+    highlightedCardId,
+    setHighlightedCardId,
   ]);
 
   return (

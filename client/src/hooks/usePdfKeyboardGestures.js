@@ -79,7 +79,8 @@ export function usePdfKeyboardGestures({
       } else if (e.altKey && (e.key === 'r' || e.key === 'R')) {
         e.preventDefault();
         tts.toggleTts();
-      } else if (e.key === 'Escape') {
+      } else if (e.key === 'Escape' || e.key === 'Backspace') {
+        e.preventDefault();
         if (tts.ttsOpen) {
           tts.setTtsOpen(false);
           return;

@@ -192,7 +192,7 @@ export default function ContinueReading({
         className={
           isGridView
             ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-5 sm:gap-6'
-            : 'flex gap-5 sm:gap-6 overflow-x-auto no-scrollbar scroll-smooth py-1 px-0.5'
+            : 'flex gap-5 sm:gap-6 overflow-x-auto no-scrollbar scroll-smooth pt-4 pb-4 px-4 sm:px-5 -mt-3 -mx-4 sm:-mx-5 scroll-px-4 sm:scroll-px-5'
         }
       >
         {inProgressBooks.map((book) => {
@@ -201,11 +201,28 @@ export default function ContinueReading({
             : Math.round(book.progress?.percent || 0);
           const percent = Math.min(100, Math.max(0, calcPercent));
 
+          const cardId = `cr-${book.id}`;
+          const isHighlighted = Boolean(
+            actions.highlightedCardId &&
+            (actions.highlightedCardId === cardId || actions.highlightedCardId === book.id)
+          );
+
           return (
             <div
               key={book.id}
               data-book-id={book.id}
+              data-card-id={cardId}
+              data-book-card="true"
+              data-nav-card="true"
+              data-highlighted={isHighlighted ? "true" : undefined}
+              tabIndex={0}
+              role="button"
+              aria-label={book.title}
+              aria-selected={isHighlighted}
               onClick={(e) => {
+                if (actions.setHighlightedCardId) {
+                  actions.setHighlightedCardId(cardId);
+                }
                 const coverEl = e.currentTarget.querySelector('.continue-reading-cover') || e.currentTarget;
                 const rect = coverEl.getBoundingClientRect();
                 const originRect = {
@@ -228,14 +245,20 @@ export default function ContinueReading({
                 height: targetHeight ? `${targetHeight}px` : undefined,
                 maxHeight: targetHeight ? `${targetHeight}px` : undefined
               }}
-              className={`group cursor-pointer bg-neutral-900/60 hover:bg-neutral-800/90 border border-neutral-800 hover:border-emerald-500/40 rounded-xl p-2.5 sm:p-3 gap-3 sm:gap-3.5 transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1 flex select-none overflow-hidden ${
+              className={`group cursor-pointer bg-neutral-900/60 hover:bg-neutral-800/90 border rounded-xl p-2.5 sm:p-3 gap-3 sm:gap-3.5 transition-all duration-300 shadow-sm flex select-none focus:outline-none scroll-mt-24 ${
+                isHighlighted
+                  ? 'border-amber-400 ring-4 ring-amber-400/90 ring-offset-2 ring-offset-neutral-950 shadow-2xl shadow-amber-500/30 -translate-y-1 bg-neutral-800/90 scale-[1.02] z-10'
+                  : 'border-neutral-800 hover:border-emerald-500/40 hover:shadow-xl hover:-translate-y-1 overflow-hidden'
+              } ${
                 !isGridView
                   ? 'w-full sm:w-[calc((200%-1.5rem)/3)] md:w-[calc((100%-1.5rem)/2)] lg:w-[calc((200%-4.5rem)/5)] xl:w-[calc((100%-3rem)/3)] shrink-0'
                   : 'w-full'
               }`}
             >
               {/* Cover on Left */}
-              <div className="h-full aspect-[1/1.45] max-w-[40%] sm:max-w-[44%] shrink-0 rounded-md overflow-hidden bg-neutral-950 border border-neutral-800/80 shadow-md relative continue-reading-cover">
+              <div className={`h-full aspect-[1/1.45] max-w-[40%] sm:max-w-[44%] shrink-0 rounded-md overflow-hidden bg-neutral-950 border shadow-md relative continue-reading-cover transition-all duration-200 ${
+                isHighlighted ? 'border-amber-400 ring-2 ring-amber-400/80 shadow-lg' : 'border-neutral-800/80'
+              }`}>
                 <img
                   src={book.cover_url}
                   alt={book.title}
@@ -295,7 +318,9 @@ export default function ContinueReading({
                           e.stopPropagation();
                           openDetails(book);
                         }}
-                        className="p-1 rounded-md text-neutral-400 hover:text-sky-300 hover:bg-neutral-800 transition opacity-0 group-hover:opacity-100 cursor-pointer shrink-0"
+                        className={`p-1 rounded-md text-neutral-400 hover:text-sky-300 hover:bg-neutral-800 transition cursor-pointer shrink-0 ${
+                          isHighlighted ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                        }`}
                         title={t('viewDetails')}
                       >
                         <Info className="w-3.5 h-3.5" />
@@ -304,7 +329,9 @@ export default function ContinueReading({
                   </div>
 
                   {/* Title */}
-                  <h3 className="text-xs sm:text-sm font-semibold text-neutral-100 group-hover:text-emerald-400 transition-colors line-clamp-2 leading-snug">
+                  <h3 className={`text-xs sm:text-sm font-semibold transition-colors line-clamp-2 leading-snug ${
+                    isHighlighted ? 'text-amber-400 font-bold' : 'text-neutral-100 group-hover:text-emerald-400'
+                  }`}>
                     {book.title}
                   </h3>
 
@@ -324,13 +351,17 @@ export default function ContinueReading({
                         ? t('progress')
                         : t('pageOf', { page: book.progress?.page || 1, total: book.progress?.total_pages || '?' })}
                     </span>
-                    <span className="font-semibold text-emerald-400 shrink-0 ml-1">{percent}%</span>
+                    <span className={`font-semibold shrink-0 ml-1 ${isHighlighted ? 'text-amber-400' : 'text-emerald-400'}`}>{percent}%</span>
                   </div>
 
                   {/* Green Progress Bar */}
                   <div className="w-full h-1.5 bg-neutral-800 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all duration-300"
+                      className={`h-full rounded-full transition-all duration-300 ${
+                        isHighlighted
+                          ? 'bg-gradient-to-r from-amber-500 to-amber-300'
+                          : 'bg-gradient-to-r from-emerald-600 to-emerald-400'
+                      }`}
                       style={{ width: `${percent}%` }}
                     />
                   </div>
@@ -338,7 +369,11 @@ export default function ContinueReading({
                   {/* Action & Size Footer */}
                   <div className="flex items-center justify-between mt-1.5 text-[10px] sm:text-[11px]">
                     <span className="text-neutral-500 truncate">{book.size_formatted}</span>
-                    <div className="px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-neutral-950 font-medium text-[10px] sm:text-[11px] transition-colors flex items-center gap-1 shrink-0">
+                    <div className={`px-2 py-0.5 rounded-md font-medium text-[10px] sm:text-[11px] transition-colors flex items-center gap-1 shrink-0 ${
+                      isHighlighted
+                        ? 'bg-amber-400 text-neutral-950 font-semibold shadow-md'
+                        : 'bg-emerald-500/15 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-neutral-950'
+                    }`}>
                       <Bookmark className="w-3 h-3" />
                       <span>{t('readButton')}</span>
                     </div>

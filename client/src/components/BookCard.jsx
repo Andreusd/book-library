@@ -6,7 +6,9 @@ import { getTagColorConfig } from '../utils/tagColors';
 
 export default function BookCard({ 
   book, 
+  cardId,
   isFavorite, 
+  isHighlighted: propIsHighlighted,
   onSelectBook, 
   onOpenDetails, 
   onContextMenu, 
@@ -24,6 +26,16 @@ export default function BookCard({
   const contextMenu = onContextMenu || actions.openContextMenu;
   const toggleFav = onToggleFavorite || actions.toggleFavorite;
   const selectTag = onSelectTag || actions.selectTag;
+
+  const effectiveCardId = cardId || (book?.id ? `book-${book.id}` : null);
+  const isHighlighted = propIsHighlighted !== undefined
+    ? propIsHighlighted
+    : Boolean(
+        actions.highlightedCardId &&
+        (actions.highlightedCardId === effectiveCardId ||
+         (!cardId && actions.highlightedCardId === book?.id) ||
+         actions.highlightedCardId === `book-${book?.id}`)
+      );
 
   const isFav = isFavorite !== undefined 
     ? isFavorite 
@@ -67,6 +79,9 @@ export default function BookCard({
   };
 
   const handleClick = (e) => {
+    if (actions.setHighlightedCardId && effectiveCardId) {
+      actions.setHighlightedCardId(effectiveCardId);
+    }
     const coverEl = e.currentTarget.querySelector('.book-cover-container') || e.currentTarget;
     const rect = coverEl.getBoundingClientRect();
     const originRect = {
@@ -83,12 +98,26 @@ export default function BookCard({
   return (
     <div 
       data-book-id={book?.id}
+      data-card-id={effectiveCardId}
+      data-book-card="true"
+      data-nav-card="true"
+      data-highlighted={isHighlighted ? "true" : undefined}
+      tabIndex={0}
+      role="button"
+      aria-label={book?.title}
+      aria-selected={isHighlighted}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
-      className="book-card group cursor-pointer flex flex-col items-center select-none text-left"
+      className={`book-card group cursor-pointer flex flex-col items-center select-none text-left transition-transform duration-200 focus:outline-none scroll-mt-24 ${
+        isHighlighted ? 'scale-[1.03] z-10' : ''
+      }`}
     >
       {/* 3D Cover Wrapper */}
-      <div className="relative w-full aspect-[1/1.45] rounded-md overflow-hidden bg-neutral-900 border border-neutral-800/80 shadow-md book-cover-container">
+      <div className={`relative w-full aspect-[1/1.45] rounded-md overflow-hidden bg-neutral-900 border shadow-md book-cover-container transition-all duration-200 ${
+        isHighlighted
+          ? 'border-amber-400 ring-4 ring-amber-400/90 ring-offset-2 ring-offset-neutral-950 shadow-2xl shadow-amber-500/40 -translate-y-1'
+          : 'border-neutral-800/80 group-hover:border-neutral-700'
+      }`}>
         
         {/* Skeleton loading animation */}
         {!imageLoaded && !imageError && (
@@ -160,7 +189,9 @@ export default function BookCard({
         )}
 
         {/* Quick Hover Action Buttons */}
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-2.5 pointer-events-none">
+        <div className={`absolute inset-0 bg-black/40 transition-opacity flex items-end justify-between p-2.5 pointer-events-none ${
+          isHighlighted ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        }`}>
           {openDetails && (
             <button
               type="button"
@@ -210,7 +241,9 @@ export default function BookCard({
       {/* Book Metadata Under Cover */}
       <div className="w-full mt-2.5 px-0.5">
         <h3 
-          className="text-xs font-medium text-neutral-200 group-hover:text-amber-400 transition-colors line-clamp-2 leading-snug"
+          className={`text-xs font-medium transition-colors line-clamp-2 leading-snug ${
+            isHighlighted ? 'text-amber-400 font-semibold' : 'text-neutral-200 group-hover:text-amber-400'
+          }`}
           title={book.title}
         >
           {book.title}

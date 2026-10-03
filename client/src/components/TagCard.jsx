@@ -2,22 +2,51 @@ import React from 'react';
 import { BookOpen, Tag } from 'lucide-react';
 import { useI18n } from '../i18n';
 import { getTagColorConfig, getTagCovers } from '../utils/tagColors';
+import { useBookActions } from '../hooks/useBookActions';
 
 export default function TagCard({
   tag,
   covers,
   books = [],
+  cardId,
+  isHighlighted: propIsHighlighted,
   onSelectTag,
   className = ''
 }) {
   const { t } = useI18n();
+  const actions = useBookActions();
   const cfg = getTagColorConfig(tag.color);
   const tagCovers = covers !== undefined ? covers : getTagCovers(tag, books);
+  const effectiveCardId = cardId || (tag?.id ? `tag-${tag.id}` : null);
+  const isHighlighted = propIsHighlighted !== undefined
+    ? propIsHighlighted
+    : Boolean(
+        actions.highlightedCardId &&
+        (actions.highlightedCardId === effectiveCardId ||
+         actions.highlightedCardId === tag?.id)
+      );
 
   return (
     <div
-      onClick={() => onSelectTag && onSelectTag(tag)}
-      className={`group relative cursor-pointer bg-neutral-900/60 hover:bg-neutral-800/90 border border-neutral-800 hover:border-indigo-500/40 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 flex flex-col items-center justify-between transition-all duration-300 shadow-sm hover:shadow-xl hover:-translate-y-1 select-none isolate ${className}`}
+      data-card-id={effectiveCardId}
+      data-tag-id={tag?.id}
+      data-nav-card="true"
+      data-highlighted={isHighlighted ? "true" : undefined}
+      tabIndex={0}
+      role="button"
+      aria-label={tag?.name}
+      aria-selected={isHighlighted}
+      onClick={() => {
+        if (actions.setHighlightedCardId && effectiveCardId) {
+          actions.setHighlightedCardId(effectiveCardId);
+        }
+        if (onSelectTag) onSelectTag(tag);
+      }}
+      className={`group relative cursor-pointer rounded-xl sm:rounded-2xl p-2.5 sm:p-3 flex flex-col items-center justify-between transition-all duration-300 shadow-sm select-none isolate scroll-mt-24 focus:outline-none ${
+        isHighlighted
+          ? 'scale-[1.03] z-10 border-2 border-indigo-400 ring-4 ring-indigo-400/90 ring-offset-2 ring-offset-neutral-950 shadow-2xl shadow-indigo-500/40 bg-neutral-800/95 -translate-y-1'
+          : 'bg-neutral-900/60 hover:bg-neutral-800/90 border border-neutral-800 hover:border-indigo-500/40 hover:shadow-xl hover:-translate-y-1'
+      } ${className}`}
     >
       {/* Thumbnail Stack Container */}
       <div className="relative w-full h-32 sm:h-36 flex items-center justify-center my-0.5 isolate">

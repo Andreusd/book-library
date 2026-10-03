@@ -24,8 +24,10 @@ export function useEpubNavigation({
   setSelectionMenu,
   toggleFullscreen,
   cycleTheme,
-  handleClose,
+  handleClose: propHandleClose,
+  onClose: propOnClose,
 }) {
+  const handleClose = propHandleClose || propOnClose;
   const isNavigatingRef = useRef(false);
   const lastSwipeTimeRef = useRef(0);
   const accumulatedDeltaXRef = useRef(0);
@@ -570,7 +572,8 @@ export function useEpubNavigation({
       } else if (e.key === 'ArrowLeft' || e.key === 'PageUp' || (upDownFlipEnabledRef.current && e.key === 'ArrowUp')) {
         e.preventDefault();
         flipPrev();
-      } else if (e.key === 'Escape') {
+      } else if (e.key === 'Escape' || e.key === 'Backspace') {
+        e.preventDefault();
         if (readerSettingsOpenRef.current) {
           setReaderSettingsOpen(false);
         } else if (ttsOpenRef.current) {
@@ -583,7 +586,7 @@ export function useEpubNavigation({
           setCommentsDrawerOpen(false);
         } else if (tocOpen) {
           setTocOpen(false);
-        } else {
+        } else if (handleClose) {
           handleClose();
         }
       } else if (e.key === 'f' || e.key === 'F') {

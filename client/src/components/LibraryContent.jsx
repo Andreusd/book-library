@@ -147,6 +147,7 @@ export default function LibraryContent({
         {books.map((book) => (
           <BookCard
             key={book.id}
+            cardId={`grid-${book.id}`}
             book={book}
             isFavorite={favoriteIds !== undefined ? favoriteIds.has(book.id) : undefined}
             onSelectBook={openReader}

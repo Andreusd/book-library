@@ -44,23 +44,39 @@ if not exist "client\dist\index.html" (
     popd
 )
 
+:: Detect LAN IP address for local network access
+set "LAN_IP="
+for /f "tokens=*" %%a in ('python -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.connect(('8.8.8.8', 80)); print(s.getsockname()[0]); s.close()" 2^>nul') do set "LAN_IP=%%a"
+
 :: Handle dev mode vs production launcher
 if /i "%~1"=="dev" goto :dev_mode
 
-echo Abrindo navegador em http://127.0.0.1:8000 ...
-timeout /t 2 /nobreak >nul
-start "" http://127.0.0.1:8000
+echo ========================================================
+echo         Biblioteca Digital pronta!
+echo   - Local [este PC]:            http://localhost:8000
+if defined LAN_IP echo   - Rede [outros dispositivos]: http://%LAN_IP%:8000
+echo ========================================================
+echo.
+echo Abrindo navegador em http://localhost:8000 ...
+ping -n 3 127.0.0.1 >nul
+start "" http://localhost:8000
 
-echo Iniciando servidor FastAPI...
-python -m uvicorn server.main:app --host 127.0.0.1 --port 8000 --reload
+echo Iniciando servidor FastAPI (acessivel na rede local)...
+python -m uvicorn server.main:app --host 0.0.0.0 --port 8000 --reload
 pause
 exit /b 0
 
 :dev_mode
-echo Iniciando em Modo Desenvolvimento [Vite + FastAPI]...
+echo ========================================================
+echo    Modo Desenvolvimento [Vite + FastAPI]
+echo   - Local [este PC]:            http://localhost:5173
+if defined LAN_IP echo   - Rede [outros dispositivos]: http://%LAN_IP%:5173
+echo ========================================================
+echo.
 start "Client Vite Dev" cmd /k "cd client && bun run dev"
-timeout /t 2 /nobreak >nul
+ping -n 3 127.0.0.1 >nul
 start "" http://localhost:5173
-echo Iniciando servidor FastAPI...
-python -m uvicorn server.main:app --host 127.0.0.1 --port 8000 --reload
+echo Iniciando servidor FastAPI (acessivel na rede local)...
+python -m uvicorn server.main:app --host 0.0.0.0 --port 8000 --reload
 exit /b 0
+
