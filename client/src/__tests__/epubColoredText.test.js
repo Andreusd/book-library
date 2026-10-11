@@ -4,6 +4,7 @@ import {
   tokenizeCodeText,
   highlightUnstyledCodeBlocks,
   applyThemeToDoc,
+  fixEpubViewportUnits,
   EPUB_THEMES,
 } from '../utils/epubThemeUtils';
 
@@ -190,5 +191,64 @@ def cancel_order(order_id: str) -> str:
       expect(mockElement.dataset.origColor).toBeUndefined();
       expect(mockElement.style.color).toBe('rgb(0, 102, 153)');
     });
+
+    it('injects math and equation styling to override viewport units', () => {
+      let createdStyle = null;
+      const mockDoc = {
+        head: { appendChild: (el) => { createdStyle = el; } },
+        getElementById: () => null,
+        createElement: () => ({ tagName: 'style', id: '', textContent: '' }),
+        querySelectorAll: () => [],
+        documentElement: { style: { setProperty: () => {} } },
+        body: {
+          style: { setProperty: () => {} },
+          classList: { remove: () => {}, add: () => {} },
+        },
+      };
+
+      applyThemeToDoc(mockDoc, 'dark');
+      const darkCss = createdStyle.textContent;
+      expect(darkCss).toContain('font-size: 1.15em !important;');
+      expect(darkCss).toContain('div[data-type="equation"] math');
+
+      applyThemeToDoc(mockDoc, 'light');
+      const lightCss = createdStyle.textContent;
+      expect(lightCss).toContain('font-size: 1.15em !important;');
+      expect(lightCss).toContain('div[data-type="equation"] math');
+    });
+  });
+
+  describe('fixEpubViewportUnits', () => {
+    it('normalizes font size on MathML elements and clamps inline vw/vh styles', () => {
+      const mockMath = {
+        getAttribute: () => 'block',
+        closest: () => null,
+        style: {
+          setProperty(prop, val) { this[prop] = val; },
+        },
+      };
+
+      const mockVwEl = {
+        getAttribute: (attr) => (attr === 'style' ? 'font-size: 5vw; width: 50vw' : null),
+        style: {
+          setProperty(prop, val) { this[prop] = val; },
+        },
+      };
+
+      const mockDoc = {
+        querySelectorAll: (selector) => {
+          if (selector === 'math') return [mockMath];
+          if (selector.includes('[style*="vw"]')) return [mockVwEl];
+          return [];
+        },
+      };
+
+      fixEpubViewportUnits(mockDoc);
+      expect(mockMath.style['font-size']).toBe('1.15em');
+      expect(mockMath.style['max-width']).toBe('100%');
+      expect(mockVwEl.style['font-size']).toBe('1em');
+      expect(mockVwEl.style['width']).toBe('100%');
+    });
   });
 });
+

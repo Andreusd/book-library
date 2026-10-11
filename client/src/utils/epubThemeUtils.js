@@ -261,6 +261,38 @@ export function highlightUnstyledCodeBlocks(doc) {
 }
 
 /**
+ * Neutralize dangerous viewport units (vw, vh) that explode in epub.js paginated mode
+ * where the iframe width expands across dozens of columns.
+ */
+export function fixEpubViewportUnits(doc) {
+  if (!doc) return;
+  try {
+    // 1. Clamping MathML font size directly on elements
+    const mathElements = doc.querySelectorAll('math');
+    mathElements.forEach(mathEl => {
+      const isInline = mathEl.getAttribute('display') !== 'block' && Boolean(mathEl.closest('p, li'));
+      mathEl.style.setProperty('font-size', isInline ? '1em' : '1.15em', 'important');
+      mathEl.style.setProperty('max-width', '100%', 'important');
+    });
+
+    // 2. Scan elements with inline styles using vw or vh units
+    const styledWithVw = doc.querySelectorAll('[style*="vw"], [style*="vh"]');
+    styledWithVw.forEach(el => {
+      const inlineStyle = el.getAttribute('style') || '';
+      if (/font-size\s*:\s*[^;]*(?:vw|vh)/i.test(inlineStyle)) {
+        el.style.setProperty('font-size', '1em', 'important');
+      }
+      if (/max-width\s*:\s*[^;]*(?:vw|vh)/i.test(inlineStyle)) {
+        el.style.setProperty('max-width', '100%', 'important');
+      }
+      if (/width\s*:\s*[^;]*(?:vw|vh)/i.test(inlineStyle)) {
+        el.style.setProperty('width', '100%', 'important');
+      }
+    });
+  } catch {}
+}
+
+/**
  * Build dedicated CSS stylesheet string for EPUB rendering based on theme.
  */
 function buildThemeCss(themeName, cfg) {
@@ -430,6 +462,32 @@ function buildThemeCss(themeName, cfg) {
       div.tip h3, div[data-type="tip"] h6 { color: #34d399 !important; }
       div.note h3, div[data-type="note"] h6 { color: #38bdf8 !important; }
       span.lineannotation { color: #f87171 !important; }
+
+      /* MathML & Math Equations - Override dangerous viewport units (vw/vh) that blow up in epub.js paginated iframes */
+      math,
+      #sbo-rt-content math,
+      div[data-type="equation"] math,
+      div.equation math,
+      .equation math,
+      math[display="block"] {
+        font-size: 1.15em !important;
+        max-width: 100% !important;
+        line-height: normal !important;
+      }
+      math[display="inline"],
+      p math,
+      li math {
+        font-size: 1em !important;
+      }
+      math, math * {
+        color: inherit !important;
+      }
+      div[data-type="equation"],
+      div.equation,
+      div.informalequation {
+        max-width: 100% !important;
+        overflow-x: auto !important;
+      }
     `;
   }
 
@@ -509,6 +567,29 @@ function buildThemeCss(themeName, cfg) {
     code.p, span.p {
       color: ${isSepia ? '#44403c' : '#334155'};
     }
+
+    /* MathML & Math Equations - Override dangerous viewport units (vw/vh) that blow up in epub.js paginated iframes */
+    math,
+    #sbo-rt-content math,
+    div[data-type="equation"] math,
+    div.equation math,
+    .equation math,
+    math[display="block"] {
+      font-size: 1.15em !important;
+      max-width: 100% !important;
+      line-height: normal !important;
+    }
+    math[display="inline"],
+    p math,
+    li math {
+      font-size: 1em !important;
+    }
+    div[data-type="equation"],
+    div.equation,
+    div.informalequation {
+      max-width: 100% !important;
+      overflow-x: auto !important;
+    }
   `;
 }
 
@@ -549,7 +630,7 @@ export const applyThemeToDoc = (doc, themeName) => {
     }
   } catch {}
 
-  // DOM Enhancements: color contrast adaptation and unstyled code tokenization
+  // DOM Enhancements: color contrast adaptation, unstyled code tokenization, and viewport unit fixes
   const runDomEnhancements = () => {
     try {
       if (isDark) {
@@ -558,6 +639,7 @@ export const applyThemeToDoc = (doc, themeName) => {
         restoreDocumentColors(doc);
       }
       highlightUnstyledCodeBlocks(doc);
+      fixEpubViewportUnits(doc);
     } catch {}
   };
 

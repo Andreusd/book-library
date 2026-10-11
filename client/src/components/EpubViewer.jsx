@@ -405,6 +405,27 @@ export default function EpubViewer({
                 fill: #f59e0b !important;
                 fill-opacity: 0.65 !important;
               }
+              math,
+              #sbo-rt-content math,
+              div[data-type="equation"] math,
+              div.equation math,
+              .equation math,
+              math[display="block"] {
+                font-size: 1.15em !important;
+                max-width: 100% !important;
+                line-height: normal !important;
+              }
+              math[display="inline"],
+              p math,
+              li math {
+                font-size: 1em !important;
+              }
+              div[data-type="equation"],
+              div.equation,
+              div.informalequation {
+                max-width: 100% !important;
+                overflow-x: auto !important;
+              }
             `);
           } catch {}
         });
