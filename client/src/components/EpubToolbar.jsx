@@ -95,20 +95,20 @@ export default function EpubToolbar({
       iconBtnActive: 'bg-amber-500/20 border-amber-600/50 text-amber-800',
     },
     light: {
-      bar: 'bg-white border-neutral-200 text-neutral-700',
-      title: 'text-neutral-900',
-      subtitle: 'text-neutral-500',
-      chapter: 'text-neutral-700',
-      btn: 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700 hover:text-neutral-900 border border-neutral-200',
+      bar: 'bg-neutral-900 border-neutral-700 text-neutral-200',
+      title: 'text-neutral-100',
+      subtitle: 'text-neutral-400',
+      chapter: 'text-neutral-300',
+      btn: 'bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:text-neutral-100 border border-neutral-700',
       btnActive: 'bg-amber-500/20 text-amber-700 border border-amber-500/40',
-      divider: 'bg-neutral-300',
+      divider: 'bg-neutral-700',
       badge: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-      input: 'bg-white border-neutral-300 text-neutral-900 focus:border-amber-500',
-      pageSlash: 'text-neutral-500',
+      input: 'bg-neutral-900 border-neutral-700 text-neutral-100 focus:border-amber-500',
+      pageSlash: 'text-neutral-400',
       percentage: 'text-amber-600 font-semibold',
-      toolGroup: 'bg-neutral-100 border-neutral-200',
-      toolBtn: 'text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200',
-      iconBtn: 'bg-neutral-100 border-neutral-200 text-neutral-600 hover:text-neutral-900 hover:bg-neutral-200',
+      toolGroup: 'bg-neutral-800 border-neutral-700',
+      toolBtn: 'text-neutral-400 hover:text-neutral-100 hover:bg-neutral-700',
+      iconBtn: 'bg-neutral-800 border-neutral-700 text-neutral-300 hover:text-neutral-100 hover:bg-neutral-700',
       iconBtnActive: 'bg-amber-500/20 border-amber-500/50 text-amber-700',
     }
   };
@@ -229,7 +229,7 @@ export default function EpubToolbar({
                 ? 'text-neutral-300 hover:text-amber-400'
                 : theme === 'sepia'
                 ? 'text-[#433422] hover:text-amber-700'
-                : 'text-neutral-700 hover:text-amber-600'
+                : 'text-neutral-200 hover:text-amber-600'
             }`}
             title={t('resetFontSize')}
           >
@@ -253,7 +253,7 @@ export default function EpubToolbar({
                 ? 'bg-neutral-800 text-amber-400'
                 : theme === 'sepia'
                 ? 'text-[#7c6a53] hover:text-[#292014]'
-                : 'text-neutral-500 hover:text-neutral-900'
+                : 'text-neutral-400 hover:text-neutral-100'
             }`}
             title={t('darkMode')}
           >
@@ -266,7 +266,7 @@ export default function EpubToolbar({
                 ? 'bg-[#5f4b32] text-[#fbf0d9] shadow-sm'
                 : theme === 'dark'
                 ? 'text-neutral-400 hover:text-white'
-                : 'text-neutral-500 hover:text-neutral-900'
+                : 'text-neutral-400 hover:text-neutral-100'
             }`}
             title={t('sepiaMode')}
           >
@@ -276,10 +276,10 @@ export default function EpubToolbar({
             onClick={() => applyTheme('light')}
             className={`p-1 rounded transition cursor-pointer ${
               theme === 'light'
-                ? 'bg-white text-neutral-900 shadow-sm border border-neutral-200/80'
+                ? 'bg-neutral-900 text-amber-500 shadow-sm border border-neutral-700'
                 : theme === 'sepia'
                 ? 'text-[#7c6a53] hover:text-[#292014]'
-                : 'text-neutral-400 hover:text-white'
+                : 'text-neutral-400 hover:text-neutral-100'
             }`}
             title={t('lightMode')}
           >

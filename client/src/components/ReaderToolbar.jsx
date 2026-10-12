@@ -81,19 +81,19 @@ export default function ReaderToolbar({
 
   const btnClass = invertColors 
     ? 'bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 hover:text-white' 
-    : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-700 hover:text-neutral-900 border border-neutral-200';
+    : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:text-neutral-100 border border-neutral-700';
 
   const btnActiveClass = invertColors 
     ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
     : 'bg-amber-500/20 text-amber-700 border border-amber-500/40';
 
-  const dividerClass = invertColors ? 'bg-neutral-700' : 'bg-neutral-300';
-  const textTitleClass = invertColors ? 'text-neutral-100' : 'text-neutral-900';
-  const textSubClass = invertColors ? 'text-neutral-400' : 'text-neutral-500';
+  const dividerClass = 'bg-neutral-700';
+  const textTitleClass = 'text-neutral-100';
+  const textSubClass = 'text-neutral-400';
   const inputClass = invertColors 
     ? 'bg-neutral-950 border-neutral-700 text-neutral-200 focus:border-amber-500' 
-    : 'bg-white border-neutral-300 text-neutral-900 focus:border-amber-500';
-  const pageSlashClass = invertColors ? 'text-neutral-400' : 'text-neutral-500';
+    : 'bg-neutral-900 border-neutral-700 text-neutral-100 focus:border-amber-500';
+  const pageSlashClass = 'text-neutral-400';
   const percentClass = invertColors ? 'text-amber-400' : 'text-amber-600 font-semibold';
   const badgeClass = invertColors 
     ? 'bg-rose-950 text-rose-300 border-rose-500/40' 
@@ -114,7 +114,7 @@ export default function ReaderToolbar({
       className={`fixed top-0 left-0 right-0 z-40 h-14 border-b flex items-center px-3 sm:px-4 transition-all duration-300 select-none ${
         invertColors 
           ? 'bg-neutral-900/95 border-neutral-800 backdrop-blur shadow-md' 
-          : 'bg-white/95 border-neutral-200 backdrop-blur shadow-sm'
+          : 'bg-neutral-900/95 border-neutral-700 backdrop-blur shadow-sm'
       } ${
         headerPinned 
           ? 'translate-y-0 opacity-100' 

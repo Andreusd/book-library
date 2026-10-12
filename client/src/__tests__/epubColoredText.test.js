@@ -216,6 +216,33 @@ def cancel_order(order_id: str) -> str:
       expect(lightCss).toContain('font-size: 1.15em !important;');
       expect(lightCss).toContain('div[data-type="equation"] math');
     });
+
+    it('injects high-contrast keycap styling for dark and light modes', () => {
+      let createdStyle = null;
+      const mockDoc = {
+        head: { appendChild: (el) => { createdStyle = el; } },
+        getElementById: () => null,
+        createElement: () => ({ tagName: 'style', id: '', textContent: '' }),
+        querySelectorAll: () => [],
+        documentElement: { style: { setProperty: () => {} } },
+        body: {
+          style: { setProperty: () => {} },
+          classList: { remove: () => {}, add: () => {} },
+        },
+      };
+
+      applyThemeToDoc(mockDoc, 'dark');
+      const darkCss = createdStyle.textContent;
+      expect(darkCss).toContain('#sbo-rt-content .keycap');
+      expect(darkCss).toContain('background-color: #1e293b !important;');
+      expect(darkCss).toContain('color: #f8fafc !important;');
+
+      applyThemeToDoc(mockDoc, 'light');
+      const lightCss = createdStyle.textContent;
+      expect(lightCss).toContain('#sbo-rt-content .keycap');
+      expect(lightCss).toContain('background-color: #f1f5f9 !important;');
+      expect(lightCss).toContain('color: #0f172a !important;');
+    });
   });
 
   describe('fixEpubViewportUnits', () => {

@@ -488,6 +488,34 @@ function buildThemeCss(themeName, cfg) {
         max-width: 100% !important;
         overflow-x: auto !important;
       }
+
+      /* Keyboard keys, shortcuts, and keycaps (e.g. CTRL-Z, CTRL-D) */
+      kbd,
+      .keycap,
+      .keystroke,
+      .keysym,
+      .key,
+      span.keycap,
+      span.keystroke,
+      #sbo-rt-content .keycap,
+      #sbo-rt-content .keystroke {
+        color: #f8fafc !important;
+        background-color: #1e293b !important;
+        border: 1px solid #475569 !important;
+        border-radius: 4px !important;
+        padding: 1px 5px !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+        font-size: 0.85em !important;
+        display: inline-block !important;
+        line-height: normal !important;
+        vertical-align: baseline !important;
+      }
+      span.boxedtext,
+      #sbo-rt-content span.boxedtext {
+        color: #f8fafc !important;
+        border-color: #475569 !important;
+      }
     `;
   }
 
@@ -589,6 +617,34 @@ function buildThemeCss(themeName, cfg) {
     div.informalequation {
       max-width: 100% !important;
       overflow-x: auto !important;
+    }
+
+    /* Keyboard keys, shortcuts, and keycaps */
+    kbd,
+    .keycap,
+    .keystroke,
+    .keysym,
+    .key,
+    span.keycap,
+    span.keystroke,
+    #sbo-rt-content .keycap,
+    #sbo-rt-content .keystroke {
+      color: ${isSepia ? '#292014' : '#0f172a'} !important;
+      background-color: ${isSepia ? '#f4e6cd' : '#f1f5f9'} !important;
+      border: 1px solid ${isSepia ? '#d4c3a3' : '#cbd5e1'} !important;
+      border-radius: 4px !important;
+      padding: 1px 5px !important;
+      box-shadow: 0 1px 2px ${isSepia ? 'rgba(67, 52, 34, 0.12)' : 'rgba(0, 0, 0, 0.08)'} !important;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+      font-size: 0.85em !important;
+      display: inline-block !important;
+      line-height: normal !important;
+      vertical-align: baseline !important;
+    }
+    span.boxedtext,
+    #sbo-rt-content span.boxedtext {
+      color: ${isSepia ? '#292014' : '#0f172a'} !important;
+      border-color: ${isSepia ? '#d4c3a3' : '#cbd5e1'} !important;
     }
   `;
 }
