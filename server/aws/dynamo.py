@@ -35,7 +35,7 @@ class DynamoDBManager:
                 KeyConditionExpression=Key("GSI1_PK").eq(f"CATEGORY#{category}")
             )
             items = resp.get("Items", [])
-            return [it for it in items if it.get("library_id") == library_id]
+            return [it for it in items if it.get("library_id", "default") == library_id]
         else:
             resp = self.table.query(
                 KeyConditionExpression=Key("PK").eq(f"LIB#{library_id}") & Key("SK").begins_with("BOOK#")
