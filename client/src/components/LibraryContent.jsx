@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookOpen, Folder, FolderOpen, Plus, Settings, Tag } from 'lucide-react';
+import { BookOpen, Folder, FolderOpen, Plus, Settings, Tag, Cloud, Upload } from 'lucide-react';
 import BookCard from './BookCard';
 import FolderCard from './FolderCard';
 import TagCard from './TagCard';
@@ -166,17 +166,23 @@ export default function LibraryContent({
     return (
       <div className="text-center py-20 flex flex-col items-center justify-center max-w-md mx-auto">
         <div className="w-16 h-16 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-4 shadow-lg shadow-amber-500/10">
-          <FolderOpen className="w-8 h-8" />
+          <Cloud className="w-8 h-8" />
         </div>
         <h3 className="text-lg font-bold text-neutral-100">{t('setupPromptTitle')}</h3>
         <p className="text-xs text-neutral-400 mt-2 mb-6 leading-relaxed">
           {t('setupPromptDesc')}
         </p>
         <button
-          onClick={() => modals?.setSettingsOpen(true)}
+          onClick={() => {
+            if (modals?.setUploadModalOpen) {
+              modals.setUploadModalOpen(true);
+            } else if (modals?.setSettingsOpen) {
+              modals.setSettingsOpen(true);
+            }
+          }}
           className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-neutral-950 text-xs font-bold rounded-xl inline-flex items-center gap-2 shadow-xl shadow-amber-500/20 transition cursor-pointer"
         >
-          <Settings className="w-4 h-4" />
+          <Upload className="w-4 h-4" />
           <span>{t('configureLibrary')}</span>
         </button>
       </div>

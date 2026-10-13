@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Settings, Folder, CheckCircle, AlertCircle, AlertTriangle, 
-  X, Plus, Trash2, Edit3, Check, Globe, ShieldCheck, ArrowRight, Sliders
+  X, Plus, Trash2, Edit3, Check, Globe, ShieldCheck, ArrowRight, Sliders, Cloud, Layers
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 import { FlagUS, FlagBR, FlagES, FlagFR } from './FlagIcons';
@@ -464,7 +464,7 @@ export default function SettingsModal({
             <div className="flex items-center justify-between">
               <div>
                 <label className="text-xs font-semibold text-neutral-200 flex items-center gap-1.5">
-                  <Folder className="w-3.5 h-3.5 text-amber-400" />
+                  <Cloud className="w-3.5 h-3.5 text-amber-400" />
                   <span>{t('libraries')}</span>
                 </label>
                 <p className="text-[11px] text-neutral-400 mt-0.5">

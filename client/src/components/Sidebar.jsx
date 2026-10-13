@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import {
   Library, Search, Folder, Heart, Bookmark, Home,
-  ChevronDown, Check, Plus, Tag, User, BookOpen
+  ChevronDown, Check, Plus, Tag, User, BookOpen, Layers, Cloud
 } from 'lucide-react';
 import ShelfIcon from './ShelfIcon';
 import { useI18n } from '../i18n';
@@ -232,7 +232,7 @@ export default function Sidebar({
                             }`}
                           >
                             <div className="flex items-center gap-2 min-w-0">
-                              <Folder className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-amber-400' : 'text-neutral-500'}`} />
+                              <Cloud className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-amber-400' : 'text-neutral-500'}`} />
                               <span className="truncate">{lib.name}</span>
                             </div>
                             {isSelected && <Check className="w-3.5 h-3.5 text-amber-400 shrink-0 ml-1.5" />}
@@ -428,7 +428,7 @@ export default function Sidebar({
                           }`}
                       />
                     </button>
-                    <Folder className={`w-4 h-4 shrink-0 ${selectedShelf === 'folders' ? 'text-amber-400' : 'text-neutral-400'}`} />
+                    <Layers className={`w-4 h-4 shrink-0 ${selectedShelf === 'folders' ? 'text-amber-400' : 'text-neutral-400'}`} />
                     <span className="truncate">{t('folders')}</span>
                   </div>
 

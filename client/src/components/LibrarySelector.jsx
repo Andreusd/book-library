@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   Library, Folder, BookOpen, Plus, ArrowRight, Settings, 
-  AlertTriangle, User, Sparkles
+  AlertTriangle, User, Sparkles, Cloud, Layers
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 import LanguageSelector from './LanguageSelector';
@@ -200,7 +200,7 @@ export default function LibrarySelector({
                       </div>
                     ) : (
                       <div className="flex flex-col items-center justify-center gap-2 text-neutral-600">
-                        <Folder className="w-12 h-12 text-neutral-700 group-hover:text-amber-500/60 transition-colors" />
+                        <Cloud className="w-12 h-12 text-neutral-700 group-hover:text-amber-500/60 transition-colors" />
                         <span className="text-xs text-neutral-500 font-medium">
                           {isValid ? t('noBooksFound') : t('pathNotFound')}
                         </span>
@@ -225,7 +225,7 @@ export default function LibrarySelector({
                         className="text-xs font-mono text-neutral-400 mt-1 truncate flex items-center gap-1.5" 
                         title={lib.path}
                       >
-                        <Folder className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
+                        <Cloud className="w-3.5 h-3.5 text-amber-500/70 shrink-0" />
                         <span className="truncate">{lib.path}</span>
                       </p>
                     </div>
@@ -238,7 +238,7 @@ export default function LibrarySelector({
                       </span>
 
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-800/80 text-neutral-300 text-xs font-medium">
-                        <Folder className="w-3.5 h-3.5 text-amber-400" />
+                        <Layers className="w-3.5 h-3.5 text-amber-400" />
                         {folderCount === 1 ? t('folderCountBadge_one') : t('folderCountBadge', { count: folderCount })}
                       </span>
 
