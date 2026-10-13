@@ -11,7 +11,7 @@ Parameters:
   AllowedEmails:
     Type: String
     Description: Comma-separated list of authorized emails (Whitelist)
-    Default: "andreusdantas@gmail.com"
+    Default: "andreuzielsd@gmail.com"
 
 Resources:
   # ==========================================

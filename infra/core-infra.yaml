@@ -10,17 +10,23 @@ Parameters:
   AllowedEmails:
     Type: String
     Description: Comma-separated list of authorized emails (Whitelist)
-    Default: "andreusdantas@gmail.com"
+    Default: "andreuzielsd@gmail.com"
 
   GoogleClientId:
     Type: String
-    Description: Google OAuth Client ID
-    NoEcho: true
+    Description: Google OAuth Client ID (Leave blank to configure later)
+    Default: ""
 
   GoogleClientSecret:
     Type: String
-    Description: Google OAuth Client Secret
+    Description: Google OAuth Client Secret (Leave blank to configure later)
     NoEcho: true
+    Default: ""
+
+Conditions:
+  HasGoogleOAuth: !And
+    - !Not [!Equals [!Ref GoogleClientId, ""]]
+    - !Not [!Equals [!Ref GoogleClientSecret, ""]]
 
 Resources:
   # ==========================================
@@ -92,6 +98,7 @@ Resources:
 
   CognitoGoogleProvider:
     Type: AWS::Cognito::UserPoolIdentityProvider
+    Condition: HasGoogleOAuth
     Properties:
       UserPoolId: !Ref CognitoUserPool
       ProviderName: Google
@@ -106,13 +113,14 @@ Resources:
 
   CognitoUserPoolClient:
     Type: AWS::Cognito::UserPoolClient
-    DependsOn: CognitoGoogleProvider
     Properties:
       ClientName: !Sub 'BookLibraryWebClient-${Environment}'
       UserPoolId: !Ref CognitoUserPool
       GenerateSecret: false
-      SupportedIdentityProviders:
-        - Google
+      SupportedIdentityProviders: !If
+        - HasGoogleOAuth
+        - [COGNITO, Google]
+        - [COGNITO]
       AllowedOAuthFlows:
         - code
       AllowedOAuthScopes:
