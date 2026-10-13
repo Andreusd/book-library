@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, renderHook, act } from '@testing-library/react';
+import { render, renderHook, act, fireEvent } from '@testing-library/react';
 import BookCard from '../components/BookCard';
 import ContinueReading from '../components/ContinueReading';
 import { BookActionsProvider } from '../contexts/BookActionsContext.jsx';
@@ -280,6 +280,50 @@ describe('Library Keyboard Navigation', () => {
       });
 
       expect(result.current.highlightedCardId).toBeNull();
+    });
+
+    it('does not highlight book when opening and closing a book, activating only on arrow key press', () => {
+      setupMockDomCards();
+
+      let activeBook = null;
+      let isReaderActive = false;
+
+      const { result, rerender } = renderHook(
+        (props) =>
+          useLibraryKeyboardNavigation({
+            isReaderActive: props.isReaderActive,
+            modals: {},
+            libraryData: { books: mockBooks },
+            activeBook: props.activeBook,
+            openReader: vi.fn(),
+          }),
+        { initialProps: { activeBook, isReaderActive } }
+      );
+
+      // Initially no card is highlighted
+      expect(result.current.highlightedCardId).toBeNull();
+
+      // Open a book
+      activeBook = mockBooks[0];
+      isReaderActive = true;
+      rerender({ activeBook, isReaderActive });
+
+      // Opening the book must NOT highlight it
+      expect(result.current.highlightedCardId).toBeNull();
+
+      // Close the book
+      activeBook = null;
+      isReaderActive = false;
+      rerender({ activeBook, isReaderActive });
+
+      // Closing the book must NOT highlight it either
+      expect(result.current.highlightedCardId).toBeNull();
+
+      // Highlighting must activate ONLY when an arrow key is pressed
+      act(() => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+      });
+      expect(result.current.highlightedCardId).toBe('grid-b1');
     });
 
     describe('Sidebar Menu Keyboard Navigation', () => {
@@ -1051,6 +1095,24 @@ describe('Library Keyboard Navigation', () => {
       expect(card).not.toHaveAttribute('data-highlighted');
       expect(card).not.toHaveClass('scale-[1.03]');
     });
+
+    it('does not set highlightedCardId when clicked', () => {
+      const book = mockBooks[0];
+      const setHighlightedCardId = vi.fn();
+      const openReader = vi.fn();
+      const { container } = render(
+        <I18nProvider>
+          <BookActionsProvider setHighlightedCardId={setHighlightedCardId} openReader={openReader}>
+            <BookCard book={book} cardId="grid-b1" />
+          </BookActionsProvider>
+        </I18nProvider>
+      );
+
+      const card = container.querySelector('[data-book-card="true"]');
+      fireEvent.click(card);
+      expect(setHighlightedCardId).not.toHaveBeenCalled();
+      expect(openReader).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('ContinueReading component keyboard highlight rendering', () => {
@@ -1069,6 +1131,24 @@ describe('Library Keyboard Navigation', () => {
       expect(card).toHaveAttribute('data-highlighted', 'true');
       expect(card).toHaveClass('border-amber-400');
       expect(card).toHaveClass('ring-4');
+    });
+
+    it('does not set highlightedCardId when clicked', () => {
+      const book = { ...mockBooks[0], progress: { page: 5, total_pages: 10, percent: 50, status: 'in_progress' } };
+      const setHighlightedCardId = vi.fn();
+      const openReader = vi.fn();
+      const { container } = render(
+        <I18nProvider>
+          <BookActionsProvider setHighlightedCardId={setHighlightedCardId} openReader={openReader}>
+            <ContinueReading books={[book]} />
+          </BookActionsProvider>
+        </I18nProvider>
+      );
+
+      const card = container.querySelector('[data-card-id="cr-b1"]');
+      fireEvent.click(card);
+      expect(setHighlightedCardId).not.toHaveBeenCalled();
+      expect(openReader).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -1213,6 +1293,24 @@ describe('Library Keyboard Navigation', () => {
       expect(card).not.toHaveAttribute('data-highlighted');
       expect(card).not.toHaveClass('scale-[1.03]');
     });
+
+    it('does not set highlightedCardId when clicked', () => {
+      const folder = { id: 'f1', name: 'Folder One', icon: 'Folder', book_count: 5 };
+      const setHighlightedCardId = vi.fn();
+      const onSelectFolder = vi.fn();
+      const { container } = render(
+        <I18nProvider>
+          <BookActionsProvider setHighlightedCardId={setHighlightedCardId}>
+            <FolderCard folder={folder} onSelectFolder={onSelectFolder} />
+          </BookActionsProvider>
+        </I18nProvider>
+      );
+
+      const card = container.querySelector('[data-card-id="folder-f1"]');
+      fireEvent.click(card);
+      expect(setHighlightedCardId).not.toHaveBeenCalled();
+      expect(onSelectFolder).toHaveBeenCalledWith('f1');
+    });
   });
 
   describe('TagCard component keyboard highlight rendering', () => {
@@ -1250,6 +1348,24 @@ describe('Library Keyboard Navigation', () => {
       expect(card).toBeInTheDocument();
       expect(card).not.toHaveAttribute('data-highlighted');
       expect(card).not.toHaveClass('scale-[1.03]');
+    });
+
+    it('does not set highlightedCardId when clicked', () => {
+      const tag = { id: 't1', name: 'Tag One', color: 'blue', book_count: 3 };
+      const setHighlightedCardId = vi.fn();
+      const onSelectTag = vi.fn();
+      const { container } = render(
+        <I18nProvider>
+          <BookActionsProvider setHighlightedCardId={setHighlightedCardId}>
+            <TagCard tag={tag} onSelectTag={onSelectTag} />
+          </BookActionsProvider>
+        </I18nProvider>
+      );
+
+      const card = container.querySelector('[data-card-id="tag-t1"]');
+      fireEvent.click(card);
+      expect(setHighlightedCardId).not.toHaveBeenCalled();
+      expect(onSelectTag).toHaveBeenCalledWith(tag);
     });
   });
 });

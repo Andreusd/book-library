@@ -37,9 +37,6 @@ export default function TagCard({
       aria-label={tag?.name}
       aria-selected={isHighlighted}
       onClick={() => {
-        if (actions.setHighlightedCardId && effectiveCardId) {
-          actions.setHighlightedCardId(effectiveCardId);
-        }
         if (onSelectTag) onSelectTag(tag);
       }}
       className={`group relative cursor-pointer rounded-xl sm:rounded-2xl p-2.5 sm:p-3 flex flex-col items-center justify-between transition-all duration-300 shadow-sm select-none isolate scroll-mt-24 focus:outline-none ${

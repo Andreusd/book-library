@@ -220,9 +220,6 @@ export default function ContinueReading({
               aria-label={book.title}
               aria-selected={isHighlighted}
               onClick={(e) => {
-                if (actions.setHighlightedCardId) {
-                  actions.setHighlightedCardId(cardId);
-                }
                 const coverEl = e.currentTarget.querySelector('.continue-reading-cover') || e.currentTarget;
                 const rect = coverEl.getBoundingClientRect();
                 const originRect = {

@@ -38,9 +38,6 @@ export default function FolderCard({
       aria-label={folder?.name}
       aria-selected={isHighlighted}
       onClick={() => {
-        if (actions.setHighlightedCardId && effectiveCardId) {
-          actions.setHighlightedCardId(effectiveCardId);
-        }
         if (onSelectFolder) onSelectFolder(folder.id);
       }}
       onContextMenu={(e) => {

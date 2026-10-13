@@ -51,9 +51,7 @@ export function useLibraryKeyboardNavigation({
 
   useEffect(() => {
     highlightedCardIdRef.current = highlightedCardId;
-    if (highlightedCardId) {
-      lastHighlightedBookIdRef.current = highlightedCardId;
-    }
+    lastHighlightedBookIdRef.current = highlightedCardId || null;
   }, [highlightedCardId]);
 
   useEffect(() => {
@@ -63,10 +61,11 @@ export function useLibraryKeyboardNavigation({
     }
   }, [highlightedMenuItemId]);
 
-  // Adjust state during render when shelf, query, or activeBook change
+  // Adjust state during render when shelf, query, activeBook, or reader active state change
   const [prevShelf, setPrevShelf] = useState(selectedShelf);
   const [prevQuery, setPrevQuery] = useState(debouncedQuery);
   const [prevActiveBookId, setPrevActiveBookId] = useState(activeBook?.id);
+  const [prevIsReaderActive, setPrevIsReaderActive] = useState(isReaderActive);
 
   if (selectedShelf !== prevShelf || debouncedQuery !== prevQuery) {
     setPrevShelf(selectedShelf);
@@ -76,18 +75,12 @@ export function useLibraryKeyboardNavigation({
     setHighlightedMenuItemId(null);
   }
 
-  if (activeBook?.id !== prevActiveBookId) {
+  if (activeBook?.id !== prevActiveBookId || isReaderActive !== prevIsReaderActive) {
     setPrevActiveBookId(activeBook?.id);
-    if (activeBook?.id) {
-      setHighlightedCardId((prev) => {
-        if (prev && (prev.includes(activeBook.id) || prev === activeBook.id)) {
-          return prev;
-        }
-        return `book-${activeBook.id}`;
-      });
-      setFocusArea('books');
-      setHighlightedMenuItemId(null);
-    }
+    setPrevIsReaderActive(isReaderActive);
+    setHighlightedCardId(null);
+    setFocusArea('books');
+    setHighlightedMenuItemId(null);
   }
 
   const { books = [], continueReading = [], favorites = [] } = libraryData;

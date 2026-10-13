@@ -79,9 +79,6 @@ export default function BookCard({
   };
 
   const handleClick = (e) => {
-    if (actions.setHighlightedCardId && effectiveCardId) {
-      actions.setHighlightedCardId(effectiveCardId);
-    }
     const coverEl = e.currentTarget.querySelector('.book-cover-container') || e.currentTarget;
     const rect = coverEl.getBoundingClientRect();
     const originRect = {
