@@ -1,0 +1,126 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'Digital Book Library - Serverless Functions & API Layer (FastAPI, Cover Extractor, Whitelist Trigger, API Gateway)'
+
+Parameters:
+  CoreStackName:
+    Type: String
+    Description: Name of the Core Infrastructure CloudFormation Stack to import exports from
+    Default: book-library-core-dev
+
+  AllowedEmails:
+    Type: String
+    Description: Comma-separated list of authorized emails (Whitelist)
+    Default: "andreusdantas@gmail.com"
+
+Resources:
+  # ==========================================
+  # 1. COGNITO PRE-SIGNUP WHITELIST TRIGGER
+  # ==========================================
+  WhitelistTriggerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${CoreStackName}-WhitelistTrigger'
+      Runtime: python3.12
+      Handler: index.handler
+      InlineCode: |
+        import os
+        ALLOWED_EMAILS = [e.strip().lower() for e in os.environ.get("ALLOWED_EMAILS", "").split(",") if e.strip()]
+        def handler(event, context):
+            email = event.get("request", {}).get("userAttributes", {}).get("email", "").strip().lower()
+            if ALLOWED_EMAILS and email not in ALLOWED_EMAILS:
+                raise Exception(f"Acesso negado para o email {email}. Nao autorizado.")
+            event["response"]["autoConfirmUser"] = True
+            event["response"]["autoVerifyEmail"] = True
+            return event
+      Environment:
+        Variables:
+          ALLOWED_EMAILS: !Ref AllowedEmails
+
+  CognitoPreSignUpPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref WhitelistTriggerFunction
+      Principal: cognito-idp.amazonaws.com
+      SourceArn:
+        Fn::ImportValue: !Sub '${CoreStackName}-CognitoUserPoolArn'
+
+  # ==========================================
+  # 2. FASTAPI SERVERLESS API FUNCTION
+  # ==========================================
+  FastApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${CoreStackName}-Api'
+      Runtime: python3.12
+      MemorySize: 512
+      Timeout: 30
+      Handler: server.aws.lambda_app.handler
+      Environment:
+        Variables:
+          DYNAMODB_TABLE:
+            Fn::ImportValue: !Sub '${CoreStackName}-DynamoDBTableName'
+          BOOKS_BUCKET:
+            Fn::ImportValue: !Sub '${CoreStackName}-BooksBucketName'
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName:
+              Fn::ImportValue: !Sub '${CoreStackName}-DynamoDBTableName'
+        - S3CrudPolicy:
+            BucketName:
+              Fn::ImportValue: !Sub '${CoreStackName}-BooksBucketName'
+      Events:
+        ApiRoot:
+          Type: HttpApi
+          Properties:
+            Path: /api/{proxy+}
+            Method: ANY
+
+  # ==========================================
+  # 3. ASYNC COVER EXTRACTION FUNCTION
+  # ==========================================
+  CoverExtractionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${CoreStackName}-CoverExtractor'
+      Runtime: python3.12
+      MemorySize: 1024
+      Timeout: 60
+      Handler: server.aws.cover_lambda.handler
+      Environment:
+        Variables:
+          DYNAMODB_TABLE:
+            Fn::ImportValue: !Sub '${CoreStackName}-DynamoDBTableName'
+          BOOKS_BUCKET:
+            Fn::ImportValue: !Sub '${CoreStackName}-BooksBucketName'
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName:
+              Fn::ImportValue: !Sub '${CoreStackName}-DynamoDBTableName'
+        - S3CrudPolicy:
+            BucketName:
+              Fn::ImportValue: !Sub '${CoreStackName}-BooksBucketName'
+      Events:
+        S3NewBookEvent:
+          Type: S3
+          Properties:
+            Bucket:
+              Ref: BooksBucketImport
+            Events: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: books/
+
+Outputs:
+  ApiUrl:
+    Description: HTTP API Gateway endpoint URL
+    Value: !Sub 'https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com'
+    Export:
+      Name: !Sub '${AWS::StackName}-ApiUrl'
+
+  FastApiFunctionArn:
+    Description: FastAPI Lambda ARN
+    Value: !GetAtt FastApiFunction.Arn

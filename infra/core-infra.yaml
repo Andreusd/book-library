@@ -1,8 +1,12 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Transform: AWS::Serverless-2016-10-31
-Description: 'Digital Book Library - Complete AWS Serverless Infrastructure with Cognito Google OAuth & Offline-First'
+Description: 'Digital Book Library - Core Infrastructure (S3, DynamoDB, Cognito, CloudFront)'
 
 Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+
   AllowedEmails:
     Type: String
     Description: Comma-separated list of authorized emails (Whitelist)
@@ -25,7 +29,7 @@ Resources:
   BooksBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub 'book-library-storage-${AWS::AccountId}-${AWS::Region}'
+      BucketName: !Sub 'book-library-storage-${AWS::AccountId}-${AWS::Region}-${Environment}'
       CorsConfiguration:
         CorsRules:
           - AllowedHeaders: ['*']
@@ -37,7 +41,7 @@ Resources:
   WebHostingBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub 'book-library-web-${AWS::AccountId}-${AWS::Region}'
+      BucketName: !Sub 'book-library-web-${AWS::AccountId}-${AWS::Region}-${Environment}'
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -50,7 +54,7 @@ Resources:
   DynamoDBTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: BookLibrary
+      TableName: !Sub 'BookLibrary-${Environment}'
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: PK
@@ -82,11 +86,9 @@ Resources:
   CognitoUserPool:
     Type: AWS::Cognito::UserPool
     Properties:
-      UserPoolName: BookLibraryUsers
+      UserPoolName: !Sub 'BookLibraryUsers-${Environment}'
       AutoVerifiedAttributes:
         - email
-      LambdaConfig:
-        PreSignUp: !GetAtt WhitelistTriggerFunction.Arn
 
   CognitoGoogleProvider:
     Type: AWS::Cognito::UserPoolIdentityProvider
@@ -106,7 +108,7 @@ Resources:
     Type: AWS::Cognito::UserPoolClient
     DependsOn: CognitoGoogleProvider
     Properties:
-      ClientName: BookLibraryWebClient
+      ClientName: !Sub 'BookLibraryWebClient-${Environment}'
       UserPoolId: !Ref CognitoUserPool
       GenerateSecret: false
       SupportedIdentityProviders:
@@ -123,87 +125,51 @@ Resources:
       LogoutURLs:
         - https://localhost:5173
 
-  # ==========================================
-  # 4. LAMBDA FUNCTIONS
-  # ==========================================
-  WhitelistTriggerFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: BookLibraryWhitelistTrigger
-      Runtime: python3.12
-      Handler: server.aws.whitelist_lambda.handler
-      InlineCode: |
-        import os
-        ALLOWED_EMAILS = [e.strip().lower() for e in os.environ.get("ALLOWED_EMAILS", "").split(",") if e.strip()]
-        def handler(event, context):
-            email = event.get("request", {}).get("userAttributes", {}).get("email", "").strip().lower()
-            if ALLOWED_EMAILS and email not in ALLOWED_EMAILS:
-                raise Exception(f"Acesso negado para o email {email}. Nao autorizado.")
-            event["response"]["autoConfirmUser"] = True
-            event["response"]["autoVerifyEmail"] = True
-            return event
-      Environment:
-        Variables:
-          ALLOWED_EMAILS: !Ref AllowedEmails
-
-  CognitoPreSignUpPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref WhitelistTriggerFunction
-      Principal: cognito-idp.amazonaws.com
-      SourceArn: !GetAtt CognitoUserPool.Arn
-
-  FastApiFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: BookLibraryApi
-      Runtime: python3.12
-      MemorySize: 512
-      Timeout: 30
-      Handler: server.aws.lambda_app.handler
-      Environment:
-        Variables:
-          DYNAMODB_TABLE: !Ref DynamoDBTable
-          BOOKS_BUCKET: !Ref BooksBucket
-      Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref DynamoDBTable
-        - S3CrudPolicy:
-            BucketName: !Ref BooksBucket
-      Events:
-        ApiRoot:
-          Type: HttpApi
-          Properties:
-            Path: /api/{proxy+}
-            Method: ANY
-
-  CoverExtractionFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: BookLibraryCoverExtractor
-      Runtime: python3.12
-      MemorySize: 1024
-      Timeout: 60
-      Handler: server.aws.cover_lambda.handler
-      Environment:
-        Variables:
-          DYNAMODB_TABLE: !Ref DynamoDBTable
-          BOOKS_BUCKET: !Ref BooksBucket
-      Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref DynamoDBTable
-        - S3CrudPolicy:
-            BucketName: !Ref BooksBucket
-
 Outputs:
   BooksBucketName:
+    Description: Name of the S3 storage bucket for books and covers
     Value: !Ref BooksBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-BooksBucketName'
+
+  BooksBucketArn:
+    Description: ARN of the S3 storage bucket
+    Value: !GetAtt BooksBucket.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-BooksBucketArn'
+
+  WebHostingBucketName:
+    Description: Name of the S3 web hosting bucket
+    Value: !Ref WebHostingBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-WebHostingBucketName'
+
   DynamoDBTableName:
+    Description: Name of the DynamoDB Single-Table
     Value: !Ref DynamoDBTable
+    Export:
+      Name: !Sub '${AWS::StackName}-DynamoDBTableName'
+
+  DynamoDBTableArn:
+    Description: ARN of the DynamoDB Single-Table
+    Value: !GetAtt DynamoDBTable.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-DynamoDBTableArn'
+
   CognitoUserPoolId:
+    Description: Cognito User Pool ID
     Value: !Ref CognitoUserPool
+    Export:
+      Name: !Sub '${AWS::StackName}-CognitoUserPoolId'
+
+  CognitoUserPoolArn:
+    Description: Cognito User Pool ARN
+    Value: !GetAtt CognitoUserPool.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-CognitoUserPoolArn'
+
   CognitoClientId:
+    Description: Cognito Web Client ID
     Value: !Ref CognitoUserPoolClient
-  ApiUrl:
-    Value: !Sub 'https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com'
+    Export:
+      Name: !Sub '${AWS::StackName}-CognitoClientId'
