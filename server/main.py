@@ -95,6 +95,13 @@ app.include_router(books_router)
 app.include_router(tags_router)
 app.include_router(lookup_router)
 
+try:
+    from .aws.router import router as aws_router
+    app.include_router(aws_router)
+except Exception as e:
+    print(f"AWS Router disabled or dependencies missing: {e}")
+
+
 # If client production build exists, mount static assets and index.html fallback
 if os.path.exists(CLIENT_DIST):
     app.mount("/assets", StaticFiles(directory=os.path.join(CLIENT_DIST, "assets")), name="assets")

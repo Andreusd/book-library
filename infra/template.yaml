@@ -1,0 +1,209 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'Digital Book Library - Complete AWS Serverless Infrastructure with Cognito Google OAuth & Offline-First'
+
+Parameters:
+  AllowedEmails:
+    Type: String
+    Description: Comma-separated list of authorized emails (Whitelist)
+    Default: "andreusdantas@gmail.com"
+
+  GoogleClientId:
+    Type: String
+    Description: Google OAuth Client ID
+    NoEcho: true
+
+  GoogleClientSecret:
+    Type: String
+    Description: Google OAuth Client Secret
+    NoEcho: true
+
+Resources:
+  # ==========================================
+  # 1. STORAGE (S3 Buckets)
+  # ==========================================
+  BooksBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'book-library-storage-${AWS::AccountId}-${AWS::Region}'
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET, PUT, HEAD]
+            AllowedOrigins: ['*']
+            ExposedHeaders: ['ETag', 'Content-Range', 'Accept-Ranges']
+            MaxAge: 3600
+
+  WebHostingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'book-library-web-${AWS::AccountId}-${AWS::Region}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # ==========================================
+  # 2. DATABASE (DynamoDB Single-Table)
+  # ==========================================
+  DynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: BookLibrary
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1_PK
+          AttributeType: S
+        - AttributeName: GSI1_SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: GSI1_PK
+              KeyType: HASH
+            - AttributeName: GSI1_SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  # ==========================================
+  # 3. AUTHENTICATION (Cognito + Google Identity)
+  # ==========================================
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: BookLibraryUsers
+      AutoVerifiedAttributes:
+        - email
+      LambdaConfig:
+        PreSignUp: !GetAtt WhitelistTriggerFunction.Arn
+
+  CognitoGoogleProvider:
+    Type: AWS::Cognito::UserPoolIdentityProvider
+    Properties:
+      UserPoolId: !Ref CognitoUserPool
+      ProviderName: Google
+      ProviderType: Google
+      ProviderDetails:
+        client_id: !Ref GoogleClientId
+        client_secret: !Ref GoogleClientSecret
+        authorize_scopes: "email profile openid"
+      AttributeMapping:
+        email: email
+        name: name
+
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: CognitoGoogleProvider
+    Properties:
+      ClientName: BookLibraryWebClient
+      UserPoolId: !Ref CognitoUserPool
+      GenerateSecret: false
+      SupportedIdentityProviders:
+        - Google
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - email
+        - openid
+        - profile
+      AllowedOAuthFlowsUserPoolClient: true
+      CallbackURLs:
+        - https://localhost:5173
+      LogoutURLs:
+        - https://localhost:5173
+
+  # ==========================================
+  # 4. LAMBDA FUNCTIONS
+  # ==========================================
+  WhitelistTriggerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: BookLibraryWhitelistTrigger
+      Runtime: python3.12
+      Handler: server.aws.whitelist_lambda.handler
+      InlineCode: |
+        import os
+        ALLOWED_EMAILS = [e.strip().lower() for e in os.environ.get("ALLOWED_EMAILS", "").split(",") if e.strip()]
+        def handler(event, context):
+            email = event.get("request", {}).get("userAttributes", {}).get("email", "").strip().lower()
+            if ALLOWED_EMAILS and email not in ALLOWED_EMAILS:
+                raise Exception(f"Acesso negado para o email {email}. Nao autorizado.")
+            event["response"]["autoConfirmUser"] = True
+            event["response"]["autoVerifyEmail"] = True
+            return event
+      Environment:
+        Variables:
+          ALLOWED_EMAILS: !Ref AllowedEmails
+
+  CognitoPreSignUpPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref WhitelistTriggerFunction
+      Principal: cognito-idp.amazonaws.com
+      SourceArn: !GetAtt CognitoUserPool.Arn
+
+  FastApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: BookLibraryApi
+      Runtime: python3.12
+      MemorySize: 512
+      Timeout: 30
+      Handler: server.aws.lambda_app.handler
+      Environment:
+        Variables:
+          DYNAMODB_TABLE: !Ref DynamoDBTable
+          BOOKS_BUCKET: !Ref BooksBucket
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DynamoDBTable
+        - S3CrudPolicy:
+            BucketName: !Ref BooksBucket
+      Events:
+        ApiRoot:
+          Type: HttpApi
+          Properties:
+            Path: /api/{proxy+}
+            Method: ANY
+
+  CoverExtractionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: BookLibraryCoverExtractor
+      Runtime: python3.12
+      MemorySize: 1024
+      Timeout: 60
+      Handler: server.aws.cover_lambda.handler
+      Environment:
+        Variables:
+          DYNAMODB_TABLE: !Ref DynamoDBTable
+          BOOKS_BUCKET: !Ref BooksBucket
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref DynamoDBTable
+        - S3CrudPolicy:
+            BucketName: !Ref BooksBucket
+
+Outputs:
+  BooksBucketName:
+    Value: !Ref BooksBucket
+  DynamoDBTableName:
+    Value: !Ref DynamoDBTable
+  CognitoUserPoolId:
+    Value: !Ref CognitoUserPool
+  CognitoClientId:
+    Value: !Ref CognitoUserPoolClient
+  ApiUrl:
+    Value: !Sub 'https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com'
