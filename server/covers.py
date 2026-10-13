@@ -9,7 +9,11 @@ import pypdfium2 as pdfium
 from PIL import Image, ImageDraw, ImageFont
 from typing import Optional
 
-CACHE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".cache", "covers"))
+if os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+    CACHE_DIR = "/tmp/.cache/covers"
+else:
+    CACHE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".cache", "covers"))
+
 
 class CoverManager:
     def __init__(self, cache_dir: str = CACHE_DIR):

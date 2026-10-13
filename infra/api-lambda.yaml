@@ -1,126 +1,139 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Transform: AWS::Serverless-2016-10-31
-Description: 'Digital Book Library - Serverless Functions & API Layer (FastAPI, Cover Extractor, Whitelist Trigger, API Gateway)'
+Description: 'Digital Book Library - Serverless FastAPI & Lambda Functions'
 
 Parameters:
   CoreStackName:
     Type: String
-    Description: Name of the Core Infrastructure CloudFormation Stack to import exports from
     Default: book-library-core-dev
 
-  AllowedEmails:
+  DeployBucket:
     Type: String
-    Description: Comma-separated list of authorized emails (Whitelist)
-    Default: "andreuzielsd@gmail.com"
+    Default: book-library-storage-109990058921-us-east-1-dev
+
+  DeployKey:
+    Type: String
+    Default: deploy/lambda-graviton.zip
 
 Resources:
-  # ==========================================
-  # 1. COGNITO PRE-SIGNUP WHITELIST TRIGGER
-  # ==========================================
-  WhitelistTriggerFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub '${CoreStackName}-WhitelistTrigger'
-      Runtime: python3.12
-      Handler: index.handler
-      InlineCode: |
-        import os
-        ALLOWED_EMAILS = [e.strip().lower() for e in os.environ.get("ALLOWED_EMAILS", "").split(",") if e.strip()]
-        def handler(event, context):
-            email = event.get("request", {}).get("userAttributes", {}).get("email", "").strip().lower()
-            if ALLOWED_EMAILS and email not in ALLOWED_EMAILS:
-                raise Exception(f"Acesso negado para o email {email}. Nao autorizado.")
-            event["response"]["autoConfirmUser"] = True
-            event["response"]["autoVerifyEmail"] = True
-            return event
-      Environment:
-        Variables:
-          ALLOWED_EMAILS: !Ref AllowedEmails
-
-  CognitoPreSignUpPermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref WhitelistTriggerFunction
-      Principal: cognito-idp.amazonaws.com
-      SourceArn:
-        Fn::ImportValue: !Sub '${CoreStackName}-CognitoUserPoolArn'
 
   # ==========================================
-  # 2. FASTAPI SERVERLESS API FUNCTION
+  # 1. IAM EXECUTION ROLE FOR LAMBDAS
+  # ==========================================
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${CoreStackName}-LambdaRole'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:*
+                Resource:
+                  - Fn::ImportValue: !Sub '${CoreStackName}-DynamoDBTableArn'
+                  - !Sub
+                    - '${TableArn}/index/*'
+                    - TableArn:
+                        Fn::ImportValue: !Sub '${CoreStackName}-DynamoDBTableArn'
+        - PolicyName: S3StorageAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:*
+                Resource:
+                  - Fn::ImportValue: !Sub '${CoreStackName}-BooksBucketArn'
+                  - !Sub
+                    - '${BucketArn}/*'
+                    - BucketArn:
+                        Fn::ImportValue: !Sub '${CoreStackName}-BooksBucketArn'
+
+  # ==========================================
+  # 2. FASTAPI LAMBDA FUNCTION
   # ==========================================
   FastApiFunction:
-    Type: AWS::Serverless::Function
+    Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Sub '${CoreStackName}-Api'
       Runtime: python3.12
+      Architectures:
+        - arm64
+      Handler: server.aws.lambda_app.handler
+
+      Role: !GetAtt LambdaExecutionRole.Arn
       MemorySize: 512
       Timeout: 30
-      Handler: server.aws.lambda_app.handler
+      Code:
+        S3Bucket: !Ref DeployBucket
+        S3Key: !Ref DeployKey
       Environment:
         Variables:
           DYNAMODB_TABLE:
             Fn::ImportValue: !Sub '${CoreStackName}-DynamoDBTableName'
           BOOKS_BUCKET:
             Fn::ImportValue: !Sub '${CoreStackName}-BooksBucketName'
-      Policies:
-        - DynamoDBCrudPolicy:
-            TableName:
-              Fn::ImportValue: !Sub '${CoreStackName}-DynamoDBTableName'
-        - S3CrudPolicy:
-            BucketName:
-              Fn::ImportValue: !Sub '${CoreStackName}-BooksBucketName'
-      Events:
-        ApiRoot:
-          Type: HttpApi
-          Properties:
-            Path: /api/{proxy+}
-            Method: ANY
 
   # ==========================================
-  # 3. ASYNC COVER EXTRACTION FUNCTION
+  # 3. HTTP API GATEWAY (v2)
   # ==========================================
-  CoverExtractionFunction:
-    Type: AWS::Serverless::Function
+  HttpApi:
+    Type: AWS::ApiGatewayV2::Api
     Properties:
-      FunctionName: !Sub '${CoreStackName}-CoverExtractor'
-      Runtime: python3.12
-      MemorySize: 1024
-      Timeout: 60
-      Handler: server.aws.cover_lambda.handler
-      Environment:
-        Variables:
-          DYNAMODB_TABLE:
-            Fn::ImportValue: !Sub '${CoreStackName}-DynamoDBTableName'
-          BOOKS_BUCKET:
-            Fn::ImportValue: !Sub '${CoreStackName}-BooksBucketName'
-      Policies:
-        - DynamoDBCrudPolicy:
-            TableName:
-              Fn::ImportValue: !Sub '${CoreStackName}-DynamoDBTableName'
-        - S3CrudPolicy:
-            BucketName:
-              Fn::ImportValue: !Sub '${CoreStackName}-BooksBucketName'
-      Events:
-        S3NewBookEvent:
-          Type: S3
-          Properties:
-            Bucket:
-              Ref: BooksBucketImport
-            Events: s3:ObjectCreated:*
-            Filter:
-              S3Key:
-                Rules:
-                  - Name: prefix
-                    Value: books/
+      Name: !Sub '${CoreStackName}-HttpApi'
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowMethods:
+          - '*'
+        AllowHeaders:
+          - '*'
+
+  HttpApiIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt FastApiFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  HttpApiProxyRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: 'ANY /api/{proxy+}'
+      Target: !Sub 'integrations/${HttpApiIntegration}'
+
+  HttpApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref HttpApi
+      StageName: '$default'
+      AutoDeploy: true
+
+  LambdaPermissionHttpApi:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref FastApiFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/*'
 
 Outputs:
   ApiUrl:
-    Description: HTTP API Gateway endpoint URL
-    Value: !Sub 'https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com'
+    Description: HTTP API Gateway URL
+    Value: !GetAtt HttpApi.ApiEndpoint
     Export:
       Name: !Sub '${AWS::StackName}-ApiUrl'
-
-  FastApiFunctionArn:
-    Description: FastAPI Lambda ARN
-    Value: !GetAtt FastApiFunction.Arn

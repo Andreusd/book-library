@@ -15,6 +15,7 @@ import { useBookModals } from './hooks/useBookModals';
 import { useLibraryRouter } from './hooks/useLibraryRouter';
 import { useLibraryData } from './hooks/useLibraryData';
 import { useLibraryKeyboardNavigation } from './hooks/useLibraryKeyboardNavigation';
+import { parseAuthTokens, exchangeCodeForTokens } from './services/cognitoAuth';
 
 /**
  * Root Application Component.
@@ -36,6 +37,25 @@ export default function App() {
     currentUser,
     setCurrentUser,
   } = useSettings();
+
+  // Handle Cognito OAuth Redirect Code
+  useEffect(() => {
+    const auth = parseAuthTokens();
+    if (auth?.code) {
+      exchangeCodeForTokens(auth.code)
+        .then((res) => {
+          if (res?.user?.email) {
+            setCurrentUser(res.user.email);
+          }
+        })
+        .catch((err) => {
+          console.error('OAuth token exchange failed:', err);
+          alert(err.message || 'Falha na autenticação');
+        });
+    }
+  }, [setCurrentUser]);
+
+
 
   const modals = useBookModals();
   const router = useLibraryRouter();

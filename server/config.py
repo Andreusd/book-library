@@ -4,8 +4,12 @@ import threading
 import uuid
 from typing import Dict, Any, Optional, List
 
-CACHE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".cache"))
+if os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+    CACHE_DIR = "/tmp/.cache"
+else:
+    CACHE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".cache"))
 CONFIG_FILE = os.path.join(CACHE_DIR, "config.json")
+
 
 class ConfigManager:
     """Manages multi-library application settings persisted in .cache/config.json."""

@@ -2,8 +2,9 @@ import React from 'react';
 import {
   Search, X, BookOpen,
   PanelLeftClose, PanelLeftOpen,
-  Settings, Heart, Bookmark, Maximize2, Minimize2, Library, Folder, Tag, Palette
+  Settings, Heart, Bookmark, Maximize2, Minimize2, Library, Folder, Tag, Palette, UploadCloud
 } from 'lucide-react';
+
 import ShelfIcon from './ShelfIcon';
 import ThemeMenu from './ThemeMenu';
 import { getTagColorConfig } from '../utils/tagColors';
@@ -243,6 +244,16 @@ export default function AppNavbar({
           )}
         </div>
 
+        {/* Upload to S3 Button */}
+        <button
+          onClick={() => modals?.setUploadModalOpen && modals.setUploadModalOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs transition shadow-md shadow-amber-500/20 cursor-pointer"
+          title="Upload de Livro para S3"
+        >
+          <UploadCloud className="w-4 h-4" />
+          <span className="hidden sm:inline">Upload</span>
+        </button>
+
         {/* Settings Button */}
         <button
           onClick={() => modals?.setSettingsOpen(true)}
@@ -255,3 +266,4 @@ export default function AppNavbar({
     </header>
   );
 }
+

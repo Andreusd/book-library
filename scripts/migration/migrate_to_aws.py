@@ -20,7 +20,7 @@ def compute_sha256(filepath: str) -> str:
             sha.update(chunk)
     return sha.hexdigest()
 
-def migrate_library(local_dir: str, bucket_name: str, table_name: str, region: str = "us-east-1"):
+def migrate_library(local_dir: str, bucket_name: str, table_name: str, region: str = "us-east-1", explicit_category: str = None):
     if not os.path.isdir(local_dir):
         print(f"Erro: Diretorio local '{local_dir}' nao encontrado.")
         sys.exit(1)
@@ -29,16 +29,20 @@ def migrate_library(local_dir: str, bucket_name: str, table_name: str, region: s
     dynamodb = boto3.resource("dynamodb", region_name=region)
     table = dynamodb.Table(table_name)
 
+    folder_category = explicit_category or os.path.basename(os.path.abspath(local_dir)).replace("-", " ").replace("_", " ")
+
     print(f"Iniciando varredura em: {local_dir}")
+    print(f"Categoria padrao: {folder_category}")
     print(f"Destino S3: s3://{bucket_name}/books/")
     print(f"Destino DynamoDB: {table_name}\n")
 
     migrated_count = 0
+    updated_count = 0
     skipped_count = 0
 
     for root, _, files in os.walk(local_dir):
         rel_folder = os.path.relpath(root, local_dir)
-        category = "General" if rel_folder == "." else rel_folder.replace("-", " ").replace("_", " ")
+        category = folder_category if rel_folder == "." else rel_folder.replace("-", " ").replace("_", " ")
 
         for filename in files:
             ext = os.path.splitext(filename)[1].lower()
@@ -57,7 +61,21 @@ def migrate_library(local_dir: str, bucket_name: str, table_name: str, region: s
             # Check if book exists in DynamoDB
             resp = table.get_item(Key={"PK": "LIB#default", "SK": f"BOOK#{book_hash}"})
             if "Item" in resp:
-                print(f"   [JA EXISTE] Pulando upload de {clean_title}...")
+                existing_item = resp["Item"]
+                if existing_item.get("primary_category") != category:
+                    print(f"   [ATUALIZANDO CATEGORIA] De '{existing_item.get('primary_category')}' para '{category}'...")
+                    table.update_item(
+                        Key={"PK": "LIB#default", "SK": f"BOOK#{book_hash}"},
+                        UpdateExpression="SET GSI1_PK = :cat_pk, primary_category = :cat, categories = :cats",
+                        ExpressionAttributeValues={
+                            ":cat_pk": f"CATEGORY#{category}",
+                            ":cat": category,
+                            ":cats": [category]
+                        }
+                    )
+                    updated_count += 1
+                else:
+                    print(f"   [JA EXISTE] Pulando upload de {clean_title}...")
                 skipped_count += 1
                 continue
 
@@ -96,17 +114,18 @@ def migrate_library(local_dir: str, bucket_name: str, table_name: str, region: s
     print("\n==========================================")
     print(f"Migracao concluida!")
     print(f"Novos livros migrados: {migrated_count}")
-    print(f"Livros ja existentes: {skipped_count}")
+    print(f"Livros com categoria atualizada: {updated_count}")
+    print(f"Livros ja existentes ignorados: {skipped_count}")
     print("==========================================")
 
 if __name__ == "__main__":
-    if len(sys.argv) < 4:
-        print("Uso: python migrate_to_aws.py <pasta_livros> <bucket_s3> <tabela_dynamodb> [regiao]")
-        sys.exit(1)
+    import argparse
+    parser = argparse.ArgumentParser(description="Migrate local books to AWS S3 & DynamoDB")
+    parser.add_argument("books_dir", help="Path to local books directory")
+    parser.add_argument("bucket", help="S3 Bucket name")
+    parser.add_argument("table", help="DynamoDB Table name")
+    parser.add_argument("--region", default="us-east-1", help="AWS Region (default: us-east-1)")
+    parser.add_argument("--category", default=None, help="Explicit category override")
 
-    books_dir = sys.argv[1]
-    bucket = sys.argv[2]
-    tbl = sys.argv[3]
-    reg = sys.argv[4] if len(sys.argv) > 4 else "us-east-1"
-
-    migrate_library(books_dir, bucket, tbl, reg)
+    args = parser.parse_args()
+    migrate_library(args.books_dir, args.bucket, args.table, args.region, args.category)

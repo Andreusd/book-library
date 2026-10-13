@@ -10,8 +10,10 @@ export function useBookModals() {
   const [iconModal, setIconModal] = useState({ isOpen: false, shelf: null });
   const [tagModal, setTagModal] = useState({ isOpen: false, book: null });
   const [detailsModal, setDetailsModal] = useState({ isOpen: false, book: null });
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
+
 
   const openBookContextMenu = useCallback((e, book) => {
     e.preventDefault();
@@ -92,9 +94,12 @@ export function useBookModals() {
     detailsModal,
     openDetailsModal,
     closeDetailsModal,
+    uploadModalOpen,
+    setUploadModalOpen,
     settingsOpen,
     setSettingsOpen,
     themeMenuOpen,
     setThemeMenuOpen,
   };
 }
+

@@ -5,7 +5,9 @@ import ShelfRenameModal from './ShelfRenameModal';
 import ShelfIconModal from './ShelfIconModal';
 import TagManagerModal from './TagManagerModal';
 import BookDetailsModal from './BookDetailsModal';
+import BookUploadModal from './BookUploadModal';
 import SettingsModal from './SettingsModal';
+
 import { useSettings } from '../hooks/useSettings';
 
 /**
@@ -169,6 +171,18 @@ export default function AppModals({
         onToggleBookAnimations={onToggleBookAnimations}
         onLibraryChanged={onLibraryChanged}
       />
+
+      {/* Book Upload to S3 Modal */}
+      <BookUploadModal
+        isOpen={Boolean(modals?.uploadModalOpen)}
+        onClose={() => modals?.setUploadModalOpen && modals.setUploadModalOpen(false)}
+        onUploadComplete={() => {
+          libraryData?.loadBooks && libraryData.loadBooks();
+          libraryData?.loadShelves && libraryData.loadShelves();
+        }}
+        categories={libraryData?.shelves || []}
+      />
     </>
   );
 }
+

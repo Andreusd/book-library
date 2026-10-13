@@ -82,10 +82,28 @@ export function useLibraryData({ setCurrentUser, modals, router }) {
   const loadLibraries = useCallback(() => {
     librariesApi.getLibraries()
       .then(data => {
-        setLibraries(data.libraries || []);
+        const libs = data.libraries || [];
+        if (libs.length === 0) {
+          // In AWS Cloud mode, default to 'cloud' library so it never prompts for local folder path
+          const defaultCloudLib = [{ id: 'default', name: 'Nuvem AWS (S3)', path: 's3://book-library' }];
+          setLibraries(defaultCloudLib);
+          if (!activeLibraryId) {
+            setActiveLibraryId('default');
+          }
+        } else {
+          setLibraries(libs);
+        }
       })
-      .catch(err => console.error('Failed to load libraries:', err));
-  }, []);
+      .catch(() => {
+        // Fallback for cloud mode
+        const defaultCloudLib = [{ id: 'default', name: 'Nuvem AWS (S3)', path: 's3://book-library' }];
+        setLibraries(defaultCloudLib);
+        if (!activeLibraryId) {
+          setActiveLibraryId('default');
+        }
+      });
+  }, [activeLibraryId]);
+
 
   // Load Shelves & Totals
   const loadShelves = useCallback((libId) => {

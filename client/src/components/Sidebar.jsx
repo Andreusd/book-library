@@ -6,6 +6,8 @@ import {
 import ShelfIcon from './ShelfIcon';
 import { useI18n } from '../i18n';
 import { getTagColorConfig } from '../utils/tagColors';
+import { getLogoutUrl } from '../services/cognitoAuth';
+
 
 export default function Sidebar({
   shelves,
@@ -647,11 +649,17 @@ export default function Sidebar({
               </div>
               <button
                 type="button"
-                onClick={onSelectAllLibraries}
-                className="text-[11px] text-amber-400 hover:text-amber-300 font-semibold cursor-pointer shrink-0 hover:underline px-1.5 py-0.5"
-                title={t('changeUserAtHome')}
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    localStorage.removeItem('book_library_auth');
+                    localStorage.removeItem('book_library_user');
+                    window.location.href = getLogoutUrl();
+                  }
+                }}
+                className="text-[11px] text-neutral-400 hover:text-rose-400 font-semibold cursor-pointer shrink-0 hover:underline px-1.5 py-0.5"
+                title="Sair"
               >
-                {t('changeUser')}
+                Sair
               </button>
             </div>
           </div>

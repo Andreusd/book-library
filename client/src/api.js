@@ -8,7 +8,27 @@ export const USER_STORAGE_KEY = 'book_library_user';
 
 export function getCurrentUser() {
   try {
-    return (localStorage.getItem(USER_STORAGE_KEY) || '').trim();
+    const rawAuth = localStorage.getItem('book_library_auth');
+    if (rawAuth) {
+      const auth = JSON.parse(rawAuth);
+      // Check id_token user payload first
+      const email = auth?.user?.email || auth?.user?.username;
+      if (email) {
+        return email.toLowerCase().trim();
+      }
+      // If user object not decoded yet, decode id_token
+      if (auth.id_token) {
+        const parts = auth.id_token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1]));
+          const tokenEmail = payload.email || payload.username || payload['cognito:username'];
+          if (tokenEmail) {
+            return tokenEmail.toLowerCase().trim();
+          }
+        }
+      }
+    }
+    return '';
   } catch {
     return '';
   }
@@ -17,23 +37,30 @@ export function getCurrentUser() {
 export function setCurrentUser(username) {
   try {
     const clean = (username || '').trim();
-    if (clean) {
-      localStorage.setItem(USER_STORAGE_KEY, clean);
-    } else {
-      localStorage.removeItem(USER_STORAGE_KEY);
-    }
-    // Dispatch event to notify any active components
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('book_library_user_changed', { detail: { user: clean } }));
     }
   } catch (e) {
-    console.error('Failed to set current user in localStorage:', e);
+    console.error('Failed to notify user change:', e);
   }
 }
 
+export function logoutUser() {
+  try {
+    localStorage.removeItem('book_library_auth');
+    localStorage.removeItem(USER_STORAGE_KEY);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('book_library_user_changed', { detail: { user: '' } }));
+    }
+  } catch (e) {
+    console.error('Failed to logout user:', e);
+  }
+}
+
+
 /**
  * Modern, centralized API fetch utility that automatically attaches
- * the active X-User header to backend requests.
+ * the active X-User and Authorization Bearer header to backend requests.
  */
 export async function apiFetch(input, init = {}) {
   const headers = new Headers(init.headers || (input instanceof Request ? input.headers : {}));
@@ -41,8 +68,22 @@ export async function apiFetch(input, init = {}) {
   if (user && !headers.has('X-User')) {
     headers.set('X-User', user);
   }
+
+  // Attach Cognito JWT Bearer token if available
+  try {
+    const rawAuth = localStorage.getItem('book_library_auth');
+    if (rawAuth) {
+      const auth = JSON.parse(rawAuth);
+      const token = auth.id_token || auth.access_token;
+      if (token && !headers.has('Authorization')) {
+        headers.set('Authorization', `Bearer ${token}`);
+      }
+    }
+  } catch {}
+
   return fetch(input, { ...init, headers });
 }
+
 
 /**
  * Common JSON request helper with automatic header injection and error handling.
