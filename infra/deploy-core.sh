@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -e
 
-STACK_NAME="${1:-book-library-core-dev}"
+STACK_NAME="${1:-uzi-library-core-dev}"
 ENVIRONMENT="${2:-dev}"
 REGION="${AWS_REGION:-us-east-1}"
 
 echo "=========================================================="
-echo "  🚀 Iniciando Deploy: Digital Book Library Core Infra"
+echo "  🚀 Iniciando Deploy: Uzi Library Core Infra"
 echo "  Stack:       $STACK_NAME"
 echo "  Ambiente:    $ENVIRONMENT"
 echo "  Região:      $REGION"

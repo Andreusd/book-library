@@ -49,8 +49,8 @@ describe('Sidebar component', () => {
 
   it('renders library title, total book and shelf counts', () => {
     renderSidebar();
-    expect(screen.getByText('Digital Library')).toBeInTheDocument();
-    expect(screen.getByText('12 books • 2 folders')).toBeInTheDocument();
+    expect(screen.getByText('Uzi Library')).toBeInTheDocument();
+    expect(screen.getByText('12 books • 2 categories')).toBeInTheDocument();
   });
 
   it('renders home, continue reading, and favorites items with counts', () => {
@@ -78,7 +78,7 @@ describe('Sidebar component', () => {
   it('filters folders and shelves dynamically based on search input', () => {
     renderSidebar();
 
-    const searchInput = screen.getByPlaceholderText(/filter folders/i);
+    const searchInput = screen.getByPlaceholderText(/filter categories/i);
     fireEvent.change(searchInput, { target: { value: 'science' } });
 
     expect(screen.getByText('Science Fiction')).toBeInTheDocument();

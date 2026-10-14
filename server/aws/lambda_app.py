@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 from .router import router as aws_router
 
-app = FastAPI(title="Book Library AWS API")
+app = FastAPI(title="Uzi Library AWS API")
 
 # Allow CORS for CloudFront and local development
 app.add_middleware(

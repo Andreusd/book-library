@@ -4,8 +4,8 @@ from typing import Any, Dict, List, Optional
 from botocore.config import Config
 
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
-DYNAMODB_TABLE = os.environ.get("DYNAMODB_TABLE", "BookLibrary")
-BOOKS_BUCKET = os.environ.get("BOOKS_BUCKET", "book-library-storage")
+DYNAMODB_TABLE = os.environ.get("DYNAMODB_TABLE", "UziLibrary")
+BOOKS_BUCKET = os.environ.get("BOOKS_BUCKET", "uzi-library-storage")
 COVERS_PREFIX = os.environ.get("COVERS_PREFIX", "covers/")
 BOOKS_PREFIX = os.environ.get("BOOKS_PREFIX", "books/")
 

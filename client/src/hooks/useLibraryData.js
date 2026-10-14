@@ -85,7 +85,7 @@ export function useLibraryData({ setCurrentUser, modals, router }) {
         const libs = data.libraries || [];
         if (libs.length === 0) {
           // In AWS Cloud mode, default to 'cloud' library so it never prompts for local folder path
-          const defaultCloudLib = [{ id: 'default', name: 'Nuvem AWS (S3)', path: 's3://book-library' }];
+          const defaultCloudLib = [{ id: 'default', name: 'Nuvem AWS (S3)', path: 's3://uzi-library' }];
           setLibraries(defaultCloudLib);
           if (!activeLibraryId) {
             setActiveLibraryId('default');
@@ -96,7 +96,7 @@ export function useLibraryData({ setCurrentUser, modals, router }) {
       })
       .catch(() => {
         // Fallback for cloud mode
-        const defaultCloudLib = [{ id: 'default', name: 'Nuvem AWS (S3)', path: 's3://book-library' }];
+        const defaultCloudLib = [{ id: 'default', name: 'Nuvem AWS (S3)', path: 's3://uzi-library' }];
         setLibraries(defaultCloudLib);
         if (!activeLibraryId) {
           setActiveLibraryId('default');

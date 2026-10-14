@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Digital Book Library - Core Infrastructure (S3, DynamoDB, Cognito, CloudFront)'
+Description: 'Uzi Library - Core Infrastructure (S3, DynamoDB, Cognito, CloudFront)'
 
 Parameters:
   Environment:
@@ -35,7 +35,7 @@ Resources:
   BooksBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub 'book-library-storage-${AWS::AccountId}-${AWS::Region}-${Environment}'
+      BucketName: !Sub 'uzi-library-storage-${AWS::AccountId}-${AWS::Region}-${Environment}'
       CorsConfiguration:
         CorsRules:
           - AllowedHeaders: ['*']
@@ -47,7 +47,7 @@ Resources:
   WebHostingBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub 'book-library-web-${AWS::AccountId}-${AWS::Region}-${Environment}'
+      BucketName: !Sub 'uzi-library-web-${AWS::AccountId}-${AWS::Region}-${Environment}'
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -58,7 +58,7 @@ Resources:
     Type: AWS::CloudFront::OriginAccessControl
     Properties:
       OriginAccessControlConfig:
-        Name: !Sub 'book-library-oac-${Environment}'
+        Name: !Sub 'uzi-library-oac-${Environment}'
         OriginAccessControlOriginType: s3
         SigningBehavior: always
         SigningProtocol: sigv4
@@ -69,7 +69,7 @@ Resources:
       DistributionConfig:
         Enabled: true
         DefaultRootObject: index.html
-        Comment: !Sub 'Book Library Web App (${Environment})'
+        Comment: !Sub 'Uzi Library Web App (${Environment})'
         Origins:
           - Id: S3WebHostingOrigin
             DomainName: !GetAtt WebHostingBucket.RegionalDomainName
@@ -145,7 +145,7 @@ Resources:
   DynamoDBTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Sub 'BookLibrary-${Environment}'
+      TableName: !Sub 'UziLibrary-${Environment}'
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: PK
@@ -177,7 +177,7 @@ Resources:
   CognitoUserPool:
     Type: AWS::Cognito::UserPool
     Properties:
-      UserPoolName: !Sub 'BookLibraryUsers-${Environment}'
+      UserPoolName: !Sub 'UziLibraryUsers-${Environment}'
       AutoVerifiedAttributes:
         - email
 
@@ -199,14 +199,14 @@ Resources:
   CognitoUserPoolDomain:
     Type: AWS::Cognito::UserPoolDomain
     Properties:
-      Domain: !Sub 'book-library-auth-${AWS::AccountId}-${Environment}'
+      Domain: !Sub 'uzi-library-auth-${AWS::AccountId}-${Environment}'
       UserPoolId: !Ref CognitoUserPool
 
   CognitoUserPoolClient:
     Type: AWS::Cognito::UserPoolClient
     DependsOn: CognitoGoogleProvider
     Properties:
-      ClientName: !Sub 'BookLibraryWebClient-${Environment}'
+      ClientName: !Sub 'UziLibraryWebClient-${Environment}'
       UserPoolId: !Ref CognitoUserPool
       GenerateSecret: false
       SupportedIdentityProviders: !If
@@ -248,7 +248,7 @@ Outputs:
       Name: !Sub '${AWS::StackName}-WebHostingBucketName'
 
   CloudFrontDomainName:
-    Description: Public HTTPS domain URL for Book Library Web App
+    Description: Public HTTPS domain URL for Uzi Library Web App
     Value: !GetAtt CloudFrontDistribution.DomainName
     Export:
       Name: !Sub '${AWS::StackName}-CloudFrontDomainName'

@@ -60,7 +60,9 @@ export default function LibrarySelector({
               <button
                 onClick={() => {
                   if (typeof window !== 'undefined') {
+                    localStorage.removeItem('uzi_library_auth');
                     localStorage.removeItem('book_library_auth');
+                    localStorage.removeItem('uzi_library_user');
                     localStorage.removeItem('book_library_user');
                     window.location.href = getLogoutUrl();
                   }

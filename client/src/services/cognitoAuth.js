@@ -3,7 +3,7 @@
  * Handles redirection to the Cognito Hosted UI and Google Federated Login.
  */
 
-const COGNITO_DOMAIN = 'book-library-auth-109990058921-dev.auth.us-east-1.amazoncognito.com';
+const COGNITO_DOMAIN = 'uzi-library-auth-109990058921-dev.auth.us-east-1.amazoncognito.com';
 const CLIENT_ID = '1o3v03p0b6m6otbssnnhan0k40';
 const REDIRECT_URI = typeof window !== 'undefined' ? window.location.origin : 'https://d4n8d1cbh8pro.cloudfront.net';
 
@@ -48,12 +48,12 @@ export function parseAuthTokens() {
   return null;
 }
 
-export const AUTH_STORAGE_KEY = 'book_library_auth';
+export const AUTH_STORAGE_KEY = 'uzi_library_auth';
 
 export function getStoredAuth() {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+    const raw = localStorage.getItem(AUTH_STORAGE_KEY) || localStorage.getItem('book_library_auth');
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -67,6 +67,7 @@ export function setStoredAuth(authData) {
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authData));
     } else {
       localStorage.removeItem(AUTH_STORAGE_KEY);
+      localStorage.removeItem('book_library_auth');
     }
   } catch (e) {
     console.error('Error saving auth tokens:', e);
@@ -77,6 +78,7 @@ export function clearStoredAuth() {
   if (typeof window === 'undefined') return;
   try {
     localStorage.removeItem(AUTH_STORAGE_KEY);
+    localStorage.removeItem('book_library_auth');
   } catch {}
 }
 

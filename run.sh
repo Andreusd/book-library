@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 echo "========================================================"
-echo "        Iniciando Biblioteca Digital de Livros"
+echo "              Iniciando Uzi Library"
 echo "========================================================"
 echo ""
 
@@ -36,7 +36,7 @@ fi
 LAN_IP=$(python3 -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.connect(('8.8.8.8', 80)); print(s.getsockname()[0]); s.close()" 2>/dev/null || echo "")
 
 echo "========================================================"
-echo "        Biblioteca Digital pronta!"
+echo "              Uzi Library pronta!"
 echo "  - Local [este PC]:            http://localhost:8000"
 if [ -n "$LAN_IP" ]; then
     echo "  - Rede [outros dispositivos]: http://$LAN_IP:8000"

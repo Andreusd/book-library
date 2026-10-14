@@ -4,11 +4,11 @@
 
 export * from './types';
 
-export const USER_STORAGE_KEY = 'book_library_user';
+export const USER_STORAGE_KEY = 'uzi_library_user';
 
 export function getCurrentUser() {
   try {
-    const rawAuth = localStorage.getItem('book_library_auth');
+    const rawAuth = localStorage.getItem('uzi_library_auth') || localStorage.getItem('book_library_auth');
     if (rawAuth) {
       const auth = JSON.parse(rawAuth);
       // Check id_token user payload first
@@ -28,7 +28,8 @@ export function getCurrentUser() {
         }
       }
     }
-    return '';
+    const storedUser = localStorage.getItem(USER_STORAGE_KEY) || localStorage.getItem('book_library_user');
+    return (storedUser || '').trim();
   } catch {
     return '';
   }
@@ -37,7 +38,14 @@ export function getCurrentUser() {
 export function setCurrentUser(username) {
   try {
     const clean = (username || '').trim();
+    if (clean) {
+      localStorage.setItem(USER_STORAGE_KEY, clean);
+    } else {
+      localStorage.removeItem(USER_STORAGE_KEY);
+      localStorage.removeItem('book_library_user');
+    }
     if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('uzi_library_user_changed', { detail: { user: clean } }));
       window.dispatchEvent(new CustomEvent('book_library_user_changed', { detail: { user: clean } }));
     }
   } catch (e) {
@@ -47,9 +55,12 @@ export function setCurrentUser(username) {
 
 export function logoutUser() {
   try {
+    localStorage.removeItem('uzi_library_auth');
     localStorage.removeItem('book_library_auth');
     localStorage.removeItem(USER_STORAGE_KEY);
+    localStorage.removeItem('book_library_user');
     if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('uzi_library_user_changed', { detail: { user: '' } }));
       window.dispatchEvent(new CustomEvent('book_library_user_changed', { detail: { user: '' } }));
     }
   } catch (e) {
@@ -71,7 +82,7 @@ export async function apiFetch(input, init = {}) {
 
   // Attach Cognito JWT Bearer token if available
   try {
-    const rawAuth = localStorage.getItem('book_library_auth');
+    const rawAuth = localStorage.getItem('uzi_library_auth') || localStorage.getItem('book_library_auth');
     if (rawAuth) {
       const auth = JSON.parse(rawAuth);
       const token = auth.id_token || auth.access_token;

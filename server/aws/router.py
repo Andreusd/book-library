@@ -102,7 +102,7 @@ def list_libraries(library_id: Optional[str] = Query(None), user: str = Depends(
             {
                 "id": "default",
                 "name": "Nuvem AWS (S3)",
-                "path": "s3://book-library",
+                "path": "s3://uzi-library",
                 "is_active": True,
                 "folder_count": len(categories),
                 "book_count": len(books),
@@ -288,13 +288,13 @@ def get_tags(library_id: Optional[str] = Query(None), user: str = Depends(get_cu
 @router.get("/settings")
 def get_settings(library_id: Optional[str] = Query(None), user: str = Depends(get_current_user)):
     return {
-        "library_path": "s3://book-library",
+        "library_path": "s3://uzi-library",
         "show_file_extension": False,
         "libraries": [
             {
                 "id": "default",
                 "name": "Nuvem AWS (S3)",
-                "path": "s3://book-library"
+                "path": "s3://uzi-library"
             }
         ],
         "active_library_id": "default"

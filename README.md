@@ -1,4 +1,4 @@
-# 📚 Digital Library / Biblioteca Digital
+# 📚 Uzi Library
 
 A modern, fast, responsive, and lightweight web application to organize, browse, and read your personal collection of PDF books.
 

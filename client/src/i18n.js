@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState } from 'react';
 const translations = {
   en: {
     // Sidebar
-    appTitle: 'Digital Library',
+    appTitle: 'Uzi Library',
     shelfCount: '{books} books • {folders} categories',
     filterShelvesPlaceholder: 'Filter categories...',
     allShelves: 'Home',
@@ -64,7 +64,7 @@ const translations = {
     noBooksFound: 'No books found',
     noBooksDesc: "We couldn't find any books matching your search or in this category.",
     clearSearch: 'Clear search',
-    setupPromptTitle: 'Welcome to Digital Library',
+    setupPromptTitle: 'Welcome to Uzi Library',
     setupPromptDesc: 'Your cloud library is empty. Upload books to get started.',
     configureLibrary: 'Upload Books',
 
@@ -310,7 +310,7 @@ const translations = {
     switchingLibrary: 'Switching library...',
     languageLabel: 'Interface Language',
     libraryPathLabel: 'Cloud Storage Location',
-    libraryPathPlaceholder: 'e.g. s3://book-library-storage',
+    libraryPathPlaceholder: 'e.g. s3://uzi-library-storage',
     libraryPathHelp: 'Books (.pdf, .epub) are stored in Amazon S3 and indexed in DynamoDB.',
     validFolder: 'Connected: {books} books across {folders} categories',
     noPdfsFound: 'Storage connected, but no books found',
@@ -411,7 +411,7 @@ const translations = {
   },
   pt: {
     // Sidebar
-    appTitle: 'Biblioteca Digital',
+    appTitle: 'Uzi Library',
     shelfCount: '{books} livros • {folders} categorias',
     filterShelvesPlaceholder: 'Filtrar categorias...',
     allShelves: 'Início',
@@ -472,7 +472,7 @@ const translations = {
     noBooksFound: 'Nenhum livro encontrado',
     noBooksDesc: 'Não encontramos nenhum livro correspondente à sua busca ou nesta categoria.',
     clearSearch: 'Limpar pesquisa',
-    setupPromptTitle: 'Bem-vindo à Biblioteca Digital',
+    setupPromptTitle: 'Bem-vindo à Uzi Library',
     setupPromptDesc: 'Sua biblioteca na nuvem está vazia. Faça upload de livros para começar.',
     configureLibrary: 'Fazer Upload de Livros',
 
@@ -718,7 +718,7 @@ const translations = {
     switchingLibrary: 'Alternando biblioteca...',
     languageLabel: 'Idioma da Interface',
     libraryPathLabel: 'Local de Armazenamento na Nuvem',
-    libraryPathPlaceholder: 'Ex: s3://book-library-storage',
+    libraryPathPlaceholder: 'Ex: s3://uzi-library-storage',
     libraryPathHelp: 'Os livros (.pdf, .epub) são armazenados no Amazon S3 e indexados no DynamoDB.',
     validFolder: 'Conectado: {books} livros em {folders} categorias',
     noPdfsFound: 'Armazenamento conectado, mas nenhum livro foi encontrado',
@@ -819,7 +819,7 @@ const translations = {
   },
   es: {
     // Sidebar
-    appTitle: 'Biblioteca Digital',
+    appTitle: 'Uzi Library',
     shelfCount: '{books} libros • {folders} carpetas',
     filterShelvesPlaceholder: 'Filtrar carpetas...',
     allShelves: 'Inicio',
@@ -880,7 +880,7 @@ const translations = {
     noBooksFound: 'No se encontraron libros',
     noBooksDesc: 'No pudimos encontrar libros que coincidan con tu búsqueda o en esta carpeta.',
     clearSearch: 'Limpiar búsqueda',
-    setupPromptTitle: 'Bienvenido a la Biblioteca Digital',
+    setupPromptTitle: 'Bienvenido a Uzi Library',
     setupPromptDesc: 'Para comenzar, configura la carpeta donde se encuentran tus libros en PDF o EPUB.',
     configureLibrary: 'Configurar carpeta de biblioteca',
 
@@ -1227,9 +1227,9 @@ const translations = {
   },
   fr: {
     // Sidebar
-    appTitle: 'Bibliothèque Numérique',
+    appTitle: 'Uzi Library',
     shelfCount: '{books} livres • {folders} dossiers',
-    filterShelvesPlaceholder: 'Filtrer les dossiers...',
+    filterShelvesPlaceholder: 'Filtrar les dossiers...',
     allShelves: 'Accueil',
     allBooks: 'Accueil',
     categories: 'Dossiers ({count})',
@@ -1288,7 +1288,7 @@ const translations = {
     noBooksFound: 'Aucun livre trouvé',
     noBooksDesc: 'Aucun livre ne correspond à votre recherche ou dans ce dossier.',
     clearSearch: 'Effacer la recherche',
-    setupPromptTitle: 'Bienvenue dans la Bibliothèque Numérique',
+    setupPromptTitle: 'Bienvenue dans Uzi Library',
     setupPromptDesc: 'Pour commencer, configurez le dossier où se trouvent vos livres PDF ou EPUB.',
     configureLibrary: 'Configurer le dossier bibliothèque',
 
@@ -1639,13 +1639,13 @@ const I18nContext = createContext(null);
 
 export function I18nProvider({ children }) {
   const [lang, setLangState] = useState(() => {
-    return localStorage.getItem('book_library_lang') || 'en';
+    return localStorage.getItem('uzi_library_lang') || localStorage.getItem('book_library_lang') || 'en';
   });
 
   const setLang = (newLang) => {
     if (['en', 'pt', 'es', 'fr'].includes(newLang)) {
       setLangState(newLang);
-      localStorage.setItem('book_library_lang', newLang);
+      localStorage.setItem('uzi_library_lang', newLang);
     }
   };
 

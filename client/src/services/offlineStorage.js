@@ -3,7 +3,7 @@ Offline-First IndexedDB Storage Service for PDFs, EPUBs, and Covers.
 Uses browser IndexedDB directly with Promise-based API for multi-gigabyte capacity.
 """
 
-const DB_NAME = 'book_library_offline_db';
+const DB_NAME = 'uzi_library_offline_db';
 const DB_VERSION = 1;
 const STORE_BOOKS = 'books_blobs';
 const STORE_COVERS = 'covers_blobs';

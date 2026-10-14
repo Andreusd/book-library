@@ -1,14 +1,14 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Digital Book Library - Serverless FastAPI & Lambda Functions'
+Description: 'Uzi Library - Serverless FastAPI & Lambda Functions'
 
 Parameters:
   CoreStackName:
     Type: String
-    Default: book-library-core-dev
+    Default: uzi-library-core-dev
 
   DeployBucket:
     Type: String
-    Default: book-library-storage-109990058921-us-east-1-dev
+    Default: uzi-library-storage-109990058921-us-east-1-dev
 
   DeployKey:
     Type: String

@@ -11,7 +11,7 @@ CACHE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".cach
 LOOKUPS_CACHE_FILE = os.path.join(CACHE_DIR, "lookups.json")
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-WIKTIONARY_AGENT = "DigitalLibrary/1.0 (https://github.com/Andreusd/book-library; contact@digitallibrary.local)"
+WIKTIONARY_AGENT = "UziLibrary/1.0 (https://github.com/Andreusd/uzi-library; contact@uzilibrary.local)"
 
 def clean_html(raw_html: str) -> str:
     """Removes HTML tags and unescapes HTML entities from text."""

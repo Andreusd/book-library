@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Book Library - Local to AWS S3 & DynamoDB Migration Script.
+Uzi Library - Local to AWS S3 & DynamoDB Migration Script.
 Scans local books, calculates binary SHA-256 hashes, uploads to S3,
 and populates the DynamoDB Single-Table.
 """

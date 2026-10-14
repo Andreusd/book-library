@@ -1,9 +1,9 @@
 @echo off
 setlocal
-title Digital Library - Biblioteca Digital
+title Uzi Library
 
 echo ========================================================
-echo         Iniciando Biblioteca Digital de Livros
+echo         Iniciando Uzi Library
 echo ========================================================
 echo.
 
@@ -52,7 +52,7 @@ for /f "tokens=*" %%a in ('python -c "import socket; s=socket.socket(socket.AF_I
 if /i "%~1"=="dev" goto :dev_mode
 
 echo ========================================================
-echo         Biblioteca Digital pronta!
+echo         Uzi Library pronta!
 echo   - Local [este PC]:            http://localhost:8000
 if defined LAN_IP echo   - Rede [outros dispositivos]: http://%LAN_IP%:8000
 echo ========================================================

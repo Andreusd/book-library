@@ -8,7 +8,7 @@ from PIL import Image
 
 s3_client = boto3.client("s3")
 dynamodb = boto3.resource("dynamodb")
-table_name = os.environ.get("DYNAMODB_TABLE", "BookLibrary")
+table_name = os.environ.get("DYNAMODB_TABLE", "UziLibrary")
 table = dynamodb.Table(table_name)
 COVERS_PREFIX = os.environ.get("COVERS_PREFIX", "covers/")
 

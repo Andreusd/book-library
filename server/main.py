@@ -77,7 +77,7 @@ async def lifespan(app: FastAPI):
     active_cover_mgr.pre_cache_all(all_books)
     yield
 
-app = FastAPI(title="Book Library API", lifespan=lifespan)
+app = FastAPI(title="Uzi Library API", lifespan=lifespan)
 
 # Allow CORS for development Vite server
 app.add_middleware(
