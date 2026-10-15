@@ -5,8 +5,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/Documents/Projects/book-library
-ExecStart=%h/Documents/Projects/book-library/.venv/bin/python -m uvicorn server.main:app --host 0.0.0.0 --port 8000
+WorkingDirectory=%h/Documents/Projects/UziLibrary
+ExecStart=%h/Documents/Projects/UziLibrary/.venv/bin/python -m uvicorn server.main:app --host 0.0.0.0 --port 8000
 Restart=always
 RestartSec=5s
 Environment=PYTHONUNBUFFERED=1
