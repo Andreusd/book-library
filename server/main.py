@@ -1,7 +1,7 @@
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -64,7 +64,7 @@ cover_mgr = get_cover_mgr()
 lookup_mgr = get_lookup_mgr()
 user_mgr = get_user_mgr()
 
-from .tray import start_tray_in_background, stop_tray
+from .tray import start_tray_in_background, stop_tray, record_activity
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -86,6 +86,12 @@ async def lifespan(app: FastAPI):
     stop_tray()
 
 app = FastAPI(title="Uzi Library API", lifespan=lifespan)
+
+# Track client user activity for system tray status (2-minute activity window)
+@app.middleware("http")
+async def track_activity_middleware(request: Request, call_next):
+    record_activity()
+    return await call_next(request)
 
 # Allow CORS for development Vite server
 app.add_middleware(

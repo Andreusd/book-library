@@ -6,6 +6,7 @@ and falls back to pystray on Windows or environments without D-Bus.
 
 import os
 import sys
+import time
 import logging
 import threading
 import subprocess
@@ -20,6 +21,23 @@ ICONS_DIR = str(PROJECT_ROOT / "icons")
 ICON_PNG = PROJECT_ROOT / "icons" / "uzi-library.png"
 ICON_ICO = PROJECT_ROOT / "icons" / "uzi-library.ico"
 ICON_ACTIVE = PROJECT_ROOT / "icons" / "uzi-library-active.png"
+
+# Activity tracking (timeout: 2 minutes / 120 seconds)
+_LAST_ACTIVITY_TIME = 0.0
+ACTIVITY_TIMEOUT_SECONDS = 120.0
+
+
+def record_activity():
+    """Record an interaction/request with Uzi Library."""
+    global _LAST_ACTIVITY_TIME
+    _LAST_ACTIVITY_TIME = time.time()
+
+
+def is_active(timeout: float = ACTIVITY_TIMEOUT_SECONDS) -> bool:
+    """Return True if an activity happened within the timeout period."""
+    global _LAST_ACTIVITY_TIME
+    return (time.time() - _LAST_ACTIVITY_TIME) < timeout
+
 
 # Check D-Bus availability (Linux native)
 HAS_DBUS = False
@@ -125,8 +143,8 @@ if HAS_DBUS:
         def __init__(self, bus: dbus.Bus, object_path: str, menu_path: str):
             super().__init__(bus, object_path)
             self.menu_path = menu_path
-            self.icon_name = "uzi-library-active"
-            self.title = "Uzi Library: Online"
+            self.icon_name = "uzi-library"
+            self.title = "Uzi Library: Ocioso"
             self.status = "Active"
 
         @dbus.service.method("org.freedesktop.DBus.Properties", in_signature="ss", out_signature="v")
@@ -219,10 +237,14 @@ if HAS_DBUS:
             empty_props = dbus.Dictionary({}, signature="sv")
 
             # 1. Header (Title)
+            active = is_active(ACTIVITY_TIMEOUT_SECONDS)
+            status_text = "Em Uso" if active else "Ocioso"
+            status_bullet = "🟢" if active else "⚪"
+
             items.append((
                 dbus.Int32(item_id),
                 dbus.Dictionary({
-                    "label": dbus.String("📖 Uzi Library: Online", variant_level=1),
+                    "label": dbus.String(f"📖 Uzi Library ({status_text})", variant_level=1),
                     "enabled": dbus.Boolean(False, variant_level=1),
                 }, signature="sv"),
                 empty_children
@@ -233,7 +255,7 @@ if HAS_DBUS:
             items.append((
                 dbus.Int32(item_id),
                 dbus.Dictionary({
-                    "label": dbus.String(f"    🟢 Local: http://localhost:{self.app.port}", variant_level=1),
+                    "label": dbus.String(f"    {status_bullet} http://localhost:{self.app.port}", variant_level=1),
                     "enabled": dbus.Boolean(False, variant_level=1),
                 }, signature="sv"),
                 empty_children
@@ -366,7 +388,11 @@ if HAS_DBUS:
                 self.bus,
             )
 
+            self.is_active_state = False
             self.register_tray()
+
+            # Poll every 2 seconds for active user requests
+            GLib.timeout_add_seconds(2, self.periodic_check)
 
         def register_tray(self):
             for watcher_name in ["org.kde.StatusNotifierWatcher", "org.ayatana.StatusNotifierWatcher"]:
@@ -378,6 +404,23 @@ if HAS_DBUS:
                 except Exception:
                     pass
             logger.debug("StatusNotifierWatcher registration handled by AppIndicator bus scanner.")
+
+        def periodic_check(self):
+            self.refresh_state()
+            return True
+
+        def refresh_state(self):
+            active = is_active(ACTIVITY_TIMEOUT_SECONDS)
+            if active != self.is_active_state:
+                self.is_active_state = active
+                if active:
+                    icon = "uzi-library-active"
+                    title = "Uzi Library: Em Uso"
+                else:
+                    icon = "uzi-library"
+                    title = "Uzi Library: Ocioso"
+                self.sni.update_icon(icon, title)
+                self.menu.notify_update()
 
         def run(self):
             self.loop = GLib.MainLoop()
@@ -397,31 +440,59 @@ class WindowsTrayApp:
     def __init__(self, port: int = 8000):
         self.port = port
         self.icon = None
+        self.running = False
+        self.is_active_state = False
+
+    def _monitor_loop(self, icon_clean, icon_active):
+        while self.running:
+            time.sleep(2)
+            active = is_active(ACTIVITY_TIMEOUT_SECONDS)
+            if active != self.is_active_state:
+                self.is_active_state = active
+                if self.icon:
+                    try:
+                        self.icon.icon = icon_active if active else icon_clean
+                        self.icon.title = f"Uzi Library: {'Em Uso' if active else 'Ocioso'}"
+                    except Exception as e:
+                        logger.debug("Failed to update Windows tray icon: %s", e)
 
     def run(self):
         if not HAS_PYSTRAY:
             logger.warning("pystray not installed; skipping Windows system tray.")
             return
 
-        icon_image = None
+        icon_clean = None
+        icon_active = None
         if ICON_ICO.exists():
             try:
-                icon_image = Image.open(str(ICON_ICO))
+                icon_clean = Image.open(str(ICON_ICO))
             except Exception:
                 pass
-        if not icon_image and ICON_PNG.exists():
+        if not icon_clean and ICON_PNG.exists():
             try:
-                icon_image = Image.open(str(ICON_PNG))
+                icon_clean = Image.open(str(ICON_PNG))
             except Exception:
                 pass
 
-        if not icon_image:
+        if ICON_ACTIVE.exists():
+            try:
+                icon_active = Image.open(str(ICON_ACTIVE))
+            except Exception:
+                pass
+        if not icon_active:
+            icon_active = icon_clean
+
+        if not icon_clean:
             logger.warning("No icon image found for tray.")
             return
 
+        self.running = True
+        monitor_thread = threading.Thread(target=self._monitor_loop, args=(icon_clean, icon_active), daemon=True)
+        monitor_thread.start()
+
         menu = pystray.Menu(
-            pystray.MenuItem("📖 Uzi Library: Online", None, enabled=False),
-            pystray.MenuItem(f"    🟢 Local: http://localhost:{self.port}", None, enabled=False),
+            pystray.MenuItem("📖 Uzi Library", None, enabled=False),
+            pystray.MenuItem(f"    Local: http://localhost:{self.port}", None, enabled=False),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("🌐 Abrir no Navegador", lambda: open_web_ui(f"http://localhost:{self.port}"), default=True),
             pystray.MenuItem("📁 Abrir Pasta de Livros", open_library_folder),
@@ -429,10 +500,11 @@ class WindowsTrayApp:
             pystray.MenuItem("⏹️ Encerrar", self.stop),
         )
 
-        self.icon = pystray.Icon("uzi-library", icon_image, "Uzi Library", menu)
+        self.icon = pystray.Icon("uzi-library", icon_clean, "Uzi Library: Ocioso", menu)
         self.icon.run()
 
     def stop(self):
+        self.running = False
         if self.icon:
             self.icon.stop()
 
