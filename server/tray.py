@@ -144,7 +144,7 @@ if HAS_DBUS:
             super().__init__(bus, object_path)
             self.menu_path = menu_path
             self.icon_name = "uzi-library"
-            self.title = "Uzi Library: Ocioso"
+            self.title = "Uzi Library: Idle"
             self.status = "Active"
 
         @dbus.service.method("org.freedesktop.DBus.Properties", in_signature="ss", out_signature="v")
@@ -238,7 +238,7 @@ if HAS_DBUS:
 
             # 1. Header (Title)
             active = is_active(ACTIVITY_TIMEOUT_SECONDS)
-            status_text = "Em Uso" if active else "Ocioso"
+            status_text = "Active" if active else "Idle"
             status_bullet = "🟢" if active else "⚪"
 
             items.append((
@@ -276,7 +276,7 @@ if HAS_DBUS:
             items.append((
                 dbus.Int32(item_id),
                 dbus.Dictionary({
-                    "label": dbus.String("🌐 Abrir no Navegador (Web UI)", variant_level=1),
+                    "label": dbus.String("🌐 Open Web UI (Browser)", variant_level=1),
                     "enabled": dbus.Boolean(True, variant_level=1),
                 }, signature="sv"),
                 empty_children
@@ -289,7 +289,7 @@ if HAS_DBUS:
             items.append((
                 dbus.Int32(item_id),
                 dbus.Dictionary({
-                    "label": dbus.String("📁 Abrir Pasta de Livros", variant_level=1),
+                    "label": dbus.String("📁 Open Books Folder", variant_level=1),
                     "enabled": dbus.Boolean(True, variant_level=1),
                 }, signature="sv"),
                 empty_children
@@ -310,7 +310,7 @@ if HAS_DBUS:
             items.append((
                 dbus.Int32(item_id),
                 dbus.Dictionary({
-                    "label": dbus.String("📋 Ver Logs em Tempo Real", variant_level=1),
+                    "label": dbus.String("📋 View Live Logs (Terminal)", variant_level=1),
                     "enabled": dbus.Boolean(True, variant_level=1),
                 }, signature="sv"),
                 empty_children
@@ -323,7 +323,7 @@ if HAS_DBUS:
             items.append((
                 dbus.Int32(item_id),
                 dbus.Dictionary({
-                    "label": dbus.String("🔄 Reiniciar Servico", variant_level=1),
+                    "label": dbus.String("🔄 Restart Library Service", variant_level=1),
                     "enabled": dbus.Boolean(True, variant_level=1),
                 }, signature="sv"),
                 empty_children
@@ -336,7 +336,7 @@ if HAS_DBUS:
             items.append((
                 dbus.Int32(item_id),
                 dbus.Dictionary({
-                    "label": dbus.String("⏹️ Parar Servico", variant_level=1),
+                    "label": dbus.String("⏹️ Stop Library Service", variant_level=1),
                     "enabled": dbus.Boolean(True, variant_level=1),
                 }, signature="sv"),
                 empty_children
@@ -415,10 +415,10 @@ if HAS_DBUS:
                 self.is_active_state = active
                 if active:
                     icon = "uzi-library-active"
-                    title = "Uzi Library: Em Uso"
+                    title = "Uzi Library: Active"
                 else:
                     icon = "uzi-library"
-                    title = "Uzi Library: Ocioso"
+                    title = "Uzi Library: Idle"
                 self.sni.update_icon(icon, title)
                 self.menu.notify_update()
 
@@ -452,7 +452,7 @@ class WindowsTrayApp:
                 if self.icon:
                     try:
                         self.icon.icon = icon_active if active else icon_clean
-                        self.icon.title = f"Uzi Library: {'Em Uso' if active else 'Ocioso'}"
+                        self.icon.title = f"Uzi Library: {'Active' if active else 'Idle'}"
                     except Exception as e:
                         logger.debug("Failed to update Windows tray icon: %s", e)
 
@@ -494,13 +494,13 @@ class WindowsTrayApp:
             pystray.MenuItem("📖 Uzi Library", None, enabled=False),
             pystray.MenuItem(f"    Local: http://localhost:{self.port}", None, enabled=False),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("🌐 Abrir no Navegador", lambda: open_web_ui(f"http://localhost:{self.port}"), default=True),
-            pystray.MenuItem("📁 Abrir Pasta de Livros", open_library_folder),
+            pystray.MenuItem("🌐 Open Web UI (Browser)", lambda: open_web_ui(f"http://localhost:{self.port}"), default=True),
+            pystray.MenuItem("📁 Open Books Folder", open_library_folder),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("⏹️ Encerrar", self.stop),
+            pystray.MenuItem("⏹️ Exit / Stop Service", self.stop),
         )
 
-        self.icon = pystray.Icon("uzi-library", icon_clean, "Uzi Library: Ocioso", menu)
+        self.icon = pystray.Icon("uzi-library", icon_clean, "Uzi Library: Idle", menu)
         self.icon.run()
 
     def stop(self):
