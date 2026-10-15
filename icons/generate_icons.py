@@ -11,8 +11,13 @@ ICONS_DIR = Path(__file__).resolve().parent
 def draw_book_surface(size=24, badge_color=None, symbolic=False):
     surf = cairo.ImageSurface(cairo.FORMAT_ARGB32, size, size)
     ctx = cairo.Context(surf)
-    scale = size / 24.0
-    ctx.scale(scale, scale)
+    base_scale = size / 24.0
+    ctx.scale(base_scale, base_scale)
+
+    # Scale and center to match the visual footprint of Crab (24x23) and Plex (23x23)
+    ctx.translate(12.0, 11.5)
+    ctx.scale(1.22, 1.22)
+    ctx.translate(-12.0, -12.0)
 
     ctx.set_line_cap(cairo.LINE_CAP_ROUND)
     ctx.set_line_join(cairo.LINE_JOIN_ROUND)
