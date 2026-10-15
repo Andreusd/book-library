@@ -27,6 +27,35 @@ Open your browser at:
 
 ---
 
+## 🔔 Inicialização com o Computador & Ícone na Bandeja (System Tray)
+
+O **Uzi Library** inclui suporte a ícone na bandeja do sistema (system tray) com o ícone de um livro aberto, além de scripts para iniciar automaticamente junto com o computador no Linux e no Windows:
+
+### 🐧 Linux (systemd user service)
+Para configurar para bootar automaticamente junto com o sistema:
+```bash
+./scripts/install-service.sh
+```
+* **Bandeja Nativa**: Integração com GNOME Shell, KDE Plasma e Wayland via StatusNotifierItem/AppIndicator.
+* **Ações na Bandeja**: Abrir no navegador, abrir pasta de livros, ver logs em tempo real (`journalctl`), reiniciar ou parar o serviço.
+* **Comandos úteis**:
+  ```bash
+  systemctl --user status uzi-library.service
+  systemctl --user restart uzi-library.service
+  systemctl --user stop uzi-library.service
+  ```
+
+### 🪟 Windows (Startup Shortcut & Tray)
+Para iniciar automaticamente com o Windows em segundo plano:
+1. Execute o script:
+   ```cmd
+   scripts\install_windows_startup.bat
+   ```
+2. O atalho é criado na pasta de Inicialização do Windows (`%APPDATA%\...\Startup`), rodando de forma silenciosa com o ícone do livro na bandeja do sistema (Taskbar Notification Area).
+3. Para desativar a inicialização automática, execute `scripts\uninstall_windows_startup.bat`.
+
+---
+
 ## ⚙️ Library Folder Configuration / Configuração da Pasta de Livros
 
 You can point the application to **any folder on your computer** where your PDF books are stored:

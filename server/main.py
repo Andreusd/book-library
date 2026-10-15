@@ -64,6 +64,8 @@ cover_mgr = get_cover_mgr()
 lookup_mgr = get_lookup_mgr()
 user_mgr = get_user_mgr()
 
+from .tray import start_tray_in_background, stop_tray
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Pre-cache covers for all configured libraries on startup
@@ -75,7 +77,13 @@ async def lifespan(app: FastAPI):
         all_books.extend(lib_books)
     print(f"Discovered {len(all_books)} books across {len(active_scanner.config_mgr.get_libraries())} libraries.")
     active_cover_mgr.pre_cache_all(all_books)
+
+    # Start system tray indicator in background
+    start_tray_in_background(port=8000)
+
     yield
+
+    stop_tray()
 
 app = FastAPI(title="Uzi Library API", lifespan=lifespan)
 

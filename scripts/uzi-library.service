@@ -1,0 +1,16 @@
+[Unit]
+Description=Uzi Library Web Service & Tray Indicator
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Documents/Projects/book-library
+ExecStart=%h/Documents/Projects/book-library/.venv/bin/python -m uvicorn server.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5s
+Environment=PYTHONUNBUFFERED=1
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+
+[Install]
+WantedBy=default.target
