@@ -1,4 +1,4 @@
-# 📚 Digital Library / Biblioteca Digital
+# 📚 Uzi Library
 
 A modern, fast, responsive, and lightweight web application to organize, browse, and read your personal collection of PDF books.
 
@@ -10,6 +10,11 @@ A modern, fast, responsive, and lightweight web application to organize, browse,
 Double click:
 ```cmd
 run.bat
+```
+
+### Linux / macOS
+```bash
+./run.sh
 ```
 
 ### Terminal

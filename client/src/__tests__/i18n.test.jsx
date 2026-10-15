@@ -30,7 +30,7 @@ describe('i18n', () => {
       </I18nProvider>
     );
 
-    expect(screen.getByTestId('translated').textContent).toBe('Digital Library');
+    expect(screen.getByTestId('translated').textContent).toBe('Uzi Library');
     expect(screen.getByTestId('current-lang').textContent).toBe('en');
   });
 
@@ -59,8 +59,8 @@ describe('i18n', () => {
     });
 
     expect(screen.getByTestId('current-lang').textContent).toBe('pt');
-    expect(screen.getByTestId('translated').textContent).toBe('Biblioteca Digital');
-    expect(localStorage.getItem('book_library_lang')).toBe('pt');
+    expect(screen.getByTestId('translated').textContent).toBe('Uzi Library');
+    expect(localStorage.getItem('uzi_library_lang')).toBe('pt');
   });
 
   it('returns key itself when key does not exist', () => {

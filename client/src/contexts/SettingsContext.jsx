@@ -119,8 +119,12 @@ export function SettingsProvider({ children }) {
     const handleUserChanged = (e) => {
       setCurrentUserState((e.detail?.user || '').trim());
     };
+    window.addEventListener('uzi_library_user_changed', handleUserChanged);
     window.addEventListener('book_library_user_changed', handleUserChanged);
-    return () => window.removeEventListener('book_library_user_changed', handleUserChanged);
+    return () => {
+      window.removeEventListener('uzi_library_user_changed', handleUserChanged);
+      window.removeEventListener('book_library_user_changed', handleUserChanged);
+    };
   }, []);
 
   const value = {

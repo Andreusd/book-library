@@ -38,7 +38,7 @@ export function useEpubTheme({ book, mode, onModeChange, renditionRef, viewerRef
       if (savedInvert === 'true') return 'dark';
     } catch {}
     if (book?.progress?.invert_colors) return 'dark';
-    return 'dark'; // default dark mode matching Digital Library aesthetics
+    return 'dark'; // default dark mode matching Uzi Library aesthetics
   });
 
   const themeRef = useRef(theme);

@@ -4,11 +4,11 @@
 
 export * from './types';
 
-export const USER_STORAGE_KEY = 'book_library_user';
+export const USER_STORAGE_KEY = 'uzi_library_user';
 
 export function getCurrentUser() {
   try {
-    return (localStorage.getItem(USER_STORAGE_KEY) || '').trim();
+    return (localStorage.getItem(USER_STORAGE_KEY) || localStorage.getItem('book_library_user') || '').trim();
   } catch {
     return '';
   }
@@ -21,9 +21,11 @@ export function setCurrentUser(username) {
       localStorage.setItem(USER_STORAGE_KEY, clean);
     } else {
       localStorage.removeItem(USER_STORAGE_KEY);
+      localStorage.removeItem('book_library_user');
     }
     // Dispatch event to notify any active components
     if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('uzi_library_user_changed', { detail: { user: clean } }));
       window.dispatchEvent(new CustomEvent('book_library_user_changed', { detail: { user: clean } }));
     }
   } catch (e) {

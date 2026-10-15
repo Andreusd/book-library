@@ -49,7 +49,7 @@ describe('Sidebar component', () => {
 
   it('renders library title, total book and shelf counts', () => {
     renderSidebar();
-    expect(screen.getByText('Digital Library')).toBeInTheDocument();
+    expect(screen.getByText('Uzi Library')).toBeInTheDocument();
     expect(screen.getByText('12 books • 2 folders')).toBeInTheDocument();
   });
 
