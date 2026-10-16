@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Settings, Folder, CheckCircle, AlertCircle, AlertTriangle, 
-  X, Plus, Trash2, Edit3, Check, Globe, ShieldCheck, ArrowRight, Sliders
+  X, Plus, Trash2, Edit3, Check, Globe, ShieldCheck, ArrowRight, Sliders, RefreshCw
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 import { FlagUS, FlagBR, FlagES, FlagFR } from './FlagIcons';
@@ -95,6 +95,11 @@ export default function SettingsModal({
 
   // Deleting library state
   const [deletingId, setDeletingId] = useState(null);
+
+  // Rescan state
+  const [rescanning, setRescanning] = useState(false);
+  const [rescanningLibId, setRescanningLibId] = useState(null);
+  const [rescanFeedback, setRescanFeedback] = useState(null);
 
   const debounceAddRef = useRef(null);
   const debounceEditRef = useRef(null);
@@ -340,6 +345,61 @@ export default function SettingsModal({
     });
   };
 
+  // Rescan Library (Active, Specific, or All)
+  const handleRescan = (targetLibId = null) => {
+    if (targetLibId) {
+      setRescanningLibId(targetLibId);
+    } else {
+      setRescanning(true);
+    }
+    setRescanFeedback(null);
+
+    const url = targetLibId
+      ? `/api/libraries/${encodeURIComponent(targetLibId)}/rescan`
+      : '/api/libraries/rescan';
+
+    fetch(url, { method: 'POST' })
+      .then(res => res.json())
+      .then(data => {
+        if (targetLibId) {
+          setRescanningLibId(null);
+        } else {
+          setRescanning(false);
+        }
+        if (data.status === 'ok') {
+          loadLibraries();
+          if (onLibraryChanged) {
+            onLibraryChanged(activeLibraryId || data.library_id);
+          }
+          const totalBooks = data.books_count !== undefined 
+            ? data.books_count 
+            : (data.stats && Object.values(data.stats).reduce((acc, s) => acc + (s.books || 0), 0));
+          setRescanFeedback({
+            type: 'success',
+            message: t('rescanSuccess', { books: totalBooks ?? 'OK' })
+          });
+          setTimeout(() => setRescanFeedback(null), 4000);
+        } else {
+          setRescanFeedback({
+            type: 'error',
+            message: data.detail || 'Failed to rescan'
+          });
+        }
+      })
+      .catch(err => {
+        console.error('Failed to rescan library:', err);
+        if (targetLibId) {
+          setRescanningLibId(null);
+        } else {
+          setRescanning(false);
+        }
+        setRescanFeedback({
+          type: 'error',
+          message: 'Error communicating with server'
+        });
+      });
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -473,16 +533,44 @@ export default function SettingsModal({
               </div>
 
               {!showAddForm && (
-                <button
-                  type="button"
-                  onClick={() => setShowAddForm(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:bg-amber-500/25 text-xs font-semibold transition cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>{t('addLibrary')}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleRescan()}
+                    disabled={rescanning || rescanningLibId !== null}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700/60 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+                    title={t('rescanLibrary')}
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${rescanning ? 'animate-spin' : ''}`} />
+                    <span>{rescanning ? t('rescanning') : t('rescanLibrary')}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddForm(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:bg-amber-500/25 text-xs font-semibold transition cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{t('addLibrary')}</span>
+                  </button>
+                </div>
               )}
             </div>
+
+            {/* Rescan feedback banner */}
+            {rescanFeedback && (
+              <div className={`p-2.5 rounded-lg border text-xs flex items-center gap-2 animate-in fade-in duration-150 ${
+                rescanFeedback.type === 'success'
+                  ? 'bg-emerald-950/20 border-emerald-500/40 text-emerald-300'
+                  : 'bg-rose-950/20 border-rose-500/40 text-rose-300'
+              }`}>
+                {rescanFeedback.type === 'success' ? (
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                )}
+                <span>{rescanFeedback.message}</span>
+              </div>
+            )}
 
             {/* Add Library Expandable Form */}
             {showAddForm && (
@@ -685,6 +773,16 @@ export default function SettingsModal({
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleRescan(lib.id)}
+                        disabled={rescanningLibId === lib.id || rescanning}
+                        className="p-1.5 text-neutral-400 hover:text-amber-400 hover:bg-neutral-800 rounded-lg transition disabled:opacity-50 cursor-pointer"
+                        title={t('rescanLibrary')}
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${rescanningLibId === lib.id ? 'animate-spin text-amber-400' : ''}`} />
+                      </button>
+
                       {!isActive && (
                         <button
                           type="button"

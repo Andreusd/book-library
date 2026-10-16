@@ -180,6 +180,13 @@ export const librariesApi = {
       method: 'POST',
       body: JSON.stringify({ library_id: libraryId }),
     }),
+
+  rescanLibrary: (libraryId) => {
+    const url = libraryId
+      ? `/api/libraries/${encodeURIComponent(libraryId)}/rescan`
+      : '/api/libraries/rescan';
+    return apiJson(url, { method: 'POST' });
+  },
 };
 
 /**
