@@ -56,6 +56,22 @@ def list_libraries(library_id: Optional[str] = Query(None), scanner: LibraryScan
         "active_library_id": library_id or ""
     }
 
+@router.post("/api/libraries/{library_id}/rescan")
+@router.post("/api/libraries/rescan")
+def rescan_library(library_id: Optional[str] = None, scanner: LibraryScanner = Depends(get_scanner), cover_mgr: CoverManager = Depends(get_cover_mgr)):
+    """Rescans physical files on disk and refreshes the virtual library catalog."""
+    stats = scanner.rescan_library(library_id)
+    books = scanner.get_books(library_id=library_id)
+    cover_mgr.pre_cache_all(books)
+    folders = scanner.get_folders(library_id=library_id)
+    return {
+        "status": "ok",
+        "stats": stats,
+        "library_id": library_id or scanner.config_mgr.get_active_library_id(),
+        "folders_count": len(folders),
+        "books_count": len(books)
+    }
+
 @router.post("/api/libraries")
 def add_library(payload: AddLibraryPayload, scanner: LibraryScanner = Depends(get_scanner), cover_mgr: CoverManager = Depends(get_cover_mgr)):
     """Adds a new library directory path."""
@@ -68,6 +84,7 @@ def add_library(payload: AddLibraryPayload, scanner: LibraryScanner = Depends(ge
         payload.path, 
         set_active=bool(payload.set_active)
     )
+    scanner.invalidate_cache(new_lib["id"])
     new_books = scanner.get_books(library_id=new_lib["id"])
     cover_mgr.pre_cache_all(new_books)
     return {
@@ -90,6 +107,7 @@ def update_library(library_id: str, payload: UpdateLibraryPayload, scanner: Libr
         raise HTTPException(status_code=404, detail="Library not found")
 
     if payload.path:
+        scanner.invalidate_cache(library_id)
         books = scanner.get_books(library_id=library_id)
         cover_mgr.pre_cache_all(books)
 
@@ -106,6 +124,7 @@ def delete_library(library_id: str, scanner: LibraryScanner = Depends(get_scanne
     if not success:
         raise HTTPException(status_code=400, detail="Cannot delete library (not found or only library remaining)")
 
+    scanner.invalidate_cache(library_id)
     return {
         "status": "ok",
         "libraries": scanner.config_mgr.get_libraries(),

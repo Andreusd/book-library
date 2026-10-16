@@ -1,211 +1,73 @@
 import os
-import json
 import threading
 import uuid
 from typing import Dict, Any, Optional, List
+from .database import get_db, Database
 
 CACHE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".cache"))
-CONFIG_FILE = os.path.join(CACHE_DIR, "config.json")
+CONFIG_FILE = os.path.join(CACHE_DIR, "library.db")
 
 class ConfigManager:
-    """Manages multi-library application settings persisted in .cache/config.json."""
+    """Manages multi-library application settings persisted in SQLite library.db."""
 
-    def __init__(self, config_path: str = CONFIG_FILE):
+    def __init__(self, config_path: str = CONFIG_FILE, db: Optional[Database] = None):
         self.config_path = config_path
+        self.db = db or get_db(config_path)
         self._lock = threading.RLock()
-        self._last_mtime = 0.0
-        self._config = self._load()
-        if os.path.exists(self.config_path):
-            try:
-                self._last_mtime = os.path.getmtime(self.config_path)
-            except Exception:
-                pass
-
-    def _reload_if_changed(self):
-        try:
-            if os.path.exists(self.config_path):
-                m = os.path.getmtime(self.config_path)
-                if m > self._last_mtime:
-                    self._config = self._load()
-                    self._last_mtime = m
-        except Exception:
-            pass
-
-    def _load(self) -> Dict[str, Any]:
-        data = {}
-        if os.path.exists(self.config_path):
-            try:
-                with open(self.config_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-            except Exception as e:
-                print(f"Error loading config: {e}")
-        return self._migrate_and_normalize(data)
-
-    def _migrate_and_normalize(self, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Ensures the config has the multi-library structure with automated backward-compatibility."""
-        libraries = config.get("libraries")
-        if not isinstance(libraries, list):
-            libraries = []
-
-        # Check for legacy single library_path
-        legacy_path = config.get("library_path", "").strip()
-        if not libraries and legacy_path:
-            norm_path = os.path.abspath(os.path.expanduser(legacy_path))
-            base_name = os.path.basename(norm_path.rstrip("/\\")) or "Default Library"
-            libraries.append({
-                "id": "default",
-                "name": base_name,
-                "path": norm_path,
-            })
-        elif not libraries:
-            # Check environment variable and candidate directories
-            env_path = os.environ.get("BOOK_LIBRARY_PATH", "").strip()
-            candidates = [
-                env_path,
-                os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "books")),
-                os.path.expanduser("~/Books"),
-                os.path.expanduser("~/Documents/Books"),
-            ]
-            for c in candidates:
-                if c and os.path.isdir(c):
-                    norm_c = os.path.abspath(os.path.expanduser(c))
-                    base_name = os.path.basename(norm_c.rstrip("/\\")) or "Default Library"
-                    libraries.append({
-                        "id": "default",
-                        "name": base_name,
-                        "path": norm_c,
-                    })
-                    break
-
-        config["libraries"] = libraries
-        # Active library is NO LONGER persisted in config.json
-        config.pop("active_library_id", None)
-        config.pop("library_path", None)
-
-        # Display preference: show file extension badges (EPUB, PDF)
-        if "show_file_extension" not in config:
-            config["show_file_extension"] = True
-
-        # Display preference: book opening and closing zoom animations
-        if "book_animations" not in config:
-            config["book_animations"] = True
-
-        return config
-
-    def _save(self):
-        os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
-        try:
-            # Ensure active_library_id and library_path are never persisted to disk
-            save_data = {k: v for k, v in self._config.items() if k not in ("active_library_id", "library_path")}
-            with open(self.config_path, "w", encoding="utf-8") as f:
-                json.dump(save_data, f, indent=2, ensure_ascii=False)
-            if os.path.exists(self.config_path):
-                self._last_mtime = os.path.getmtime(self.config_path)
-        except Exception as e:
-            print(f"Error saving config: {e}")
+        self._runtime_active_id = ""
 
     def get_libraries(self) -> List[Dict[str, Any]]:
-        """Returns list of all configured libraries."""
         with self._lock:
-            self._reload_if_changed()
-            return [dict(lib) for lib in self._config.get("libraries", [])]
+            return self.db.get_libraries()
 
     def get_active_library_id(self) -> str:
-        """Returns the in-memory active library ID (not persisted across restarts)."""
         with self._lock:
             return getattr(self, "_runtime_active_id", "") or ""
 
     def get_active_library(self) -> Optional[Dict[str, Any]]:
-        """Returns metadata for the currently active library in-memory."""
         with self._lock:
-            self._reload_if_changed()
             active_id = self.get_active_library_id()
             if not active_id:
                 return None
-            for lib in self._config.get("libraries", []):
-                if lib.get("id") == active_id:
-                    return dict(lib)
-            return None
+            return self.db.get_library(active_id)
 
     def get_library_by_id(self, library_id: str) -> Optional[Dict[str, Any]]:
-        """Returns metadata for a specific library by ID."""
         with self._lock:
-            self._reload_if_changed()
-            for lib in self._config.get("libraries", []):
-                if lib.get("id") == library_id:
-                    return dict(lib)
-            return None
+            return self.db.get_library(library_id)
 
     def set_active_library(self, library_id: str) -> bool:
-        """Sets the runtime in-memory active library ID without persisting to config.json."""
         with self._lock:
-            for lib in self._config.get("libraries", []):
-                if lib.get("id") == library_id:
-                    self._runtime_active_id = library_id
-                    return True
+            lib = self.db.get_library(library_id)
+            if lib:
+                self._runtime_active_id = library_id
+                return True
             return False
 
     def add_library(self, name: str, path: str, set_active: bool = False) -> Dict[str, Any]:
-        """Adds a new library directory path."""
         with self._lock:
             clean_path = os.path.abspath(os.path.expanduser(path.strip()))
             clean_name = name.strip() or os.path.basename(clean_path.rstrip("/\\")) or "Books"
-            libraries = self._config.get("libraries", [])
-            
+            libraries = self.db.get_libraries()
             lib_id = "default" if not libraries else f"lib_{uuid.uuid4().hex[:8]}"
-            new_lib = {
-                "id": lib_id,
-                "name": clean_name,
-                "path": clean_path,
-            }
-            libraries.append(new_lib)
-            self._config["libraries"] = libraries
-
+            new_lib = self.db.add_library(lib_id, clean_name, clean_path)
             if set_active:
                 self._runtime_active_id = lib_id
-
-            self._save()
-            return dict(new_lib)
+            return new_lib
 
     def update_library(self, library_id: str, name: Optional[str] = None, path: Optional[str] = None) -> Optional[Dict[str, Any]]:
-        """Updates name or directory path of an existing library."""
         with self._lock:
-            for lib in self._config.get("libraries", []):
-                if lib.get("id") == library_id:
-                    if name is not None and name.strip():
-                        lib["name"] = name.strip()
-                    if path is not None and path.strip():
-                        clean_path = os.path.abspath(os.path.expanduser(path.strip()))
-                        lib["path"] = clean_path
-
-                    self._save()
-                    return dict(lib)
-            return None
+            clean_path = os.path.abspath(os.path.expanduser(path.strip())) if (path and path.strip()) else None
+            return self.db.update_library(library_id, name=name, path=clean_path)
 
     def remove_library(self, library_id: str) -> bool:
-        """Removes a library from configuration. Prevents removing the last library."""
         with self._lock:
-            libraries = self._config.get("libraries", [])
-            if len(libraries) <= 1:
-                return False
-
-            idx_to_remove = next((i for i, l in enumerate(libraries) if l.get("id") == library_id), None)
-            if idx_to_remove is None:
-                return False
-
-            removed = libraries.pop(idx_to_remove)
-            self._config["libraries"] = libraries
-
-            if getattr(self, "_runtime_active_id", "") == library_id:
+            success = self.db.delete_library(library_id)
+            if success and getattr(self, "_runtime_active_id", "") == library_id:
                 self._runtime_active_id = ""
-
-            self._save()
-            return True
+            return success
 
     def get_library_path(self) -> str:
-        """Returns the in-memory active library path or first library path."""
         with self._lock:
-            self._reload_if_changed()
             active = self.get_active_library()
             if active and active.get("path"):
                 return active["path"]
@@ -213,7 +75,6 @@ class ConfigManager:
             return libs[0]["path"] if libs else ""
 
     def set_library_path(self, path: str) -> str:
-        """Sets and persists a library path for the active library (or creates one)."""
         with self._lock:
             clean_path = path.strip()
             if clean_path:
@@ -229,29 +90,19 @@ class ConfigManager:
 
     def get_show_file_extension(self) -> bool:
         """Returns whether file extension badges (EPUB, PDF) should be shown."""
-        with self._lock:
-            self._reload_if_changed()
-            return bool(self._config.get("show_file_extension", True))
+        return bool(self.db.get_setting("show_file_extension", True))
 
     def set_show_file_extension(self, show: bool) -> bool:
         """Saves whether file extension badges should be shown."""
-        with self._lock:
-            self._config["show_file_extension"] = bool(show)
-            self._save()
-            return self._config["show_file_extension"]
+        return bool(self.db.set_setting("show_file_extension", bool(show)))
 
     def get_book_animations(self) -> bool:
         """Returns whether book opening and closing zoom animations are enabled."""
-        with self._lock:
-            self._reload_if_changed()
-            return bool(self._config.get("book_animations", True))
+        return bool(self.db.get_setting("book_animations", True))
 
     def set_book_animations(self, enabled: bool) -> bool:
         """Saves whether book opening and closing zoom animations are enabled."""
-        with self._lock:
-            self._config["book_animations"] = bool(enabled)
-            self._save()
-            return self._config["book_animations"]
+        return bool(self.db.set_setting("book_animations", bool(enabled)))
 
     @staticmethod
     def validate_path(path: str) -> Dict[str, Any]:

@@ -6,9 +6,10 @@ import threading
 import urllib.request
 import urllib.parse
 from typing import Dict, Any, Optional, List
+from .database import get_db, Database
 
 CACHE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".cache"))
-LOOKUPS_CACHE_FILE = os.path.join(CACHE_DIR, "lookups.json")
+LOOKUPS_CACHE_FILE = os.path.join(CACHE_DIR, "library.db")
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 WIKTIONARY_AGENT = "UziLibrary/1.0 (https://github.com/Andreusd/uzi-library; contact@uzilibrary.local)"
@@ -27,39 +28,21 @@ def sanitize_word(raw_word: str) -> str:
     if not raw_word:
         return ""
     w = raw_word.strip()
-    # Strip common enclosing punctuation
     w = re.sub(r'^[^\w\u00C0-\u017F]+|[^\w\u00C0-\u017F]+$', '', w)
     return w.lower()
 
 class LookupManager:
-    """Provides definition and translation services with persistent caching."""
+    """Provides definition and translation services with persistent caching in SQLite."""
 
-    def __init__(self, cache_file: str = LOOKUPS_CACHE_FILE):
+    def __init__(self, cache_file: str = LOOKUPS_CACHE_FILE, db: Optional[Database] = None):
         self.cache_file = cache_file
+        self.db = db or get_db(cache_file)
         self._lock = threading.RLock()
-        self._cache = self._load_cache()
-
-    def _load_cache(self) -> Dict[str, Any]:
-        if os.path.exists(self.cache_file):
-            try:
-                with open(self.cache_file, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except Exception as e:
-                print(f"Error loading lookups cache: {e}")
-        return {"definitions": {}, "translations": {}}
-
-    def _save_cache(self):
-        os.makedirs(os.path.dirname(self.cache_file), exist_ok=True)
-        try:
-            with open(self.cache_file, "w", encoding="utf-8") as f:
-                json.dump(self._cache, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            print(f"Error saving lookups cache: {e}")
 
     def define_word(self, word: str, lang: str = "en") -> Dict[str, Any]:
         """
         Looks up a word definition using Wiktionary, Free Dictionary API, and Datamuse fallback.
-        Results are cached locally.
+        Results are cached in SQLite.
         """
         clean_word = sanitize_word(word)
         if not clean_word:
@@ -67,17 +50,14 @@ class LookupManager:
 
         cache_key = f"{lang.lower()}:{clean_word}"
         with self._lock:
-            cached = self._cache.get("definitions", {}).get(cache_key)
+            cached = self.db.get_lookup("definition", cache_key)
             if cached:
                 return cached
 
         result = self._fetch_definition(clean_word, lang)
         if result and result.get("entries"):
             with self._lock:
-                if "definitions" not in self._cache:
-                    self._cache["definitions"] = {}
-                self._cache["definitions"][cache_key] = result
-                self._save_cache()
+                self.db.set_lookup("definition", cache_key, result)
 
         return result
 
@@ -90,7 +70,6 @@ class LookupManager:
                 if res.status == 200:
                     raw_data = json.loads(res.read().decode("utf-8"))
                     entries = []
-                    # Check requested lang first, then 'en', then whatever is available
                     available_langs = list(raw_data.keys())
                     target_keys = [lang.lower()] if lang.lower() in raw_data else (['en'] if 'en' in raw_data else available_langs[:1])
                     
@@ -118,41 +97,84 @@ class LookupManager:
                         return {
                             "word": word,
                             "language": lang,
-                            "source": "Wiktionary",
-                            "entries": entries
+                            "entries": entries,
+                            "source": "Wiktionary"
                         }
-        except Exception as e:
-            # Fall through to Datamuse or FreeDict
+        except Exception:
             pass
 
-        # 2. Try Datamuse API (fast, reliable English definitions)
+        # 2. Try Free Dictionary API (English primary)
         try:
-            datamuse_url = f"https://api.datamuse.com/words?sp={urllib.parse.quote(word)}&md=dp&max=1"
-            req = urllib.request.Request(datamuse_url, headers={"User-Agent": USER_AGENT})
+            url = f"https://api.dictionaryapi.dev/api/v2/entries/en/{urllib.parse.quote(word)}"
+            req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+            with urllib.request.urlopen(req, timeout=6) as res:
+                if res.status == 200:
+                    data = json.loads(res.read().decode("utf-8"))
+                    if isinstance(data, list) and len(data) > 0:
+                        entry = data[0]
+                        entries = []
+                        phonetic = entry.get("phonetic", "")
+                        for m in entry.get("meanings", []):
+                            pos = m.get("partOfSpeech", "General").capitalize()
+                            defs = []
+                            examples = []
+                            for d in m.get("definitions", []):
+                                d_text = d.get("definition", "")
+                                if d_text and d_text not in defs:
+                                    defs.append(d_text)
+                                ex = d.get("example", "")
+                                if ex and ex not in examples:
+                                    examples.append(ex)
+                            if defs:
+                                entries.append({
+                                    "partOfSpeech": pos,
+                                    "definitions": defs[:4],
+                                    "examples": examples[:2]
+                                })
+                        if entries:
+                            res_dict = {
+                                "word": word,
+                                "language": lang,
+                                "entries": entries,
+                                "source": "FreeDictionaryAPI"
+                            }
+                            if phonetic:
+                                res_dict["phonetic"] = phonetic
+                            return res_dict
+        except Exception:
+            pass
+
+        # 3. Fallback: Datamuse API (definition hints)
+        try:
+            url = f"https://api.datamuse.com/words?sp={urllib.parse.quote(word)}&md=d&max=1"
+            req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
             with urllib.request.urlopen(req, timeout=5) as res:
                 if res.status == 200:
-                    dm_data = json.loads(res.read().decode("utf-8"))
-                    if dm_data and isinstance(dm_data, list) and len(dm_data) > 0:
-                        first = dm_data[0]
-                        defs_raw = first.get("defs", [])
-                        pos_map = {"n": "Noun", "v": "Verb", "adj": "Adjective", "adv": "Adverb", "u": "General"}
-                        grouped: Dict[str, List[str]] = {}
-                        for d in defs_raw:
-                            parts = d.split("\t", 1)
-                            p_key = parts[0].strip() if len(parts) > 1 else "u"
-                            d_text = parts[1].strip() if len(parts) > 1 else parts[0].strip()
-                            pos_name = pos_map.get(p_key, "General")
-                            if pos_name not in grouped:
-                                grouped[pos_name] = []
-                            grouped[pos_name].append(d_text)
-
-                        entries = [{"partOfSpeech": p, "definitions": ds[:3], "examples": []} for p, ds in grouped.items()]
-                        if entries:
+                    data = json.loads(res.read().decode("utf-8"))
+                    if isinstance(data, list) and len(data) > 0:
+                        item = data[0]
+                        raw_defs = item.get("defs", [])
+                        if raw_defs:
+                            pos_map = {"n": "Noun", "v": "Verb", "adj": "Adjective", "adv": "Adverb", "u": "General"}
+                            entries = []
+                            for raw_def in raw_defs:
+                                parts = raw_def.split("\t", 1)
+                                if len(parts) == 2:
+                                    tag, d_text = parts
+                                    pos = pos_map.get(tag, tag.upper())
+                                else:
+                                    pos = "General"
+                                    d_text = raw_def
+                                entries.append({
+                                    "partOfSpeech": pos,
+                                    "definitions": [d_text],
+                                    "examples": []
+                                })
                             return {
                                 "word": word,
-                                "language": "en",
-                                "source": "Datamuse",
-                                "entries": entries
+                                "language": lang,
+                                "entries": entries[:3],
+                                "source": "Datamuse"
                             }
         except Exception:
             pass
@@ -160,35 +182,26 @@ class LookupManager:
         return {
             "word": word,
             "language": lang,
-            "source": "none",
-            "entries": []
+            "entries": [],
+            "error": "not_found"
         }
 
     def translate_text(self, text: str, target_lang: str = "pt", source_lang: str = "auto") -> Dict[str, Any]:
-        """
-        Translates text using Google Translate (dict-chrome-ex client) with fallback to MyMemory.
-        Results are cached locally.
-        """
-        clean_text = text.strip()
+        """Translates text between languages with SQLite persistent caching."""
+        clean_text = (text or "").strip()
         if not clean_text:
-            return {"error": "empty_text", "translated_text": "", "source_lang": source_lang, "target_lang": target_lang}
+            return {"error": "empty_text", "translated_text": "", "original_text": ""}
 
-        target_lang = target_lang.lower().strip()
-        source_lang = source_lang.lower().strip() or "auto"
-        cache_key = f"{source_lang}->{target_lang}:{clean_text}"
-
+        cache_key = f"{source_lang.lower()}:{target_lang.lower()}:{clean_text[:120]}"
         with self._lock:
-            cached = self._cache.get("translations", {}).get(cache_key)
+            cached = self.db.get_lookup("translation", cache_key)
             if cached:
                 return cached
 
         result = self._fetch_translation(clean_text, target_lang, source_lang)
-        if result and result.get("translated_text"):
+        if result and not result.get("error"):
             with self._lock:
-                if "translations" not in self._cache:
-                    self._cache["translations"] = {}
-                self._cache["translations"][cache_key] = result
-                self._save_cache()
+                self.db.set_lookup("translation", cache_key, result)
 
         return result
 
@@ -202,7 +215,6 @@ class LookupManager:
                 if res.status == 200:
                     raw = res.read().decode("utf-8")
                     data = json.loads(raw)
-                    # Expected format: [["Translated text", "detected_lang"]]
                     if isinstance(data, list) and len(data) > 0:
                         first = data[0]
                         if isinstance(first, list) and len(first) > 0:
@@ -215,7 +227,7 @@ class LookupManager:
                                 "target_lang": target_lang,
                                 "source": "Google"
                             }
-        except Exception as e:
+        except Exception:
             pass
 
         # 2. Fallback: MyMemory API

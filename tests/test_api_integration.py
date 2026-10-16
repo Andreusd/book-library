@@ -141,6 +141,14 @@ class TestLibrariesAPI(BaseAPITestCase):
         del_last_resp = self.client.delete(f"/api/libraries/{lib2_id}")
         self.assertEqual(del_last_resp.status_code, 400)
 
+    def test_rescan_library(self):
+        resp = self.client.post("/api/libraries/rescan")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["status"], "ok")
+        self.assertEqual(data["books_count"], 3)
+        self.assertEqual(data["folders_count"], 2)
+
 
 class TestSettingsAPI(BaseAPITestCase):
     def test_get_settings(self):

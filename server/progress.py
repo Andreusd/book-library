@@ -1,58 +1,35 @@
 import os
-import json
 import threading
 from datetime import datetime
 from typing import Dict, Any, Optional, List
+from .database import get_db, Database
 
-DATA_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".cache", "progress.json"))
+CACHE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".cache"))
+DATA_PATH = os.path.join(CACHE_DIR, "library.db")
 
 class ProgressTracker:
-    def __init__(self, data_path: str = DATA_PATH):
+    def __init__(self, data_path: str = DATA_PATH, user_slug: str = "default", db: Optional[Database] = None):
         self.data_path = data_path
-        dir_name = os.path.dirname(self.data_path)
-        if dir_name:
-            os.makedirs(dir_name, exist_ok=True)
+        self.user_slug = user_slug
+        self.db = db or get_db(data_path)
         self._lock = threading.RLock()
-        self._data = self._load()
-
-    def _load(self) -> Dict[str, Any]:
-        if os.path.exists(self.data_path):
-            try:
-                with open(self.data_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    res = {k: v for k, v in data.items() if isinstance(v, dict)}
-                    changed = False
-                    for b_id, item in res.items():
-                        if not item.get("cfi") and item.get("total_pages", 0) > 1 and item.get("page", 0) > 0:
-                            calc = round((item["page"] / item["total_pages"]) * 100, 1)
-                            if abs(item.get("percent", 0.0) - calc) > 0.5:
-                                item["percent"] = calc
-                                changed = True
-                    if changed:
-                        try:
-                            with open(self.data_path, "w", encoding="utf-8") as f_out:
-                                json.dump(res, f_out, indent=2, ensure_ascii=False)
-                        except Exception:
-                            pass
-                    return res
-            except Exception as e:
-                print(f"Error loading progress file: {e}")
-        return {}
-
-    def _save(self):
-        try:
-            with open(self.data_path, "w", encoding="utf-8") as f:
-                json.dump(self._data, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            print(f"Error saving progress file: {e}")
 
     def get_progress(self, book_id: str) -> Optional[Dict[str, Any]]:
         with self._lock:
-            return self._data.get(book_id)
+            return self.db.get_progress(self.user_slug, book_id)
 
-    def set_progress(self, book_id: str, page: int, total_pages: int, zoom: Optional[float] = None, invert_colors: Optional[bool] = None, cfi: Optional[str] = None, percent: Optional[float] = None) -> Dict[str, Any]:
+    def set_progress(
+        self,
+        book_id: str,
+        page: int,
+        total_pages: int,
+        zoom: Optional[float] = None,
+        invert_colors: Optional[bool] = None,
+        cfi: Optional[str] = None,
+        percent: Optional[float] = None
+    ) -> Dict[str, Any]:
         with self._lock:
-            existing = self._data.get(book_id, {})
+            existing = self.db.get_progress(self.user_slug, book_id) or {}
             current_zoom = round(zoom, 2) if zoom is not None else existing.get("zoom", 1.2)
             current_invert = bool(invert_colors) if invert_colors is not None else existing.get("invert_colors", False)
             current_cfi = cfi if cfi is not None else existing.get("cfi")
@@ -71,7 +48,6 @@ class ProgressTracker:
             else:
                 pct = round((page / max(total_pages, 1)) * 100, 1)
 
-            # A book is in progress if read beyond page 1, has cfi, or percent > 0.5%
             is_in_progress = (page > 1) or (pct > 0.5) or (current_cfi is not None and len(current_cfi) > 0)
             if not is_in_progress:
                 record = {
@@ -84,9 +60,7 @@ class ProgressTracker:
                 }
                 if current_cfi:
                     record["cfi"] = current_cfi
-                self._data[book_id] = record
-                self._save()
-                return record
+                return self.db.set_progress_record(self.user_slug, book_id, record)
 
             record = {
                 "page": max(1, page),
@@ -94,47 +68,42 @@ class ProgressTracker:
                 "percent": pct,
                 "zoom": current_zoom,
                 "invert_colors": current_invert,
+                "status": "in_progress",
                 "updated_at": datetime.now().isoformat()
             }
             if current_cfi:
                 record["cfi"] = current_cfi
 
-            self._data[book_id] = record
-            self._save()
-            return record
+            return self.db.set_progress_record(self.user_slug, book_id, record)
 
     def set_zoom(self, book_id: str, zoom: float) -> Dict[str, Any]:
         """Saves preferred zoom for a book, preserving reading progress and night mode."""
         with self._lock:
-            existing = self._data.get(book_id, {
+            existing = self.db.get_progress(self.user_slug, book_id) or {
                 "page": 1,
                 "total_pages": 1,
                 "percent": 0.0,
                 "status": "not_started"
-            })
+            }
             existing["zoom"] = round(zoom, 2)
-            self._data[book_id] = existing
-            self._save()
-            return existing
+            return self.db.set_progress_record(self.user_slug, book_id, existing)
 
     def set_night_mode(self, book_id: str, invert_colors: bool) -> Dict[str, Any]:
         """Saves preferred night reading mode (invert colors) for a book, preserving reading progress and zoom."""
         with self._lock:
-            existing = self._data.get(book_id, {
+            existing = self.db.get_progress(self.user_slug, book_id) or {
                 "page": 1,
                 "total_pages": 1,
                 "percent": 0.0,
                 "status": "not_started"
-            })
+            }
             existing["invert_colors"] = bool(invert_colors)
-            self._data[book_id] = existing
-            self._save()
-            return existing
+            return self.db.set_progress_record(self.user_slug, book_id, existing)
 
     def reset_progress(self, book_id: str) -> Dict[str, Any]:
         """Resets progress to page 1 but preserves preferred zoom, night mode, and total_pages."""
         with self._lock:
-            existing = self._data.get(book_id, {})
+            existing = self.db.get_progress(self.user_slug, book_id) or {}
             zoom = existing.get("zoom", 1.2)
             invert = existing.get("invert_colors", False)
             total_pages = existing.get("total_pages", 1)
@@ -146,14 +115,12 @@ class ProgressTracker:
                 "invert_colors": invert,
                 "status": "not_started"
             }
-            self._data[book_id] = record
-            self._save()
-            return record
+            return self.db.set_progress_record(self.user_slug, book_id, record)
 
     def mark_completed(self, book_id: str, total_pages: int = 1) -> Dict[str, Any]:
         """Marks a book as 100% completed, preserving zoom and night mode."""
         with self._lock:
-            existing = self._data.get(book_id, {})
+            existing = self.db.get_progress(self.user_slug, book_id) or {}
             zoom = existing.get("zoom", 1.2)
             invert = existing.get("invert_colors", False)
             record = {
@@ -165,27 +132,13 @@ class ProgressTracker:
                 "status": "completed",
                 "updated_at": datetime.now().isoformat()
             }
-            self._data[book_id] = record
-            self._save()
-            return record
+            return self.db.set_progress_record(self.user_slug, book_id, record)
 
     def get_all(self) -> Dict[str, Any]:
         with self._lock:
-            return dict(self._data)
+            return self.db.get_all_progress(self.user_slug)
 
     def get_recent(self, limit: int = 8, include_completed: bool = False) -> List[Dict[str, Any]]:
-        """Returns list of book_ids sorted by most recently read, excluding completed books and books on page 1."""
+        """Returns list of books sorted by most recently read."""
         with self._lock:
-            items = []
-            for b_id, info in self._data.items():
-                is_started = info.get("page", 1) > 1 or info.get("percent", 0) > 0.5 or bool(info.get("cfi"))
-                if not is_started:
-                    continue
-                if not include_completed and info.get("percent", 0) >= 100:
-                    continue
-                items.append({
-                    "book_id": b_id,
-                    **info
-                })
-            items.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
-            return items[:limit]
+            return self.db.get_recent_progress(self.user_slug, limit=limit, include_completed=include_completed)

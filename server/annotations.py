@@ -1,98 +1,36 @@
 import os
-import json
 import threading
-import uuid
-from datetime import datetime
 from typing import List, Dict, Any, Optional
+from .database import get_db, Database
 
 CACHE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".cache"))
-ANNOTATIONS_FILE = os.path.join(CACHE_DIR, "annotations.json")
+ANNOTATIONS_FILE = os.path.join(CACHE_DIR, "library.db")
 
 class AnnotationsManager:
-    """Manages reading highlights and comments per book, persisted in .cache/annotations.json."""
+    """Manages reading highlights and comments per book, persisted in SQLite library.db."""
 
-    def __init__(self, storage_path: str = ANNOTATIONS_FILE):
+    def __init__(self, storage_path: str = ANNOTATIONS_FILE, user_slug: str = "default", db: Optional[Database] = None):
         self.storage_path = storage_path
+        self.user_slug = user_slug
+        self.db = db or get_db(storage_path)
         self._lock = threading.RLock()
-        self._data = self._load()
-
-    def _load(self) -> Dict[str, List[Dict[str, Any]]]:
-        if os.path.exists(self.storage_path):
-            try:
-                with open(self.storage_path, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except Exception as e:
-                print(f"Error loading annotations: {e}")
-        return {}
-
-    def _save(self):
-        os.makedirs(os.path.dirname(self.storage_path), exist_ok=True)
-        try:
-            with open(self.storage_path, "w", encoding="utf-8") as f:
-                json.dump(self._data, f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            print(f"Error saving annotations: {e}")
 
     def get_annotations(self, book_id: str) -> List[Dict[str, Any]]:
         """Returns all annotations for a specific book, sorted by page."""
         with self._lock:
-            items = list(self._data.get(book_id, []))
-            items.sort(key=lambda x: (x.get("page", 1), x.get("created_at", "")))
-            return items
+            return self.db.get_annotations(self.user_slug, book_id)
 
     def add_annotation(self, book_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Adds a new highlight or comment for a book."""
         with self._lock:
-            if book_id not in self._data:
-                self._data[book_id] = []
-
-            annotation_id = f"ann_{uuid.uuid4().hex[:12]}"
-            record = {
-                "id": annotation_id,
-                "book_id": book_id,
-                "page": int(data.get("page", 1)),
-                "cfi": data.get("cfi"),
-                "chapter": data.get("chapter"),
-                "text": str(data.get("text", "")).strip(),
-                "color": str(data.get("color", "yellow")),
-                "comment": str(data.get("comment", "")).strip(),
-                "rects": list(data.get("rects", [])),
-                "created_at": datetime.now().isoformat(),
-                "updated_at": datetime.now().isoformat()
-            }
-            self._data[book_id].append(record)
-            self._save()
-            return record
+            return self.db.add_annotation(self.user_slug, book_id, data)
 
     def update_annotation(self, book_id: str, annotation_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Updates an existing annotation's comment or color."""
         with self._lock:
-            if book_id not in self._data:
-                return None
-
-            for item in self._data[book_id]:
-                if item.get("id") == annotation_id:
-                    if "comment" in data:
-                        item["comment"] = str(data["comment"]).strip()
-                    if "color" in data:
-                        item["color"] = str(data["color"])
-                    item["updated_at"] = datetime.now().isoformat()
-                    self._save()
-                    return item
-            return None
+            return self.db.update_annotation(self.user_slug, book_id, annotation_id, data)
 
     def delete_annotation(self, book_id: str, annotation_id: str) -> bool:
         """Deletes an annotation by ID."""
         with self._lock:
-            if book_id not in self._data:
-                return False
-
-            original_len = len(self._data[book_id])
-            self._data[book_id] = [
-                item for item in self._data[book_id]
-                if item.get("id") != annotation_id
-            ]
-            if len(self._data[book_id]) < original_len:
-                self._save()
-                return True
-            return False
+            return self.db.delete_annotation(self.user_slug, book_id, annotation_id)
