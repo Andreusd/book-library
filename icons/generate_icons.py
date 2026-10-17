@@ -14,8 +14,10 @@ def draw_book_surface(size=24, badge_color=None, symbolic=False):
     base_scale = size / 24.0
     ctx.scale(base_scale, base_scale)
 
+    ctx.save()
     # Scale and center to match the visual footprint of Crab (24x23) and Plex (23x23)
-    ctx.translate(12.0, 11.5)
+    # Book geometry center is shifted down (+1.1px) to align visual center of mass with tray peers
+    ctx.translate(12.0, 12.6)
     ctx.scale(1.22, 1.22)
     ctx.translate(-12.0, -12.0)
 
@@ -99,6 +101,8 @@ def draw_book_surface(size=24, badge_color=None, symbolic=False):
         ctx.move_to(14.5, 11.5)
         ctx.line_to(18.0, 11.5)
         ctx.stroke()
+
+    ctx.restore()
 
     # Optional status badge
     if badge_color:
